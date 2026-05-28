@@ -1,0 +1,165 @@
+import React, { useState, useEffect } from 'react';
+import { ToastProvider, useToast } from './components/ToastContext.tsx';
+import LandingPage from './components/LandingPage.tsx';
+import AuthPage from './components/AuthPage.tsx';
+import ResidentDashboard from './components/ResidentDashboard.tsx';
+import AdminDashboard from './components/AdminDashboard.tsx';
+import AmbientBackground from './components/AmbientBackground.tsx';
+import { User } from './types.ts';
+import Chatbot from './components/Chatbot.tsx';
+import MobilePaySimulator from './components/MobilePaySimulator.tsx';
+
+/**
+ * Split Content component to ensure context hooks are safely located under the ToastProvider tree
+ */
+function AppContent() {
+  const { toast } = useToast();
+  
+  // Intercept mobile QR code checkout simulations instantly
+  const isPaySimRoute = window.location.pathname.startsWith('/pay-sim') || window.location.search.includes('pay-sim=');
+  if (isPaySimRoute) {
+    return <MobilePaySimulator />;
+  }
+
+  // App routing views: 'landing' | 'auth'
+  const [currentView, setCurrentView] = useState<'landing' | 'auth'>('landing');
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string>('');
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
+
+  // Restore authenticated session from localStorage
+  useEffect(() => {
+    try {
+      const savedToken = localStorage.getItem('vista_token');
+      const savedUser = localStorage.getItem('vista_user');
+
+      if (savedToken && savedUser) {
+        setToken(savedToken);
+        const parsedUser = JSON.parse(savedUser) as User;
+        
+        // Let's verify token is valid with backend auth me validation check
+        fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${savedToken}` }
+        })
+          .then(async (res) => {
+            const data = await res.json();
+            if (res.ok && data.user) {
+              setUser(data.user);
+              // Save again as refresh
+              localStorage.setItem('vista_user', JSON.stringify(data.user));
+            } else {
+              // Evict stale credentials
+              localStorage.removeItem('vista_token');
+              localStorage.removeItem('vista_user');
+              toast('Session expired. Please sign in again.', 'warning');
+            }
+          })
+          .catch(() => {
+            // Local fallback if server isn't responsive on first millisecond
+            setUser(parsedUser);
+          })
+          .finally(() => {
+            setIsInitializing(false);
+          });
+      } else {
+        setIsInitializing(false);
+      }
+    } catch {
+      setIsInitializing(false);
+    }
+  }, [toast]);
+
+  const handleLoginSuccess = (loggedInUser: User, sessionToken: string) => {
+    setUser(loggedInUser);
+    setToken(sessionToken);
+    localStorage.setItem('vista_token', sessionToken);
+    localStorage.setItem('vista_user', JSON.stringify(loggedInUser));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setToken('');
+    localStorage.removeItem('vista_token');
+    localStorage.removeItem('vista_user');
+    setCurrentView('landing');
+  };
+
+  const handleUpdateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+    localStorage.setItem('vista_user', JSON.stringify(updatedUser));
+  };
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white space-y-4 select-none">
+        <div className="p-3 bg-white/10 border border-white/10 text-emerald-400 rounded-2xl animate-spin backdrop-blur-md">
+          <svg className="h-6 w-6 stroke-emerald-400 fill-none" viewBox="0 0 24 24" strokeWidth="2.5">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25"></circle>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+          </svg>
+        </div>
+        <p className="text-xs uppercase tracking-widest font-mono text-slate-400">Restoring Secure Tunnel...</p>
+      </div>
+    );
+  }
+
+  // Determine shown UI node depending on auth states and routes
+  let viewContent: React.ReactNode;
+
+  if (user && token) {
+    if (user.role === 'admin') {
+      viewContent = (
+        <AdminDashboard 
+          user={user} 
+          token={token} 
+          onLogout={handleLogout} 
+        />
+      );
+    } else {
+      viewContent = (
+        <ResidentDashboard 
+          user={user} 
+          token={token} 
+          onLogout={handleLogout} 
+          onUpdateUser={handleUpdateUser}
+        />
+      );
+    }
+  } else {
+    // Routing for unauthenticated public flow
+    switch (currentView) {
+      case 'auth':
+        viewContent = (
+          <AuthPage 
+            onLoginSuccess={handleLoginSuccess} 
+            onNavigateHome={() => setCurrentView('landing')} 
+          />
+        );
+        break;
+      case 'landing':
+      default:
+        viewContent = (
+          <LandingPage 
+            onLoginClick={() => setCurrentView('auth')} 
+            onBrowseClick={() => setCurrentView('auth')} 
+          />
+        );
+        break;
+    }
+  }
+
+  return (
+    <AmbientBackground>
+      {viewContent}
+      <Chatbot user={user} />
+    </AmbientBackground>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
