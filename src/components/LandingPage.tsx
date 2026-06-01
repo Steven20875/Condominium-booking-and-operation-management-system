@@ -133,7 +133,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
       <section id="hero" className="relative py-20 md:py-32 px-6 overflow-hidden text-white select-none">
         
         {/* Absolute Background Rendering */}
-        <div className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.22] scale-[1.02] mix-blend-multiply" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=2000&q=80')" }} />
+        <div className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.22] scale-[1.02] mix-blend-multiply landing-hero-background" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/60 to-[#0f172a]/20 z-0" />
         
         {/* Subtle decorative lights overlay */}
@@ -246,7 +246,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
             <h2 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight text-white animate-fade-in">
               Fitted With Real-World Management Power
             </h2>
-            <p className="text-slate-350 text-sm max-w-lg mx-auto">
+            <p className="text-slate-400 text-sm max-w-lg mx-auto">
               Our comprehensive system bridges the gap between tenant leisure requirements and property manager oversight.
             </p>
           </div>
@@ -304,7 +304,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
           <div className="space-y-3">
             <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">Live Listings</span>
             <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">Curated Living Spaces</h2>
-            <p className="text-slate-350 text-sm max-w-md">
+            <p className="text-slate-400 text-sm max-w-md">
               View selected units currently available for lease or reservation within One Spatial Iloilo's state-of-the-art building.
             </p>
           </div>
@@ -354,7 +354,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                     </h3>
                   </div>
 
-                  <p className="text-xs text-slate-350 leading-relaxed line-clamp-2 h-8">
+                  <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 h-8">
                     {unit.description}
                   </p>
 
@@ -494,6 +494,8 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
 
           <div className="flex items-center justify-center gap-4">
             <button 
+              type="button"
+              aria-label="Previous testimonial"
               onClick={handlePrevTestimonial}
               className="p-2.5 border border-white/10 hover:bg-white/10 rounded-full transition-all active:scale-[0.9] text-white"
             >
@@ -511,6 +513,8 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
             </div>
 
             <button 
+              type="button"
+              aria-label="Next testimonial"
               onClick={handleNextTestimonial}
               className="p-2.5 border border-white/10 hover:bg-white/10 rounded-full transition-all active:scale-[0.9] text-white"
             >
@@ -678,7 +682,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
 
       {/* FOOTER */}
       <footer className="bg-slate-950 text-slate-400 py-16 px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 border-b border-slate-850 pb-12 mb-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 border-b border-slate-700 pb-12 mb-12">
           
           <div className="md:col-span-5 space-y-4">
             <div className="flex items-center gap-2 text-white">

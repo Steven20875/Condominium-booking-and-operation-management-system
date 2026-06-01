@@ -1,0 +1,494 @@
+{
+  "users": [
+    {
+      "id": "user-admin-1",
+      "email": "admin@condo.com",
+      "password": "admin123",
+      "name": "Sarah Jenkins",
+      "role": "admin",
+      "phone": "+1 (555) 0192-384",
+      "avatarUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
+      "createdAt": "2026-05-28T04:07:00.916Z"
+    },
+    {
+      "id": "user-resident-1",
+      "email": "john@condo.com",
+      "password": "john123",
+      "name": "steven felarca",
+      "role": "resident",
+      "phone": "09127068234",
+      "unitNumber": "Unit 1204",
+      "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80",
+      "createdAt": "2026-05-28T04:07:00.916Z"
+    },
+    {
+      "id": "user-resident-2",
+      "email": "alice@condo.com",
+      "password": "alice123",
+      "name": "Alice Cooper",
+      "role": "resident",
+      "phone": "+1 (555) 0144-555",
+      "unitNumber": "Unit 102",
+      "avatarUrl": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80",
+      "createdAt": "2026-05-28T04:07:00.917Z"
+    }
+  ],
+  "units": [
+    {
+      "id": "unit-101",
+      "name": "The Zenith Suite",
+      "type": "Studio Deluxe",
+      "description": "A luxurious open-flow studio on the 10th floor with custom glass partitions, panoramic metropolitan views, and a private step-out balcony.",
+      "price": 120,
+      "amenities": [
+        "High-speed Wi-Fi",
+        "King Bed",
+        "Smart TV",
+        "Chef Kitchenette",
+        "Rain Shower",
+        "Private Balcony"
+      ],
+      "availability": false,
+      "capacity": 2,
+      "floorNumber": 10,
+      "status": "Booked",
+      "images": [
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"
+      ],
+      "createdAt": "2026-05-28T04:07:00.915Z"
+    },
+    {
+      "id": "unit-102",
+      "name": "The Grand Horizon Penthouse",
+      "type": "Penthouse",
+      "description": "Spanning the top level of the south tower, this ultra-spacious penthouse features double-height ceilings, automated floor-to-ceiling shades, and private plunge pool access.",
+      "price": 350,
+      "amenities": [
+        "Private Pool",
+        "24/7 Concierge",
+        "En-suite Jacuzzi",
+        "Wine Cellar",
+        "Dual Balconies",
+        "Heated Floors",
+        "Super King Bed"
+      ],
+      "availability": false,
+      "capacity": 6,
+      "floorNumber": 24,
+      "status": "Booked",
+      "images": [
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80"
+      ],
+      "createdAt": "2026-05-28T04:07:00.916Z"
+    },
+    {
+      "id": "unit-103",
+      "name": "The Oasis Garden Loft",
+      "type": "1-Bedroom Loft",
+      "description": "Charming duplex loft featuring exposed structural brickwork, reclaimed timber accents, and a lush private garden terrace perfect for morning coffee.",
+      "price": 180,
+      "amenities": [
+        "Garden Terrace",
+        "Exposed Brick Style",
+        "Coffee Station",
+        "Dedicated Workspace",
+        "Smart Locks",
+        "Queen Bed",
+        "In-unit Laundry"
+      ],
+      "availability": true,
+      "capacity": 3,
+      "floorNumber": 4,
+      "status": "Available",
+      "images": [
+        "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800&q=80"
+      ],
+      "createdAt": "2026-05-28T04:07:00.916Z"
+    },
+    {
+      "id": "unit-104",
+      "name": "The Solarium Duplex",
+      "type": "2-Bedroom Suite",
+      "description": "Bathed in glorious natural light, this southwest-facing duplex offers a spectacular layout ideal for small families or business travelers seeking upscale comfort.",
+      "price": 240,
+      "amenities": [
+        "Wraparound Glass",
+        "Kitchen Island",
+        "Home Office Corner",
+        "Walk-in Closet",
+        "Nespresso Machine",
+        "Two Queen Beds",
+        "Bath Tub"
+      ],
+      "availability": true,
+      "capacity": 4,
+      "floorNumber": 15,
+      "status": "Available",
+      "images": [
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80"
+      ],
+      "createdAt": "2026-05-28T04:07:00.916Z"
+    },
+    {
+      "id": "unit-105",
+      "name": "The Crimson Executive Lounge",
+      "type": "Executive Studio",
+      "description": "Sleek, moody minimalist studio designed for corporate leaders. Soundproofed glazing, high-end acoustic systems, and dynamic ambient lighting presets.",
+      "price": 150,
+      "amenities": [
+        "Acoustic Soundproofing",
+        "Curved Monitor Workspace",
+        "RGB Diffused Lighting",
+        "Premium Sound System",
+        "Double Bed"
+      ],
+      "availability": true,
+      "capacity": 2,
+      "floorNumber": 8,
+      "status": "Available",
+      "images": [
+        "https://images.unsplash.com/photo-1502672014263-04e87abe90b3?auto=format&fit=crop&w=800&q=80"
+      ],
+      "createdAt": "2026-05-28T04:07:00.916Z"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "book-kqulwjzp3",
+      "unitId": "unit-101",
+      "unitName": "The Zenith Suite",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "residentEmail": "john@condo.com",
+      "startDate": "2026-06-15",
+      "endDate": "2026-06-18",
+      "totalPrice": 360,
+      "status": "Pending",
+      "guestsCount": 2,
+      "notes": "",
+      "createdAt": "2026-06-01T01:14:17.728Z"
+    },
+    {
+      "id": "book-u03ahqlr1",
+      "unitId": "unit-103",
+      "unitName": "The Oasis Garden Loft",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "residentEmail": "john@condo.com",
+      "startDate": "2026-06-15",
+      "endDate": "2026-06-18",
+      "totalPrice": 540,
+      "status": "Cancelled",
+      "guestsCount": 2,
+      "notes": "",
+      "createdAt": "2026-05-28T04:48:27.988Z"
+    },
+    {
+      "id": "book-1",
+      "unitId": "unit-102",
+      "unitName": "The Grand Horizon Penthouse",
+      "residentId": "user-resident-2",
+      "residentName": "Alice Cooper",
+      "residentEmail": "alice@condo.com",
+      "startDate": "2026-06-01",
+      "endDate": "2026-06-10",
+      "totalPrice": 3150,
+      "status": "Approved",
+      "guestsCount": 4,
+      "notes": "Please arrange airport pickup if possible.",
+      "createdAt": "2026-05-28T04:07:00.917Z"
+    },
+    {
+      "id": "book-2",
+      "unitId": "unit-101",
+      "unitName": "The Zenith Suite",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "residentEmail": "john@condo.com",
+      "startDate": "2026-06-15",
+      "endDate": "2026-06-18",
+      "totalPrice": 360,
+      "status": "Approved",
+      "guestsCount": 2,
+      "notes": "Celebrating marriage anniversary.",
+      "createdAt": "2026-05-28T04:07:00.917Z"
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay-jz1yjojgj",
+      "bookingId": "manual",
+      "residentId": "user-resident-2",
+      "residentName": "Alice Cooper",
+      "unitName": "Periodic Association Dues",
+      "amount": 200,
+      "status": "Pending",
+      "method": "Credit Card",
+      "referenceNumber": "TXN-GEN-SSJOGS",
+      "createdAt": "2026-06-01T02:00:17.026Z"
+    },
+    {
+      "id": "pay-8lg4xwm3a",
+      "bookingId": "manual",
+      "residentId": "user-resident-1",
+      "residentName": "steven felarca",
+      "unitName": "Periodic Association Dues",
+      "amount": 200,
+      "status": "Pending",
+      "method": "Credit Card",
+      "referenceNumber": "TXN-GEN-7GC4PL",
+      "createdAt": "2026-06-01T02:00:09.672Z"
+    },
+    {
+      "id": "pay-go2op73yn",
+      "bookingId": "manual",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "unitName": "Periodic Association Dues",
+      "amount": 200,
+      "status": "Pending",
+      "method": "Credit Card",
+      "referenceNumber": "TXN-GEN-CRYLTT",
+      "createdAt": "2026-06-01T01:15:15.637Z"
+    },
+    {
+      "id": "pay-dektxtnbf",
+      "bookingId": "book-kqulwjzp3",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "unitName": "The Zenith Suite",
+      "amount": 360,
+      "status": "Pending",
+      "method": "Credit Card",
+      "referenceNumber": "TXN-PENDING-QJFYAA",
+      "createdAt": "2026-06-01T01:14:17.728Z"
+    },
+    {
+      "id": "pay-y5a5q3wpz",
+      "bookingId": "book-u03ahqlr1",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "unitName": "The Oasis Garden Loft",
+      "amount": 540,
+      "status": "Failed",
+      "method": "Credit Card",
+      "referenceNumber": "TXN-PENDING-QO02ZE",
+      "createdAt": "2026-05-28T04:48:27.997Z"
+    },
+    {
+      "id": "pay-1",
+      "bookingId": "book-1",
+      "residentId": "user-resident-2",
+      "residentName": "Alice Cooper",
+      "unitName": "The Grand Horizon Penthouse",
+      "amount": 3150,
+      "status": "Paid",
+      "method": "Credit Card",
+      "referenceNumber": "TXN-90812312-AB",
+      "paidAt": "2026-05-28T04:07:00.917Z",
+      "createdAt": "2026-05-28T04:07:00.917Z"
+    },
+    {
+      "id": "pay-2",
+      "bookingId": "book-2",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "unitName": "The Zenith Suite",
+      "amount": 360,
+      "status": "Paid",
+      "method": "GCash Mobile",
+      "referenceNumber": "TXN-IKDI9X",
+      "createdAt": "2026-05-28T04:07:00.917Z",
+      "paidAt": "2026-06-01T01:26:21.932Z"
+    }
+  ],
+  "maintenanceRequests": [
+    {
+      "id": "req-1",
+      "residentId": "user-resident-1",
+      "residentName": "John Doe",
+      "unitNumber": "Unit 1204",
+      "issueType": "Plumbing",
+      "description": "Slow water drainage in the master bathroom shower cabin. Seems clogged.",
+      "priority": "Medium",
+      "status": "In Progress",
+      "assignedStaff": "Robert Mclean (Plumber Lead)",
+      "createdAt": "2026-05-26T04:07:00.917Z"
+    },
+    {
+      "id": "req-2",
+      "residentId": "user-resident-2",
+      "residentName": "Alice Cooper",
+      "unitNumber": "Unit 102",
+      "issueType": "HVAC / Cooling",
+      "description": "The Smart Thermostat triggers an error code E-102 every time cooling is set past 22 degrees centigrade.",
+      "priority": "High",
+      "status": "Pending",
+      "createdAt": "2026-05-28T04:07:00.917Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif-lk74ye5gq",
+      "title": "Maintenance Request In Progress",
+      "message": "Your maintenance ticket concerning \"Plumbing\" is now: IN PROGRESS. Assigned to: Robert Mclean (Plumber Lead).",
+      "recipientId": "user-resident-1",
+      "recipientRole": "resident",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-06-01T02:00:26.428Z"
+    },
+    {
+      "id": "notif-2omhv9xc5",
+      "title": "Payment Received",
+      "message": "John Doe submitted a payment of $360 for The Zenith Suite (Ref: TXN-IKDI9X).",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "success",
+      "createdAt": "2026-06-01T01:26:21.932Z"
+    },
+    {
+      "id": "notif-xb662otkd",
+      "title": "New Reservation Pending",
+      "message": "John Doe submitted a request to book The Zenith Suite from 2026-06-15 to 2026-06-18.",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-06-01T01:14:17.728Z"
+    },
+    {
+      "id": "notif-vy2ppb77s",
+      "title": "Booking Cancelled",
+      "message": "Your reservation request for \"The Oasis Garden Loft\" has been cancelled.",
+      "recipientId": "user-resident-1",
+      "recipientRole": "resident",
+      "isRead": false,
+      "type": "alert",
+      "createdAt": "2026-06-01T01:13:57.567Z"
+    },
+    {
+      "id": "notif-zsiizwr6u",
+      "title": "New Reservation Pending",
+      "message": "John Doe submitted a request to book The Oasis Garden Loft from 2026-06-15 to 2026-06-18.",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-05-28T04:48:27.997Z"
+    },
+    {
+      "id": "notif-1",
+      "title": "Pool Maintenace Complete",
+      "message": "The outdoor infinity ozone-pool on the 3rd floor deck has passed safety checks and is now fully reopened for swimming hours.",
+      "recipientId": "all",
+      "recipientRole": "all",
+      "isRead": false,
+      "type": "success",
+      "createdAt": "2026-05-28T02:07:00.917Z"
+    },
+    {
+      "id": "notif-2",
+      "title": "Upcoming AC Duct Cleaning",
+      "message": "We will conduct localized duct clearing and exhaust disinfection between May 30th and June 2nd. Please check notice boards for timings.",
+      "recipientId": "all",
+      "recipientRole": "resident",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-05-28T04:07:00.917Z"
+    }
+  ],
+  "activityLogs": [
+    {
+      "id": "log-t0jdle84j",
+      "userId": "user-admin-1",
+      "userName": "Sarah Jenkins",
+      "userRole": "admin",
+      "action": "Maintenance Ticket Updated",
+      "details": "Updated ticket ID: req-1 to state: In Progress",
+      "createdAt": "2026-06-01T02:00:26.432Z"
+    },
+    {
+      "id": "log-j38439nmw",
+      "userId": "user-admin-1",
+      "userName": "Sarah Jenkins",
+      "userRole": "admin",
+      "action": "Invoice Generated",
+      "details": "Created manual invoice of $200 for resident",
+      "createdAt": "2026-06-01T02:00:17.028Z"
+    },
+    {
+      "id": "log-u8xyihsla",
+      "userId": "user-admin-1",
+      "userName": "Sarah Jenkins",
+      "userRole": "admin",
+      "action": "Invoice Generated",
+      "details": "Created manual invoice of $200 for resident",
+      "createdAt": "2026-06-01T02:00:09.675Z"
+    },
+    {
+      "id": "log-ena65vvwn",
+      "userId": "user-resident-1",
+      "userName": "steven felarca",
+      "userRole": "resident",
+      "action": "Profile Updated",
+      "details": "User modified profile settings.",
+      "createdAt": "2026-06-01T01:59:02.176Z"
+    },
+    {
+      "id": "log-fh3rqzazo",
+      "userId": "user-resident-1",
+      "userName": "John Doe",
+      "userRole": "resident",
+      "action": "Payment Submitted",
+      "details": "Paid $360 references TXN-IKDI9X",
+      "createdAt": "2026-06-01T01:26:21.939Z"
+    },
+    {
+      "id": "log-f8tpheq81",
+      "userId": "user-admin-1",
+      "userName": "Sarah Jenkins",
+      "userRole": "admin",
+      "action": "Invoice Generated",
+      "details": "Created manual invoice of $200 for resident",
+      "createdAt": "2026-06-01T01:15:15.643Z"
+    },
+    {
+      "id": "log-dbdkj3ii5",
+      "userId": "user-resident-1",
+      "userName": "John Doe",
+      "userRole": "resident",
+      "action": "Booking Created",
+      "details": "Requested booking for The Zenith Suite",
+      "createdAt": "2026-06-01T01:14:17.733Z"
+    },
+    {
+      "id": "log-hvr4yslnd",
+      "userId": "user-resident-1",
+      "userName": "John Doe",
+      "userRole": "resident",
+      "action": "Booking Status Modified",
+      "details": "Set booking book-u03ahqlr1 status to Cancelled",
+      "createdAt": "2026-06-01T01:13:57.574Z"
+    },
+    {
+      "id": "log-q5n10kuqm",
+      "userId": "user-resident-1",
+      "userName": "John Doe",
+      "userRole": "resident",
+      "action": "Booking Created",
+      "details": "Requested booking for The Oasis Garden Loft",
+      "createdAt": "2026-05-28T04:48:28.002Z"
+    },
+    {
+      "id": "log-1",
+      "userId": "user-admin-1",
+      "userName": "Sarah Jenkins",
+      "userRole": "admin",
+      "action": "System Initialized",
+      "details": "The Condominium Booking and Operation Database was deployed.",
+      "createdAt": "2026-05-28T04:07:00.917Z"
+    }
+  ]
+}

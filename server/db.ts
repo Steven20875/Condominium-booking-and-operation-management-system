@@ -788,7 +788,10 @@ class MockDatabase {
       .reduce((sum, p) => sum + p.amount, 0);
 
     const pendingRequestsCount = maintenance.filter(r => r.status === 'Pending' || r.status === 'In Progress').length;
-    
+    const unresolvedMaintenance = maintenance.filter(r => r.status !== 'Completed').length;
+    const totalInvoices = payments.length;
+    const pendingPayments = payments.filter(p => p.status === 'Pending').length;
+
     // Calculate Occupancy Rate: Booked units / Total units
     const bookedCount = units.filter(u => u.status === 'Booked' || !u.availability).length;
     const occupancyRate = units.length > 0 ? Math.round((bookedCount / units.length) * 100) : 0;
@@ -844,8 +847,11 @@ class MockDatabase {
       totalUnits: units.length,
       totalBookings: bookings.length,
       totalRevenue,
+      totalInvoices,
+      pendingPayments,
       occupancyRate,
       pendingRequestsCount,
+      unresolvedMaintenance,
       monthlyRevenue,
       bookingStatusData,
       unitTypeAvailability,

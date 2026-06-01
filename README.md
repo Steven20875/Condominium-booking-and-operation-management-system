@@ -105,4 +105,4 @@ You can test the two fundamental system levels using these seeded accounts:
 | **Resident 2** | `alice@condo.com` | `alice123` | Dynamic reservations, View invoices, Notification desk |
 
 
- 
+

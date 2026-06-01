@@ -112,10 +112,40 @@ export interface DashboardStats {
   totalUnits: number;
   totalBookings: number;
   totalRevenue: number;
+  totalInvoices: number;
+  pendingPayments: number;
   occupancyRate: number;
   pendingRequestsCount: number;
+  unresolvedMaintenance: number;
   monthlyRevenue: { month: string; revenue: number }[];
   bookingStatusData: { name: string; value: number }[];
   unitTypeAvailability: { type: string; count: number }[];
   maintenancePriorityData: { name: string; value: number }[];
+}
+
+export type InquiryFrequency = 'daily' | 'weekly' | 'monthly';
+
+export interface Inquiry {
+  id: string;
+  unitId: string;
+  unitName?: string;
+  residentId: string;
+  residentName?: string;
+  type: 'inquire' | 'buy';
+  frequency?: InquiryFrequency; // Optional for one-off buys
+  message?: string;
+  status?: 'Open' | 'Responded' | 'Closed';
+  createdAt: string;
+}
+
+export interface Purchase {
+  id: string;
+  unitId: string;
+  unitName?: string;
+  residentId: string;
+  residentName?: string;
+  amount?: number;
+  frequency?: InquiryFrequency;
+  status?: 'Pending' | 'Completed' | 'Cancelled';
+  createdAt: string;
 }

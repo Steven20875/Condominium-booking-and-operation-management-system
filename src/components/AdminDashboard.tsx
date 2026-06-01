@@ -27,6 +27,18 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
 
+  const formatCurrency = (value: number | null | undefined): string => {
+    if (value == null) {
+      return 'PHP 0.00';
+    }
+
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
   // Core collections
   const [units, setUnits] = useState<Unit[]>([]);
   const [residents, setResidents] = useState<UserType[]>([]);
@@ -134,17 +146,13 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       .catch(e => console.error(e));
 
     // Resident users
-    fetch('/api/units') // Just using a separate query loop to locate all created accounts on database. Wait, we can gather users by email pattern or mapping bookings. Actually, we can get list of users back. Let's make an endpoint in server or simulate profiles list. We'll find registered residents directly.
-    fetch('/api/auth/register', { method: 'POST' }) // Instead we can extract all registered residents from payments / bookings! Or even better, let's look at what bookings we have.
-    // Wait, let's fetch residents list. In server, did we define GET /api/residents? Ah, let's verify if there is one. No, we have residents resolved. Let's register a list of residents based on mock db arrays or bookings in residents state.
-    // Let's create a custom endpoint inside server or fetch mock database. Let's make sure we find them. Actually, bookings table contains resident details (residentEmail, residentId, residentName). Let's resolve residents from user-resident indices! We can also parse from database via logs or write a small hook. To make things bulletproof, we can just resolve residents by using a hardcoded map of default users + any users with role 'resident' listed in bookings!
-    // Wait, we can easily write the GET /api/residents endpoint! Or since we already created `server.ts`, we can just resolve residents list from transactions data or fetch residents state. Let's fetch residents list if defined, otherwise mock from records. Since we can update server.ts later if needed, let's see: we can register a fallback to get list of residents based on bookings roster!
-    // Actually, did we define `db.getUsers()` in db.ts? Yes, we did! Let's check server.ts to see if we created GET `/api/residents` or `GET /api/users`. No, we didn't add the route `/api/users` in `server.ts`. We can easily query it. Wait! To make sure that we can view and list residents in the Admin Dashboard, we can add a route inside `server.ts` or fetch list of user objects safely! Let's edit `server.ts` to add `/api/residents`! No, actually, can we update the residents state directly by pulling from bookings, or can we quickly do an API update? Yes, let's see. Let's look at how we can pull residents.
-    // It is outstandingly easy to edit `server.ts` to add `GET /api/residents`! Let's call edit_file on `server.ts` to add `GET /api/residents`! Let's check where to add it in `server.ts`.
-    // Wait! Let's search the existing routes in `server.ts`. We have modules like:
-    // `// 1. AUTHENTICATION MODULE`
-    // Let's view `server.ts` where we mount `/api/auth/me`. We can add `/api/residents` under Admin modules! Let's view the file structure of `server.ts` briefly using view_file or edit directly in a single pass.
-    setLoading(false);
+    fetch('/api/residents', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setResidents(data as UserType[]);
+      })
+      .catch(e => console.error(e))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -583,37 +591,77 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LEDGER Gross Income</p>
-                    <p className="text-2xl font-serif font-bold text-emerald-400">${stats.totalRevenue}</p>
+                    <p className="text-2xl font-serif font-bold text-emerald-400">{formatCurrency(stats.totalRevenue)}</p>
                   </div>
                   <div className="p-3 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl">
-                    <DollarSign className="h-5 w-5" />
+                    <CreditCard className="h-5 w-5" />
                   </div>
                 </div>
 
               </div>
 
-              {/* Graphics charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                <div className="lg:col-span-8 glass-card p-6 rounded-3xl border border-white/10 shadow-sm space-y-4">
-                  <h3 className="font-serif font-bold text-white text-base">Annual Cash Inflow Progress</h3>
-                  <div className="h-80 select-none">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={stats.monthlyRevenue}>
-                        <defs>
-                           <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                           </linearGradient>
-                        </defs>
-                        <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                        <Tooltip contentStyle={{ backgroundColor: 'rgb(15, 23, 42)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
-                        <Area type="monotone" dataKey="revenue" name="Inflow ($)" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2.5} />
-                      </AreaChart>
-                    </ResponsiveContainer>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Invoices</p>
+                    <p className="text-2xl font-serif font-bold text-white">{stats.totalInvoices}</p>
+                  </div>
+                  <div className="p-3 bg-slate-500/10 border border-slate-500/20 text-slate-400 rounded-xl">
+                    <FileText className="h-5 w-5" />
                   </div>
                 </div>
+
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Payments</p>
+                    <p className="text-2xl font-serif font-bold text-white">{stats.pendingPayments}</p>
+                  </div>
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
+                    <DollarSign className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tickets</p>
+                    <p className="text-2xl font-serif font-bold text-white">{stats.unresolvedMaintenance}</p>
+                  </div>
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Bookings</p>
+                    <p className="text-2xl font-serif font-bold text-white">{stats.bookingStatusData.find(entry => entry.name === 'Pending Approval')?.value || 0}</p>
+                  </div>
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-8 glass-card p-6 rounded-3xl border border-white/10 shadow-sm">
+                  <h3 className="font-serif font-bold text-white text-base">Revenue Trend</h3>
+                  <div className="h-80 mt-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={stats.monthlyRevenue} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: 'rgb(15, 23, 42)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
+                      <Area type="monotone" dataKey="revenue" name="Inflow (₱)" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2.5} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
                 <div className="lg:col-span-4 glass-card p-6 rounded-3xl border border-white/10 shadow-sm flex flex-col justify-between">
                   <h3 className="font-serif font-bold text-white text-base">Reservations Status Ratio</h3>
@@ -713,11 +761,13 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     <div className="p-5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-xs">
                       <div>
                         <span className="text-[9px] text-slate-400 block uppercase font-bold">RATE</span>
-                        <strong className="text-sm font-black text-slate-950">${item.price}</strong>
+                        <strong className="text-sm font-black text-slate-950">{formatCurrency(item.price)}</strong>
                       </div>
 
                       <div className="flex gap-2">
                         <button
+                          type="button"
+                          aria-label="Edit unit"
                           onClick={() => {
                             setEditUnitItem(item);
                             setUnitName(item.name);
@@ -735,6 +785,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           <Edit2 className="h-3.5 w-3.5" />
                         </button>
                         <button
+                          type="button"
+                          aria-label="Delete unit"
                           onClick={() => handleDeleteUnit(item.id)}
                           className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 p-2 rounded-xl"
                         >
@@ -794,7 +846,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
               {/* Roster database Table representation */}
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-650 tracking-wider">
+                <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-600 tracking-wider">
                   Verified Resident Profiles Directory
                 </div>
 
@@ -819,7 +871,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             </div>
                             {res.name}
                           </td>
-                          <td className="py-4 px-3 font-mono text-slate-650">{res.email}</td>
+                          <td className="py-4 px-3 font-mono text-slate-600">{res.email}</td>
                           <td className="py-4 px-3 text-slate-600">{res.phone || 'Non Specified'}</td>
                           <td className="py-4 px-3 font-bold text-slate-900">{res.unitNumber || 'Suite pending'}</td>
                           <td className="py-4 px-3 text-slate-400 text-[10px]">{new Date(res.createdAt).toLocaleDateString()}</td>
@@ -883,7 +935,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             <strong>{b.startDate}</strong> to <strong>{b.endDate}</strong>
                           </td>
                           <td className="py-4 px-3 text-center font-bold text-slate-700">{b.guestsCount} Persons</td>
-                          <td className="py-4 px-3 font-black text-slate-950">${b.totalPrice}</td>
+                          <td className="py-4 px-3 font-black text-slate-950">{formatCurrency(b.totalPrice)}</td>
                           <td className="py-4 px-3 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono tracking-wider font-bold uppercase ${
                               b.status === 'Approved' ? 'bg-emerald-55 bg-emerald-100 text-emerald-800' :
@@ -897,12 +949,16 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             {b.status === 'Pending' ? (
                               <div className="flex gap-1.5 justify-end">
                                 <button
+                                  type="button"
+                                  aria-label="Approve booking"
                                   onClick={() => handleBookingApproval(b.id, 'Approved')}
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white p-1.5 rounded-lg"
                                 >
                                   <Check className="h-4.5 w-4.5" />
                                 </button>
                                 <button
+                                  type="button"
+                                  aria-label="Reject booking"
                                   onClick={() => handleBookingApproval(b.id, 'Rejected')}
                                   className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded-lg"
                                 >
@@ -961,7 +1017,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           <td className="py-4 px-3">{p.residentName || 'R. Tenant'}</td>
                           <td className="py-4 px-3 text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                           <td className="py-4 px-3 font-mono text-[10px] text-slate-400">{p.referenceNumber}</td>
-                          <td className="py-4 px-3 font-black text-slate-950">${p.amount}</td>
+                          <td className="py-4 px-3 font-black text-slate-950">{formatCurrency(p.amount)}</td>
                           <td className="py-4 px-3 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono tracking-wider font-bold uppercase ${
                               p.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
@@ -1007,7 +1063,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               exit={{ opacity: 0, y: -15 }}
               className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden animate-fade-in space-y-4"
             >
-              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-650 tracking-widest uppercase">
+              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-600 tracking-widest uppercase">
                 Active Tenant Repairs & Concierge Work Orders
               </div>
 
@@ -1096,7 +1152,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     type="text"
                     required
                     placeholder="E.g. Elevators Maintenance Notice: Sector North"
-                    className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-850 font-bold"
+                    className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-900 font-bold"
                     value={bcTitle}
                     onChange={(e) => setBcTitle(e.target.value)}
                   />
@@ -1104,8 +1160,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Recipient Visibility Filter</label>
+                    <label htmlFor="broadcast-visibility-filter" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Recipient Visibility Filter</label>
                     <select
+                      id="broadcast-visibility-filter"
                       className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:outline-none focus:bg-white text-slate-700"
                       value={bcRole}
                       onChange={(e) => setBcRole(e.target.value as any)}
@@ -1117,8 +1174,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Dispatched Alert Tone</label>
+                    <label htmlFor="broadcast-alert-tone" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Dispatched Alert Tone</label>
                     <select
+                      id="broadcast-alert-tone"
                       className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:outline-none focus:bg-white text-slate-700"
                       value={bcType}
                       onChange={(e) => setBcType(e.target.value as any)}
@@ -1137,7 +1195,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     required
                     rows={5}
                     placeholder="Dear residents. We will dispatch mechanics to perform elevator safety checks between 2 PM and 4 PM in Tower Block B on May 30th. Kindly use sector escalators..."
-                    className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-850 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-800 resize-none font-medium h-32 leading-relaxed"
+                    className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-800 resize-none font-medium h-32 leading-relaxed"
                     value={bcMessage}
                     onChange={(e) => setBcMessage(e.target.value)}
                   />
@@ -1214,6 +1272,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     <button 
                       type="button" 
                       onClick={() => setShowAddUnitModal(false)}
+                      aria-label="Close unit modal"
                       className="p-1.5 bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       <X className="h-4 w-4" />
@@ -1243,6 +1302,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           <img src={unitImages[0]} alt="prev-up" className="h-full w-full object-cover" />
                           <button
                             type="button"
+                            aria-label="Remove uploaded unit image"
                             onClick={() => setUnitImages([])}
                             className="absolute top-0.5 right-0.5 bg-slate-900 text-white rounded-full p-0.5 shrink-0"
                           >
@@ -1255,8 +1315,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-650">Unit Name</label>
+                      <label htmlFor="unit-name" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Unit Name</label>
                       <input
+                        id="unit-name"
                         type="text"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-semibold"
@@ -1267,8 +1328,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-650">Architecture Type</label>
+                      <label htmlFor="unit-type" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Architecture Type</label>
                       <input
+                        id="unit-type"
                         type="text"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-semibold"
@@ -1280,8 +1342,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                   <div className="grid grid-cols-3 gap-3 text-xs">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-650">Rate / Night</label>
+                      <label htmlFor="unit-price" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Rate / Night</label>
                       <input
+                        id="unit-price"
                         type="number"
                         required
                         className="w-full bg-slate-50 border border-slate-200 py-2 px-3 rounded-xl focus:outline-none font-bold text-slate-900"
@@ -1291,8 +1354,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-655 font-bold">Capacity</label>
+                      <label htmlFor="unit-capacity" className="text-[10px] font-bold uppercase tracking-wider text-slate-655 font-bold">Capacity</label>
                       <input
+                        id="unit-capacity"
                         type="number"
                         required
                         className="w-full bg-slate-50 border border-slate-200 py-2 px-3 rounded-xl focus:outline-none font-bold text-slate-900"
@@ -1302,8 +1366,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-655 font-bold">Floor Level</label>
+                      <label htmlFor="unit-floor" className="text-[10px] font-bold uppercase tracking-wider text-slate-655 font-bold">Floor Level</label>
                       <input
+                        id="unit-floor"
                         type="number"
                         required
                         className="w-full bg-slate-50 border border-slate-200 py-2 px-3 rounded-xl focus:outline-none font-bold text-slate-900"
@@ -1314,7 +1379,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-650">Offered Amenities (Comma Separated)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Offered Amenities (Comma Separated)</label>
                     <input
                       type="text"
                       className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
@@ -1325,7 +1390,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-650">Unit Layout Descriptions</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Unit Layout Descriptions</label>
                     <textarea
                       rows={3}
                       className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none resize-none leading-relaxed text-slate-900 font-medium"
@@ -1408,6 +1473,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
                     <button 
                       type="button" 
+                      aria-label="Close resident modal"
                       onClick={() => setShowAddResidentModal(false)}
                       className="p-1 bg-slate-100 rounded-full text-slate-400 cursor-pointer"
                     >
@@ -1417,8 +1483,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Legal Resident Name</label>
+                      <label htmlFor="resident-name" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Legal Resident Name</label>
                       <input
+                        id="resident-name"
                         type="text"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
@@ -1429,8 +1496,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">E-mail Identity</label>
+                      <label htmlFor="resident-email" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">E-mail Identity</label>
                       <input
+                        id="resident-email"
                         type="email"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none font-mono text-slate-900 font-semibold"
@@ -1442,8 +1510,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">SMS / Call</label>
+                        <label htmlFor="resident-phone" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">SMS / Call</label>
                         <input
+                          id="resident-phone"
                           type="tel"
                           placeholder="+1 (555) 012"
                           className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
@@ -1453,8 +1522,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Suite Unit</label>
+                        <label htmlFor="resident-unit" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Suite Unit</label>
                         <input
+                          id="resident-unit"
                           type="text"
                           placeholder="Unit 1204"
                           className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
@@ -1465,8 +1535,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-605">Security Password</label>
+                      <label htmlFor="resident-password" className="text-[10px] font-bold uppercase tracking-wider text-slate-605">Security Password</label>
                       <input
+                        id="resident-password"
                         type="text"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none font-mono text-slate-900 font-bold"
@@ -1518,6 +1589,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
                     <button 
                       type="button" 
+                      aria-label="Close invoice modal"
                       onClick={() => setShowCreateInvoiceModal(false)}
                       className="p-1 bg-slate-100 rounded-full text-slate-400 cursor-pointer"
                     >
@@ -1527,8 +1599,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                   <div className="space-y-3 font-sans">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Choose Resident Customer</label>
+                      <label htmlFor="invoice-resident" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Choose Resident Customer</label>
                       <select
+                        id="invoice-resident"
                         className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2.5 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-semibold cursor-pointer"
                         value={targetResidentBillId}
                         onChange={(e) => setTargetResidentBillId(e.target.value)}
@@ -1540,8 +1613,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Friction Invoice Title</label>
+                      <label htmlFor="invoice-title" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Friction Invoice Title</label>
                       <input
+                        id="invoice-title"
                         type="text"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-semibold"
@@ -1551,8 +1625,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Assigned Inflow Amount</label>
+                      <label htmlFor="invoice-amount" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Assigned Inflow Amount</label>
                       <input
+                        id="invoice-amount"
                         type="number"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none focus:bg-white font-bold text-slate-900"
@@ -1604,6 +1679,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
                     <button 
                       type="button" 
+                      aria-label="Close dispatch modal"
                       onClick={() => setDispatchTicket(null)}
                       className="p-1 bg-slate-100 rounded-full text-slate-400"
                     >
@@ -1618,8 +1694,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                   <div className="space-y-3 pt-2">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Assign On-Duty Responder</label>
+                      <label htmlFor="dispatch-staff" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Assign On-Duty Responder</label>
                       <select
+                        id="dispatch-staff"
                         className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2.5 rounded-xl focus:outline-none text-slate-800 font-bold"
                         value={dispatchStaff}
                         onChange={(e) => setDispatchStaff(e.target.value)}
@@ -1632,8 +1709,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Task Resolution State</label>
+                      <label htmlFor="dispatch-status" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Task Resolution State</label>
                       <select
+                        id="dispatch-status"
                         className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2.5 rounded-xl focus:outline-none text-slate-800 font-bold"
                         value={dispatchStatus}
                         onChange={(e) => setDispatchStatus(e.target.value)}

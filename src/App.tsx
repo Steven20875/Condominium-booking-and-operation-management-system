@@ -29,6 +29,12 @@ function AppContent() {
 
   // Restore authenticated session from localStorage
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutHandle = window.setTimeout(() => {
+      controller.abort();
+      setIsInitializing(false);
+    }, 4000);
+
     try {
       const savedToken = localStorage.getItem('vista_token');
       const savedUser = localStorage.getItem('vista_user');
@@ -39,34 +45,40 @@ function AppContent() {
         
         // Let's verify token is valid with backend auth me validation check
         fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${savedToken}` }
+          headers: { 'Authorization': `Bearer ${savedToken}` },
+          signal: controller.signal
         })
           .then(async (res) => {
             const data = await res.json();
             if (res.ok && data.user) {
               setUser(data.user);
-              // Save again as refresh
               localStorage.setItem('vista_user', JSON.stringify(data.user));
             } else {
-              // Evict stale credentials
               localStorage.removeItem('vista_token');
               localStorage.removeItem('vista_user');
               toast('Session expired. Please sign in again.', 'warning');
             }
           })
           .catch(() => {
-            // Local fallback if server isn't responsive on first millisecond
             setUser(parsedUser);
           })
           .finally(() => {
             setIsInitializing(false);
+            window.clearTimeout(timeoutHandle);
           });
       } else {
         setIsInitializing(false);
+        window.clearTimeout(timeoutHandle);
       }
     } catch {
       setIsInitializing(false);
+      window.clearTimeout(timeoutHandle);
     }
+
+    return () => {
+      window.clearTimeout(timeoutHandle);
+      controller.abort();
+    };
   }, [toast]);
 
   const handleLoginSuccess = (loggedInUser: User, sessionToken: string) => {

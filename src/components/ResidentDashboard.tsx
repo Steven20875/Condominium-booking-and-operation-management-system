@@ -4,7 +4,7 @@ import { useToast } from './ToastContext.tsx';
 import { 
   Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, Heart, X, Sparkles, Upload, FileText, Smartphone, DollarSign, HelpCircle, QrCode, ShieldCheck 
 } from 'lucide-react';
-import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification } from '../types.ts';
+import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, Inquiry, Purchase } from '../types.ts';
 
 interface ResidentDashboardProps {
   user: UserType;
@@ -48,6 +48,13 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
   const [guestsCount, setGuestsCount] = useState<number>(2);
   const [bookingNotes, setBookingNotes] = useState<string>('');
   const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
+
+  // Inquire / Buy action state
+  const [selectedUnitForAction, setSelectedUnitForAction] = useState<Unit | null>(null);
+  const [actionType, setActionType] = useState<'inquire' | 'buy'>('inquire');
+  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [actionMessage, setActionMessage] = useState<string>('');
+  const [submittingAction, setSubmittingAction] = useState<boolean>(false);
 
   // Unit Filtering Sizing
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -123,6 +130,21 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
         if (Array.isArray(data)) setNotifications(data);
       })
       .catch(e => console.error(e));
+
+    // Fetch inquiries & purchases if backend exposes them (optional)
+    fetch('/api/inquiries', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => {
+        // no-op: UI may later display inquiries
+      })
+      .catch(() => {});
+
+    fetch('/api/purchases', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => {
+        // no-op: UI may later display purchases
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -190,6 +212,46 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
     }
   };
 
+  // Submit inquire or buy action
+  const handleSubmitAction = async () => {
+    if (!selectedUnitForAction) return;
+    setSubmittingAction(true);
+
+    try {
+      const payload: any = {
+        unitId: selectedUnitForAction.id,
+        unitName: selectedUnitForAction.name,
+        residentId: user.id,
+        residentName: user.name,
+        type: actionType,
+        frequency: actionType === 'inquire' ? frequency : frequency,
+        message: actionMessage,
+      };
+
+      const endpoint = actionType === 'inquire' ? '/api/inquiries' : '/api/purchases';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Action failed.');
+
+      toast(`${actionType === 'inquire' ? 'Inquiry' : 'Purchase request'} submitted for ${selectedUnitForAction.name}`, 'success');
+      setSelectedUnitForAction(null);
+      setActionMessage('');
+      fetchAllData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to submit request.', 'error');
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
   // Avatar Upload simulation
   const handleAvatarSelect = (url: string) => {
     setProfileAvatar(url);
@@ -211,6 +273,13 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
   const calculateTotalCost = (price: number) => {
     return calculateDays() * price;
+  };
+
+  // Currency formatting (display in PHP)
+  const EXCHANGE_RATE = 57; // 1 USD -> 57 PHP (adjustable)
+  const formatPHP = (usdAmount: number | null | undefined) => {
+    const n = Number(usdAmount || 0) * EXCHANGE_RATE;
+    return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   // Submit Booking request
@@ -278,8 +347,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed compiling payment.');
 
-      const phpAmount = (payingInvoice.amount * 57).toLocaleString(undefined, {minimumFractionDigits: 2});
-      toast(`Transaction settled! Paid ₱${phpAmount} ($${payingInvoice.amount}) successfully via ${selectedMethod}.`, 'success');
+      toast(`Transaction settled! Paid ${formatPHP(payingInvoice.amount)} (${payingInvoice.amount.toLocaleString(undefined,{minimumFractionDigits:2})} USD) successfully via ${selectedMethod}.`, 'success');
       setPayingInvoice(null);
       // Reset modes
       setGcashStep('phone');
@@ -291,6 +359,24 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
     } finally {
       setSubmittingPayment(false);
     }
+  };
+
+  const handleReceiptSettle = () => {
+    if (!selectedBookingReceipt) return;
+    const pendingPayment = payments.find(
+      (p) => p.bookingId === selectedBookingReceipt.id && p.status === 'Pending'
+    );
+
+    if (pendingPayment) {
+      setPayingInvoice(pendingPayment);
+      setSelectedBookingReceipt(null);
+      setActiveTab('payments');
+      toast('Loaded your pending invoice into the payment terminal. Complete settlement here.', 'info');
+      return;
+    }
+
+    setSelectedBookingReceipt(null);
+    toast('Receipt closed. No pending invoice was found for this booking.', 'info');
   };
 
   // Submit Maintenance ticket
@@ -359,7 +445,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
   // Filters calculation
   const getFilteredUnits = () => {
-    return units.filter(u => {
+    return units.filter((u: Unit) => {
       const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             u.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = filterType ? u.type.toLowerCase() === filterType.toLowerCase() : true;
@@ -540,7 +626,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                 <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Bills Score</p>
-                    <p className="text-2xl font-serif font-bold text-rose-500">${pendingPaymentsAmount}</p>
+                    <p className="text-2xl font-serif font-bold text-rose-500">{formatPHP(pendingPaymentsAmount)}</p>
                   </div>
                   <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
                     <DollarSign className="h-5 w-5" />
@@ -552,7 +638,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Domestic Support Tickets</p>
                     <p className="text-2xl font-serif font-bold text-white">{activeIssuesCount}</p>
                   </div>
-                  <div className="p-3 bg-white/5 border border-white/10 text-slate-350 rounded-xl">
+                  <div className="p-3 bg-white/5 border border-white/10 text-slate-400 rounded-xl">
                     <Wrench className="h-5 w-5" />
                   </div>
                 </div>
@@ -582,7 +668,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                             <h4 className="font-bold text-xs text-white">{notif.title}</h4>
                             <span className="text-[9px] text-slate-400 font-mono">{new Date(notif.createdAt).toLocaleDateString()}</span>
                           </div>
-                          <p className="text-xs text-slate-350 leading-relaxed">{notif.message}</p>
+                          <p className="text-xs text-slate-400 leading-relaxed">{notif.message}</p>
                         </div>
                       ))}
                     </div>
@@ -656,6 +742,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                 <div>
                   <select
+                    aria-label="Filter unit type"
                     className="w-full glass-input text-xs text-white/80 px-3 py-2.5 rounded-xl focus:outline-none"
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
@@ -671,6 +758,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                 <div>
                   <select
+                    aria-label="Filter unit status"
                     className="w-full glass-input text-xs text-white/80 px-3 py-2.5 rounded-xl focus:outline-none"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
@@ -729,17 +817,31 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     <div className="p-5 border-t border-slate-50 flex items-center justify-between">
                       <div>
                         <span className="text-[9px] text-slate-400 uppercase tracking-widest block font-bold">Daily Rate</span>
-                        <span className="text-base font-bold text-slate-950">${item.price}</span>
+                        <span className="text-base font-bold text-slate-950">{formatPHP(item.price)}</span>
                       </div>
-                      <button
-                        disabled={item.status !== 'Available'}
-                        onClick={() => {
-                          setSelectedUnitForBooking(item);
-                        }}
-                        className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400 text-white px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider shadow"
-                      >
-                        {item.status === 'Available' ? 'Book Suite' : 'Occupied'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          disabled={item.status !== 'Available'}
+                          onClick={() => {
+                            setSelectedUnitForBooking(item);
+                          }}
+                          className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400 text-white px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider shadow"
+                        >
+                          {item.status === 'Available' ? 'Book Suite' : 'Occupied'}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedUnitForAction(item);
+                            setActionType('inquire');
+                            setFrequency('daily');
+                            setActionMessage('');
+                          }}
+                          className="bg-white/5 hover:bg-white/10 text-white/90 px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider border border-white/10"
+                        >
+                          Inquire / Buy
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -783,7 +885,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                               <span className="font-medium text-slate-800">{book.startDate}</span> to <span className="font-medium text-slate-800">{book.endDate}</span>
                             </td>
                             <td className="py-4 px-3 text-center font-medium">{book.guestsCount} Persons</td>
-                            <td className="py-4 px-3 font-bold text-slate-900">${book.totalPrice}</td>
+                            <td className="py-4 px-3 font-bold text-slate-900">{formatPHP(book.totalPrice)}</td>
                             <td className="py-4 px-3">
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                                 book.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -795,8 +897,10 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                             </td>
                             <td className="py-4 px-3 text-right space-x-2">
                               <button
+                                type="button"
                                 onClick={() => setSelectedBookingReceipt(book)}
-                                className="bg-slate-100 hover:bg-slate-200 text-slate-850 px-2.5 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider flex inline-items items-center gap-1 inline-flex"
+                                aria-label="View receipt"
+                                className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-900 shadow-sm transition hover:bg-slate-200"
                               >
                                 <FileText className="h-3 w-3" /> Receipt
                               </button>
@@ -886,7 +990,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                           <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-3 font-bold text-slate-900">{p.unitName || 'Operations Bill'}</td>
                             <td className="py-4 px-3 font-mono text-slate-500 text-[10px]">{p.referenceNumber}</td>
-                            <td className="py-4 px-3 font-black text-slate-950">${p.amount}</td>
+                            <td className="py-4 px-3 font-black text-slate-950">{formatPHP(p.amount)}</td>
                             <td className="py-4 px-3 text-slate-550">{new Date(p.createdAt).toLocaleDateString()}</td>
                             <td className="py-4 px-3">
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
@@ -943,8 +1047,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                 <form onSubmit={handleFilingMaintenance} className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Issue Classification</label>
+                    <label htmlFor="maintenance-issue-type" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Issue Classification</label>
                     <select
+                      id="maintenance-issue-type"
                       className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 px-3 py-3 rounded-xl focus:outline-none focus:bg-white"
                       value={mIssueType}
                       onChange={(e) => setMIssueType(e.target.value)}
@@ -959,8 +1064,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Emergency Priority</label>
-                    <div className="grid grid-cols-4 gap-2 text-center">
+                    <label id="maintenance-priority-label" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Emergency Priority</label>
+                    <div role="group" aria-labelledby="maintenance-priority-label" className="grid grid-cols-4 gap-2 text-center">
                       {(['Low', 'Medium', 'High', 'Emergency'] as const).map((pr) => (
                         <button
                           key={pr}
@@ -979,11 +1084,12 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Observation Details</label>
+                    <label htmlFor="maintenance-description" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Observation Details</label>
                     <textarea
+                      id="maintenance-description"
                       required
                       rows={4}
-                      className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 px-4 py-3 rounded-xl focus:border-slate-850 focus:bg-white focus:outline-none resize-none"
+                      className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 px-4 py-3 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none resize-none"
                       placeholder="Specify leaks location, warning sound indicators or thermostat E-code numbers..."
                       value={mDescription}
                       onChange={(e) => setMDescription(e.target.value)}
@@ -1111,6 +1217,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                       <button
                         onClick={() => handleClearNotification(notif.id)}
+                        aria-label="Dismiss notification"
                         className="shrink-0 text-slate-400 hover:text-slate-600 p-1"
                       >
                         <X className="h-4 w-4" />
@@ -1173,9 +1280,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Legal Registration Name</label>
-                  <input
-                    type="text"
+                    <label htmlFor="profile-name" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Legal Registration Name</label>
+                    <input
+                      id="profile-name"
                     required
                     className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-800 font-bold"
                     value={profileName}
@@ -1185,8 +1292,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">SMS / Call Coordinates</label>
+                    <label htmlFor="profile-phone" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">SMS / Call Coordinates</label>
                     <input
+                      id="profile-phone"
                       type="tel"
                       className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-800 font-bold"
                       value={profilePhone}
@@ -1195,10 +1303,11 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Assigned Suite Unit</label>
+                    <label htmlFor="profile-unit" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Assigned Suite Unit</label>
                     <input
+                      id="profile-unit"
                       type="text"
-                      className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-850 font-bold"
+                      className="w-full bg-slate-50 border border-slate-200 text-xs py-3 px-4 rounded-xl focus:border-slate-800 focus:bg-white focus:outline-none placeholder:text-slate-400 text-slate-900 font-bold"
                       value={profileUnit}
                       onChange={(e) => setProfileUnit(e.target.value)}
                     />
@@ -1206,8 +1315,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Mail coordinates (read-only)</label>
+                  <label htmlFor="profile-email" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Mail coordinates (read-only)</label>
                   <input
+                    id="profile-email"
                     type="email"
                     disabled
                     className="w-full bg-slate-100 border border-slate-200 text-xs py-3 px-4 rounded-xl cursor-not-allowed text-slate-500 font-medium"
@@ -1218,7 +1328,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                 <button
                   type="submit"
                   disabled={isUpdatingProfile}
-                  className="w-full py-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-350 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md mt-6"
+                  className="w-full py-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md mt-6"
                 >
                   {isUpdatingProfile ? 'Saving Records...' : 'Save Profile Coordination'}
                 </button>
@@ -1249,7 +1359,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     <h3 className="text-xl font-serif font-black text-slate-950 mt-1">{selectedUnitForBooking.name}</h3>
                   </div>
                   <button 
+                    type="button"
                     onClick={() => setSelectedUnitForBooking(null)}
+                    aria-label="Close reservation modal"
                     className="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 rounded-full"
                   >
                     <X className="h-4 w-4" />
@@ -1258,8 +1370,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                 <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Check-In Date</label>
+                    <label htmlFor="booking-checkin" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Check-In Date</label>
                     <input
+                      id="booking-checkin"
                       type="date"
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none"
                       value={checkInDate}
@@ -1268,8 +1381,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Check-Out Date</label>
+                    <label htmlFor="booking-checkout" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Check-Out Date</label>
                     <input
+                      id="booking-checkout"
                       type="date"
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none"
                       value={checkOutDate}
@@ -1280,8 +1394,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                 <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Adult Guests Count</label>
+                    <label htmlFor="booking-guests" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Adult Guests Count</label>
                     <input
+                      id="booking-guests"
                       type="number"
                       min={1}
                       max={selectedUnitForBooking.capacity}
@@ -1312,9 +1427,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                 <div className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100 font-sans">
                   <div>
                     <span className="text-[9px] text-slate-400 font-bold uppercase block tracking-wider">Estimated Price ({calculateDays()} Days)</span>
-                    <span className="text-xl font-bold text-slate-950">${calculateTotalCost(selectedUnitForBooking.price)}</span>
+                    <span className="text-xl font-bold text-slate-950">{formatPHP(calculateTotalCost(selectedUnitForBooking.price))}</span>
                   </div>
-                  <span className="text-xs text-slate-400 font-medium">Rate: ${selectedUnitForBooking.price} / Day</span>
+                  <span className="text-xs text-slate-400 font-medium">Rate: {formatPHP(selectedUnitForBooking.price)} / Day</span>
                 </div>
               </div>
 
@@ -1338,6 +1453,67 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
           </div>
         )}
       </AnimatePresence>
+
+        {/* C. INQUIRE / BUY MODAL */}
+        <AnimatePresence>
+          {selectedUnitForAction && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden flex flex-col"
+              >
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-serif font-black">{selectedUnitForAction.name}</h3>
+                      <p className="text-xs text-slate-500">{selectedUnitForAction.type} • {formatPHP(selectedUnitForAction.price)} / day</p>
+                    </div>
+                    <button type="button" aria-label="Close action modal" onClick={() => setSelectedUnitForAction(null)} className="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 rounded-full">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-slate-600">Action</label>
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => setActionType('inquire')} className={`py-2 px-3 rounded-xl text-xs font-bold ${actionType === 'inquire' ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-700'}`}>
+                          Inquire
+                        </button>
+                        <button type="button" onClick={() => setActionType('buy')} className={`py-2 px-3 rounded-xl text-xs font-bold ${actionType === 'buy' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-700'}`}>
+                          Buy / Lease
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="action-frequency" className="text-[10px] font-bold uppercase text-slate-600">Frequency</label>
+                      <select id="action-frequency" value={frequency} onChange={(e) => setFrequency(e.target.value as any)} className="w-full mt-2 bg-slate-50 border border-slate-200 py-2 px-3 rounded-xl text-xs">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="action-message" className="text-[10px] font-bold uppercase text-slate-600">Message (optional)</label>
+                    <textarea id="action-message" value={actionMessage} onChange={(e) => setActionMessage(e.target.value)} rows={4} className="w-full mt-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" placeholder="Additional notes for the admin or seller..." />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
+                  <button onClick={() => setSelectedUnitForAction(null)} className="flex-1 py-3 border border-slate-200 bg-white text-slate-700 font-bold text-xs rounded-xl">Cancel</button>
+                  <button onClick={handleSubmitAction} disabled={submittingAction} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl">
+                    {submittingAction ? 'Submitting…' : actionType === 'inquire' ? 'Send Inquiry' : 'Request Purchase'}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       {/* B. SECURED CARD PAYMENT TERMINAL MODAL */}
       <AnimatePresence>
@@ -1378,6 +1554,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                         setGcashOtp('');
                         setQrScanned(false);
                       }}
+                      aria-label="Close payment modal"
                       className="p-1 bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       <X className="h-4 w-4" />
@@ -1449,10 +1626,11 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                       {gcashStep === 'phone' ? (
                         <div className="space-y-3">
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">GCash Mobile Number</label>
+                            <label htmlFor="gcash-phone" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">GCash Mobile Number</label>
                             <div className="relative">
                               <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold font-mono">+63</span>
                               <input
+                                id="gcash-phone"
                                 type="tel"
                                 required
                                 placeholder="917 123 4567"
@@ -1475,7 +1653,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                           </div>
                           
                           <div className="space-y-1">
+                            <label htmlFor="gcash-otp" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Verification Code</label>
                             <input
+                              id="gcash-otp"
                               type="text"
                               required
                               maxLength={6}
@@ -1573,8 +1753,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                       <div className="space-y-3">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Cardholder Name</label>
+                          <label htmlFor="card-holder" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Cardholder Name</label>
                           <input
+                            id="card-holder"
                             type="text"
                             required={paymentOption === 'card'}
                             className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-semibold"
@@ -1584,8 +1765,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Credit Card Number</label>
+                          <label htmlFor="card-number" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Credit Card Number</label>
                           <input
+                            id="card-number"
                             type="text"
                             required={paymentOption === 'card'}
                             className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none font-mono text-slate-900 font-semibold"
@@ -1596,8 +1778,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Expiry Date</label>
+                            <label htmlFor="card-expiry" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Expiry Date</label>
                             <input
+                              id="card-expiry"
                               type="text"
                               required={paymentOption === 'card'}
                               placeholder="MM/YY"
@@ -1608,8 +1791,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                           </div>
 
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">CVC Code</label>
+                            <label htmlFor="card-cvc" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">CVC Code</label>
                             <input
+                              id="card-cvc"
                               type="password"
                               required={paymentOption === 'card'}
                               maxLength={3}
@@ -1624,17 +1808,11 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     </div>
                   )}
 
-                  {/* Interactive Dual-Currency Display Block */}
+                  {/* Payment summary in local currency */}
                   <div className="p-4 bg-blue-50/60 rounded-2xl flex flex-col gap-1.5 border border-blue-100 font-sans">
                     <div className="flex justify-between items-center text-blue-900">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Total Bill (USD)</span>
-                      <span className="text-sm font-black text-slate-900">${payingInvoice.amount}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-blue-700 font-bold border-t border-blue-200/50 pt-1.5 mt-0.5">
-                      <span className="text-[10px] uppercase tracking-widest text-slate-600">Local Currency Equivalent</span>
-                      <span className="text-base font-black text-blue-800">
-                        ₱{(payingInvoice.amount * 57).toLocaleString(undefined, {minimumFractionDigits: 2})} PHP
-                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Total Bill</span>
+                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.amount)}</span>
                     </div>
                   </div>
                 </div>
@@ -1690,6 +1868,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     <span className="font-serif font-black text-slate-950 leading-none">VISTA RESIDENCE</span>
                   </div>
                   <button 
+                    type="button"
+                    aria-label="Close receipt dialog"
                     onClick={() => setSelectedBookingReceipt(null)}
                     className="p-1 bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
                   >
@@ -1725,7 +1905,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
                   <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-sm font-serif">
                     <span className="font-bold text-slate-900">Total Charged Amount</span>
-                    <span className="text-lg font-black text-slate-950">${selectedBookingReceipt.totalPrice}</span>
+                    <span className="text-lg font-black text-slate-950">{formatPHP(selectedBookingReceipt.totalPrice)}</span>
                   </div>
 
                   <div className="bg-slate-50 p-3 rounded-xl text-[10px] text-slate-400 text-center uppercase tracking-wide border border-dashed border-slate-200">
@@ -1743,7 +1923,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     Print PDF
                   </button>
                   <button
-                    onClick={() => setSelectedBookingReceipt(null)}
+                    onClick={handleReceiptSettle}
                     className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all"
                   >
                     Okay, Settle

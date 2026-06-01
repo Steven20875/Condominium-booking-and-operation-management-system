@@ -150,7 +150,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
           {/* Left Visual Banner Section */}
           <div className="lg:col-span-5 bg-slate-950/40 p-8 sm:p-12 flex flex-col justify-between text-white relative overflow-hidden border-r border-white/5">
             {/* Background Texture Image overlay */}
-            <div className="absolute inset-0 z-0 bg-cover bg-center mix-blend-overlay opacity-30 scale-105 hover:scale-100 transition-all duration-1000" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80')" }} />
+            <div className="absolute inset-0 z-0 bg-cover bg-center mix-blend-overlay opacity-30 scale-105 hover:scale-100 transition-all duration-1000 auth-hero-image" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent z-1" />
 
             <div className="relative z-10">
@@ -195,7 +195,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                   <div>
                     <span className="text-xs font-mono font-bold tracking-widest uppercase text-blue-400">Step 2: Security Validation</span>
                     <h3 className="text-2xl font-serif font-bold text-white mt-1">Check Your Inbox</h3>
-                    <p className="text-sm text-slate-350 mt-2 leading-relaxed">
+                    <p className="text-sm text-slate-400 mt-2 leading-relaxed">
                       We’ve simulated routing an authentication pin to you. To confirm your identity and register safely, please insert the verification code below.
                     </p>
                   </div>

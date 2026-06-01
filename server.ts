@@ -8,16 +8,21 @@ import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const VITE_HMR_PORT = Number(process.env.VITE_HMR_PORT) || 24678;
 
 // Security helper: mock Auth check middleware
 function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const authHeader = String(req.headers.authorization || '');
+  if (!authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentication required. Missing Bearer token.' });
   }
   
-  const userId = authHeader.split(' ')[1];
+  const userId = authHeader.split(' ')[1]?.trim();
+  if (!isNonEmptyString(userId)) {
+    return res.status(401).json({ error: 'Authentication token malformed.' });
+  }
+
   const user = db.findUserById(userId);
   if (!user) {
     return res.status(401).json({ error: 'User session invalid or expired.' });
@@ -38,6 +43,22 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
   });
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function parseNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function validateFields(body: any, requiredFields: string[]) {
+  return requiredFields.filter(key => {
+    const value = body?.[key];
+    return value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+  });
+}
+
 async function startServer() {
   const app = express();
 
@@ -50,21 +71,27 @@ async function startServer() {
   // 1. AUTHENTICATION MODULE
   app.post('/api/auth/register', (req: Request, res: Response) => {
     const { email, password, name, phone, unitNumber } = req.body;
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: 'Please specify required fields: email, password, and name.' });
+    const missing = validateFields(req.body, ['email', 'password', 'name']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
     }
 
-    const existing = db.findUserByEmail(email);
+    if (!isNonEmptyString(email) || !isNonEmptyString(password) || !isNonEmptyString(name)) {
+      return res.status(400).json({ error: 'Email, password, and name must be valid non-empty strings.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = db.findUserByEmail(normalizedEmail);
     if (existing) {
       return res.status(400).json({ error: 'An account with this email address already exists.' });
     }
 
     const newUser = db.createUser({
-      email,
+      email: normalizedEmail,
       password,
-      name,
-      phone,
-      unitNumber,
+      name: name.trim(),
+      phone: isNonEmptyString(phone) ? phone.trim() : undefined,
+      unitNumber: isNonEmptyString(unitNumber) ? unitNumber.trim() : undefined,
       role: 'resident'
     });
 
@@ -75,11 +102,16 @@ async function startServer() {
 
   app.post('/api/auth/login', (req: Request, res: Response) => {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Please specify email and password.' });
+    const missing = validateFields(req.body, ['email', 'password']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
     }
 
-    const user = db.findUserByEmail(email);
+    if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
+      return res.status(400).json({ error: 'Email and password must be valid non-empty strings.' });
+    }
+
+    const user = db.findUserByEmail(email.trim().toLowerCase());
     if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Invalid email or password combination.' });
     }
@@ -111,6 +143,12 @@ async function startServer() {
 
     const { password: _, ...userSafe } = updated as any;
     res.json({ user: userSafe });
+  });
+
+  app.get('/api/residents', requireAdmin, (req: Request, res: Response) => {
+    const residents = db.getUsers().filter(u => u.role === 'resident');
+    const safeResidents = residents.map(({ password, ...rest }) => rest);
+    res.json(safeResidents);
   });
 
   // 2. CONDO UNITS MODULE
@@ -204,12 +242,20 @@ async function startServer() {
   app.post('/api/bookings', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
     const { unitId, startDate, endDate, totalPrice, guestsCount, notes } = req.body;
-
-    if (!unitId || !startDate || !endDate || !totalPrice) {
-      return res.status(400).json({ error: 'Missing mandatory fields: unitId, startDate, endDate, and totalPrice.' });
+    const missing = validateFields(req.body, ['unitId', 'startDate', 'endDate', 'totalPrice']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing mandatory fields: ${missing.join(', ')}.` });
     }
 
-    // Verify availability
+    if (!isNonEmptyString(unitId) || !isNonEmptyString(startDate) || !isNonEmptyString(endDate)) {
+      return res.status(400).json({ error: 'unitId, startDate, and endDate must be valid strings.' });
+    }
+
+    const priceValue = parseNumber(totalPrice, -1);
+    if (priceValue < 0) {
+      return res.status(400).json({ error: 'totalPrice must be a valid number.' });
+    }
+
     const unit = db.findUnitById(unitId);
     if (!unit) {
       return res.status(404).json({ error: 'The requested unit does not exist.' });
@@ -221,14 +267,68 @@ async function startServer() {
     const booking = db.createBooking({
       unitId,
       residentId: user.id,
-      startDate,
-      endDate,
-      totalPrice: Number(totalPrice),
+      startDate: startDate.trim(),
+      endDate: endDate.trim(),
+      totalPrice: priceValue,
       guestsCount: Number(guestsCount) || 1,
-      notes
+      notes: isNonEmptyString(notes) ? notes.trim() : ''
     });
 
     res.status(201).json(booking);
+  });
+
+  // 3b. INQUIRIES & PURCHASES (simple endpoints)
+  app.post('/api/inquiries', requireAuth, (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const { unitId, unitName, type, frequency, message } = req.body;
+    const missing = validateFields(req.body, ['unitId']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing mandatory field: ${missing.join(', ')}.` });
+    }
+
+    const inquiry = {
+      id: 'inq-' + Math.random().toString(36).substring(2, 11),
+      unitId: unitId.trim(),
+      unitName: isNonEmptyString(unitName) ? unitName.trim() : '',
+      residentId: user.id,
+      residentName: user.name,
+      type: isNonEmptyString(type) ? type.trim() : 'inquire',
+      frequency: isNonEmptyString(frequency) ? frequency.trim() : null,
+      message: isNonEmptyString(message) ? message.trim() : '',
+      status: 'Open',
+      createdAt: new Date().toISOString()
+    };
+    db.addActivityLog(user.id, user.name, user.role, 'Inquiry Submitted', `Inquiry for ${unitId}`);
+    res.status(201).json(inquiry);
+  });
+
+  app.post('/api/purchases', requireAuth, (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const { unitId, unitName, amount, frequency, message } = req.body;
+    const missing = validateFields(req.body, ['unitId', 'amount']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing mandatory fields: ${missing.join(', ')}.` });
+    }
+
+    const amountValue = parseNumber(amount, -1);
+    if (amountValue < 0) {
+      return res.status(400).json({ error: 'amount must be a valid numerical value.' });
+    }
+
+    const purchase = {
+      id: 'pur-' + Math.random().toString(36).substring(2, 11),
+      unitId: unitId.trim(),
+      unitName: isNonEmptyString(unitName) ? unitName.trim() : '',
+      residentId: user.id,
+      residentName: user.name,
+      amount: amountValue,
+      frequency: isNonEmptyString(frequency) ? frequency.trim() : null,
+      message: isNonEmptyString(message) ? message.trim() : '',
+      status: 'Pending',
+      createdAt: new Date().toISOString()
+    };
+    db.addActivityLog(user.id, user.name, user.role, 'Purchase Request', `Purchase request for ${unitId}`);
+    res.status(201).json(purchase);
   });
 
   app.put('/api/bookings/:id/status', requireAuth, (req: Request, res: Response) => {
@@ -270,17 +370,26 @@ async function startServer() {
   app.post('/api/payments/:id/pay', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
     const { method, referenceNumber, amount } = req.body;
+    const missing = validateFields(req.body, ['method', 'referenceNumber', 'amount']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing payment fields: ${missing.join(', ')}.` });
+    }
 
-    if (!method || !referenceNumber) {
-      return res.status(400).json({ error: 'Missing payment method or transaction reference number.' });
+    if (!isNonEmptyString(method) || !isNonEmptyString(referenceNumber)) {
+      return res.status(400).json({ error: 'Payment method and reference number must be valid strings.' });
+    }
+
+    const amountValue = parseNumber(amount, -1);
+    if (amountValue < 0) {
+      return res.status(400).json({ error: 'Payment amount must be a valid positive number.' });
     }
 
     const payment = db.submitPayment(
-      req.params.id, 
-      method, 
-      referenceNumber, 
-      Number(amount), 
-      user.id, 
+      req.params.id,
+      method.trim(),
+      referenceNumber.trim(),
+      amountValue,
+      user.id,
       user.name
     );
 
@@ -302,18 +411,27 @@ async function startServer() {
 
   app.post('/api/public/payments/:id/pay', (req: Request, res: Response) => {
     const { method, referenceNumber, amount, payorName } = req.body;
+    const missing = validateFields(req.body, ['method', 'referenceNumber', 'amount']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing public payment fields: ${missing.join(', ')}.` });
+    }
 
-    if (!method || !referenceNumber) {
-      return res.status(400).json({ error: 'Missing secure payment method or transaction reference.' });
+    if (!isNonEmptyString(method) || !isNonEmptyString(referenceNumber)) {
+      return res.status(400).json({ error: 'Payment method and reference number must be valid strings.' });
+    }
+
+    const amountValue = parseNumber(amount, -1);
+    if (amountValue < 0) {
+      return res.status(400).json({ error: 'Payment amount must be a valid positive number.' });
     }
 
     const payment = db.submitPayment(
-      req.params.id, 
-      method, 
-      referenceNumber, 
-      Number(amount), 
-      'qr-payor', 
-      payorName || 'Gales QR Client'
+      req.params.id,
+      method.trim(),
+      referenceNumber.trim(),
+      amountValue,
+      'qr-payor',
+      isNonEmptyString(payorName) ? payorName.trim() : 'Gales QR Client'
     );
 
     if (!payment) {
@@ -355,17 +473,26 @@ async function startServer() {
   app.post('/api/maintenance', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
     const { unitNumber, issueType, description, priority } = req.body;
-
-    if (!issueType || !description) {
-      return res.status(400).json({ error: 'Please specify the main issue category and detailed description.' });
+    const missing = validateFields(req.body, ['issueType', 'description']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing maintenance fields: ${missing.join(', ')}.` });
     }
+
+    if (!isNonEmptyString(issueType) || !isNonEmptyString(description)) {
+      return res.status(400).json({ error: 'Issue type and description must be valid strings.' });
+    }
+
+    const normalizedPriority = isNonEmptyString(priority) ? priority.trim() : 'Medium';
+    const safePriority = ['Low', 'Medium', 'High', 'Emergency'].includes(normalizedPriority)
+      ? normalizedPriority as any
+      : 'Medium';
 
     const ticket = db.createMaintenanceRequest({
       residentId: user.id,
-      unitNumber: unitNumber || user.unitNumber || 'Common Spaces',
-      issueType,
-      description,
-      priority: priority || 'Medium'
+      unitNumber: isNonEmptyString(unitNumber) ? unitNumber.trim() : user.unitNumber || 'Common Spaces',
+      issueType: issueType.trim(),
+      description: description.trim(),
+      priority: safePriority
     });
 
     res.status(201).json(ticket);
@@ -400,16 +527,31 @@ async function startServer() {
 
   app.post('/api/notifications/announce', requireAdmin, (req: Request, res: Response) => {
     const { title, message, type, recipientRole } = req.body;
-    if (!title || !message) {
-      return res.status(400).json({ error: 'Announcements must contain both title and message parameters.' });
+    const missing = validateFields(req.body, ['title', 'message']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing announcement fields: ${missing.join(', ')}.` });
     }
 
+    if (!isNonEmptyString(title) || !isNonEmptyString(message)) {
+      return res.status(400).json({ error: 'Announcement title and message must be valid text.' });
+    }
+
+    const normalizedRecipientRole = isNonEmptyString(recipientRole) ? recipientRole.trim() : 'all';
+    const safeRecipientRole = ['admin', 'resident', 'all'].includes(normalizedRecipientRole)
+      ? normalizedRecipientRole as any
+      : 'all';
+
+    const normalizedType = isNonEmptyString(type) ? type.trim() : 'info';
+    const safeType = ['info', 'success', 'warning', 'alert'].includes(normalizedType)
+      ? normalizedType as any
+      : 'info';
+
     const notif = db.createNotification({
-      title,
-      message,
+      title: title.trim(),
+      message: message.trim(),
       recipientId: 'all',
-      recipientRole: recipientRole || 'all',
-      type: type || 'info'
+      recipientRole: safeRecipientRole,
+      type: safeType
     });
 
     res.status(201).json(notif);
@@ -508,11 +650,22 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
   });
 
 
+  // 404 catch for unknown API routes
+  app.use('/api', (req: Request, res: Response) => {
+    res.status(404).json({ error: 'API endpoint not found.' });
+  });
+
+  // Global error handling for unexpected failures
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('Unhandled server error:', err);
+    res.status(500).json({ error: 'Internal server error. Please try again later.' });
+  });
+
   // --- VITE DEV MIDDLEWARE / STATIC ASSETS ROUTING ---
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: { port: VITE_HMR_PORT } },
       appType: 'spa'
     });
     app.use(vite.middlewares);
