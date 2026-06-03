@@ -336,8 +336,8 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         }}
                         className="text-left bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-white/15 hover:border-blue-400/50 transition-colors cursor-pointer"
                       >
-                        <p className="font-semibold text-white">🔑 John Doe (Resident)</p>
-                        <p className="text-slate-400 font-mono mt-0.5 text-[10px]">Email: john@condo.com <br/>Pass: john123</p>
+                        <p className="font-semibold text-white">🔑 Steven Felarca (Resident)</p>
+                        <p className="text-slate-400 font-mono mt-0.5 text-[10px]">Email: steven@condo.com <br/>Pass: steven123</p>
                       </button>
                       
                       <button
@@ -348,7 +348,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         }}
                         className="text-left bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-white/15 hover:border-purple-400/50 transition-colors cursor-pointer"
                       >
-                        <p className="font-semibold text-white">🔑 Sarah J. (Admin)</p>
+                        <p className="font-semibold text-white">🔑 Donna Talam (Admin)</p>
                         <p className="text-slate-400 font-mono mt-0.5 text-[10px]">Email: admin@condo.com <br/>Pass: admin123</p>
                       </button>
                     </div>

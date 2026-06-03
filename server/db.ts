@@ -102,7 +102,7 @@ const defaultUsers: User[] = [
     id: 'user-admin-1',
     email: 'admin@condo.com',
     password: 'admin123', // Clean plain-text mock auth for the sandboxed preview
-    name: 'Sarah Jenkins',
+    name: 'GALES URBAN HAVEN',
     role: 'admin',
     phone: '+1 (555) 0192-384',
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
@@ -112,7 +112,7 @@ const defaultUsers: User[] = [
     id: 'user-resident-1',
     email: 'john@condo.com',
     password: 'john123',
-    name: 'John Doe',
+    name: 'Steven Felarca',
     role: 'resident',
     phone: '+1 (555) 0122-874',
     unitNumber: 'Unit 1204',
@@ -153,7 +153,7 @@ const defaultBookings: Booking[] = [
     unitId: 'unit-101',
     unitName: 'The Zenith Suite',
     residentId: 'user-resident-1',
-    residentName: 'John Doe',
+    residentName: 'Steven Felarca',
     residentEmail: 'john@condo.com',
     startDate: '2026-06-15',
     endDate: '2026-06-18',
@@ -183,7 +183,7 @@ const defaultPayments: Payment[] = [
     id: 'pay-2',
     bookingId: 'book-2',
     residentId: 'user-resident-1',
-    residentName: 'John Doe',
+    residentName: 'Steven Felarca',
     unitName: 'The Zenith Suite',
     amount: 360.00,
     status: 'Pending',
@@ -197,7 +197,7 @@ const defaultMaintenance: MaintenanceRequest[] = [
   {
     id: 'req-1',
     residentId: 'user-resident-1',
-    residentName: 'John Doe',
+    residentName: 'Steven Felarca',
     unitNumber: 'Unit 1204',
     issueType: 'Plumbing',
     description: 'Slow water drainage in the master bathroom shower cabin. Seems clogged.',
@@ -861,3 +861,4 @@ class MockDatabase {
 }
 
 export const db = new MockDatabase();
+

@@ -96,63 +96,36 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [searchUnit, setSearchUnit] = useState<string>('');
   const [searchRes, setSearchRes] = useState<string>('');
 
-  const fetchAllData = () => {
+  const fetchAllData = async () => {
     setLoading(true);
-    
-    // Core stats
-    fetch('/api/dashboard/stats', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => setStats(data))
-      .catch(e => console.error(e));
+    try {
+      const authHeaders = { 'Authorization': `Bearer ${token}` };
 
-    // Units
-    fetch('/api/units')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setUnits(data);
-      })
-      .catch(e => console.error(e));
+      // Execute all fetches in parallel and wait for all to complete
+      const [statsRes, unitsRes, bookingsRes, paymentsRes, maintenanceRes, logsRes, residentsRes] = await Promise.all([
+        fetch('/api/dashboard/stats', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Stats fetch error:', e); return null; }),
+        fetch('/api/units').then(res => res.json()).catch(e => { console.error('Units fetch error:', e); return null; }),
+        fetch('/api/bookings', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Bookings fetch error:', e); return null; }),
+        fetch('/api/payments', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Payments fetch error:', e); return null; }),
+        fetch('/api/maintenance', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Maintenance fetch error:', e); return null; }),
+        fetch('/api/logs', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Logs fetch error:', e); return null; }),
+        fetch('/api/residents', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Residents fetch error:', e); return null; })
+      ]);
 
-    // Bookings
-    fetch('/api/bookings', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setBookings(data);
-      })
-      .catch(e => console.error(e));
-
-    // Payments
-    fetch('/api/payments', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setPayments(data);
-      })
-      .catch(e => console.error(e));
-
-    // Maintenance
-    fetch('/api/maintenance', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setMaintenance(data);
-      })
-      .catch(e => console.error(e));
-
-    // Audit Logs
-    fetch('/api/logs', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setLogs(data);
-      })
-      .catch(e => console.error(e));
-
-    // Resident users
-    fetch('/api/residents', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setResidents(data as UserType[]);
-      })
-      .catch(e => console.error(e))
-      .finally(() => setLoading(false));
+      // Update state atomically once all data is fetched
+      if (statsRes) setStats(statsRes);
+      if (Array.isArray(unitsRes)) setUnits(unitsRes);
+      if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
+      if (Array.isArray(paymentsRes)) setPayments(paymentsRes);
+      if (Array.isArray(maintenanceRes)) setMaintenance(maintenanceRes);
+      if (Array.isArray(logsRes)) setLogs(logsRes);
+      if (Array.isArray(residentsRes)) setResidents(residentsRes as UserType[]);
+    } catch (e) {
+      console.error('Fatal data synchronization error:', e);
+      toast('Error refreshing dashboard data. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -380,20 +353,20 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
     // Default mock rosters
     mapReg['user-resident-1'] = {
       id: 'user-resident-1',
-      email: 'john@condo.com',
-      name: 'John Doe',
+      email: 'Steven@gmail.com',
+      name: 'Steven Felarca',
       role: 'resident',
-      phone: '+1 (555) 0122-874',
+      phone: '09127068234',
       unitNumber: 'Unit 1204',
       createdAt: new Date().toISOString()
     };
     
     mapReg['user-resident-2'] = {
       id: 'user-resident-2',
-      email: 'alice@condo.com',
-      name: 'Alice Cooper',
+      email: 'al@condo.com',
+      name: 'Donna Talam',
       role: 'resident',
-      phone: '+1 (555) 0144-555',
+      phone: '09127068233',
       unitNumber: 'Unit 102',
       createdAt: new Date().toISOString()
     };
@@ -435,11 +408,11 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
           <div className="bg-white/5 p-3 rounded-xl border border-white/10 flex items-center gap-2.5">
             <div className="h-9 w-9 bg-white/10 rounded-full border border-white/15 overflow-hidden shrink-0 flex items-center justify-center">
-              <span className="font-bold text-xs text-white">SJ</span>
+              <span className="font-bold text-xs text-white">GUH</span>
             </div>
             <div className="overflow-hidden">
               <p className="font-bold text-xs truncate max-w-[130px]">{user.name}</p>
-              <p className="text-[10px] text-purple-400 font-bold truncate max-w-[130px]">Chief Manager</p>
+              <p className="text-[10px] text-purple-400 font-bold truncate max-w-[130px]">admin</p>
             </div>
           </div>
 
@@ -546,8 +519,25 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
         {/* CONTROLLER SWITCH ROUTING */}
         <AnimatePresence mode="wait">
           
+          {/* LOADING STATE */}
+          {loading && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="bg-white rounded-3xl border border-slate-100 shadow-sm p-12 text-center"
+            >
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 bg-slate-200 rounded-lg w-64 mx-auto"></div>
+                <div className="h-4 bg-slate-100 rounded-lg w-96 mx-auto"></div>
+                <p className="text-slate-400 font-mono text-xs mt-6">Synchronizing financial records and operational data...</p>
+              </div>
+            </motion.div>
+          )}
+
           {/* A. PERFORMANCE METRICS TAB */}
-          {activeTab === 'metrics' && stats && (
+          {!loading && activeTab === 'metrics' && stats && (
             <motion.div
               key="metrics-tab"
               initial={{ opacity: 0, y: 15 }}
@@ -1489,7 +1479,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         type="text"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
-                        placeholder="John Doe"
+                        placeholder="Steven Felarca"
                         value={resName}
                         onChange={(e) => setResName(e.target.value)}
                       />

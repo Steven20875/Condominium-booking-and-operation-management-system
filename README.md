@@ -3,11 +3,25 @@
 
 An offline-first, full-stack condominium operation and booking management system designed for **One Spatial Iloilo**. The application provides residents with an upscale portal to view available units, request reservations, pay bills via an interactive QR Ph simulation, and log maintenance tickets. Simultaneously, it equips administrators with a control room dashboard featuring live analytics, resident registries, booking approval queues, and logged activities.
 
+This README and the attached chapter documentation describe the same solution: a condominium booking and operations management system built to solve the business problems of One Spatial Iloilo. The project documentation explains the background, statement of the problem, and goals, while this web app is the actual implementation of those requirements.
+
+## 🧾 Client Profile
+* Client Name: **GALES URBAN HAVEN**
+* Business Name: **One Spatial Iloilo**
+* Industry: **Real Estate / Residential Property Management**
+* Products/Services: Condominium rental and leasing, property management services, and residential amenities
+* Target Customers: Young professionals, small families, and students seeking affordable, convenient condominium living in Iloilo City
+* Current Challenge: Manually managing bookings, payments, revenue tracking, and maintenance due to the lack of a centralized system.
+
 ---
 
 ## 🛠️ Technology Stack & Architecture
 
 Unlike traditional web projects that rely on older, scattered stacks (such as PHP + Apache + MySQL inside XAMPP), **One Spatial Iloilo** is engineered using a **Unified TypeScript Stack**. This allows both the frontend and backend to share system models and speak the exact same language seamlessly.
+
+**Frontend:** `React 19` with `TypeScript`, styled with `Tailwind CSS`, and built with `Vite`.
+
+**Backend:** `Node.js` with `Express`, written in `TypeScript`, and bundled with `tsx`/`esbuild`.
 
 ### 1. Frontend (Client-Side)
 *   **React 19 & TypeScript**: Strong typing and modern functional rendering for scalable application modules.
@@ -100,8 +114,8 @@ You can test the two fundamental system levels using these seeded accounts:
 
 | Role | Username / Email | Password | Allowed Capabilities |
 | :--- | :--- | :--- | :--- |
-| **Administrator** | `admin@condo.com` | `admin123` | Analytics, Approval management, Maintenance assigning, Log telemetry, Resident registry |
-| **Resident 1** | `john@condo.com` | `john123` | Booking requests, Track QR Ph payment bills, File plumbing tasks |
+| **Administrator (Gales Urban Haven)** | `admin@condo.com` | `admin123` | Analytics, Approval management, Maintenance assigning, Log telemetry, Resident registry |
+| **Steven Felarca (Resident)** | `john@condo.com` | `john123` | Booking requests, Track QR Ph payment bills, File plumbing tasks |
 | **Resident 2** | `alice@condo.com` | `alice123` | Dynamic reservations, View invoices, Notification desk |
 
 
