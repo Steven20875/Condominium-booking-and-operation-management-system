@@ -110,8 +110,8 @@ const defaultUsers: User[] = [
   },
   {
     id: 'user-resident-1',
-    email: 'john@condo.com',
-    password: 'john123',
+    email: 'teben@gmail.com',
+    password: 'teben123',
     name: 'Steven Felarca',
     role: 'resident',
     phone: '+1 (555) 0122-874',
@@ -246,7 +246,7 @@ const defaultLogs: ActivityLog[] = [
   {
     id: 'log-1',
     userId: 'user-admin-1',
-    userName: 'Sarah Jenkins',
+    userName: 'Donna Talam',
     userRole: 'admin',
     action: 'System Initialized',
     details: 'The Condominium Booking and Operation Database was deployed.',

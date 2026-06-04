@@ -665,7 +665,11 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: { port: VITE_HMR_PORT } },
+      server: { 
+        middlewareMode: true, 
+        hmr: { port: VITE_HMR_PORT }, 
+        allowedHosts: ['*']
+      },
       appType: 'spa'
     });
     app.use(vite.middlewares);

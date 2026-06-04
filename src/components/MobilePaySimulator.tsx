@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Smartphone, Building, ShieldCheck, CheckCircle2, QrCode, AlertTriangle, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Smartphone, ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
 
 export default function MobilePaySimulator() {
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
@@ -15,9 +15,7 @@ export default function MobilePaySimulator() {
   const [gcashStep, setGcashStep] = useState<'phone' | 'otp' | 'success'>('phone');
   const [mobileNumber, setMobileNumber] = useState<string>('09171234567');
   const [otpCode, setOtpCode] = useState<string>('');
-  const [errorOtp, setErrorOtp] = useState<boolean>(false);
   const [referenceNum, setReferenceNum] = useState<string>('');
-  const [selectedGateway, setSelectedGateway] = useState<'gcash' | 'maya'>('gcash');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -62,15 +60,11 @@ export default function MobilePaySimulator() {
 
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode !== '885912' && otpCode.length > 0) {
-      // Allow user convenience, but note sandbox suggestion
-      setErrorOtp(false);
-    }
 
     setLoading(true);
     const amountToBill = invoiceDetails ? invoiceDetails.amount : initAmount;
-    const finalMethod = selectedGateway === 'gcash' ? 'GCash Mobile' : 'Maya Standard';
-    const mockRef = (selectedGateway === 'gcash' ? 'GCSH-MOB-' : 'MAYA-MOB-') + Math.random().toString(36).substr(2, 6).toUpperCase();
+    const finalMethod = 'GCash Mobile';
+    const mockRef = 'GCSH-MOB-' + Math.random().toString(36).substr(2, 6).toUpperCase();
 
     try {
       const res = await fetch(`/api/public/payments/${invoiceId}/pay`, {
@@ -140,14 +134,12 @@ export default function MobilePaySimulator() {
         {/* Gateway Brand Header Bar */}
         <div className="bg-gradient-to-r from-blue-950 via-slate-950 to-blue-950 py-4.5 px-6 border-b border-white/10 flex justify-between items-center text-white">
           <div className="flex items-center gap-2">
-            <div className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-              selectedGateway === 'gcash' ? 'bg-blue-600 text-white' : 'bg-[#1b253b] text-teal-400'
-            }`}>
-              {selectedGateway === 'gcash' ? 'g)' : 'M)'}
+            <div className="h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs bg-blue-600 text-white">
+              g)
             </div>
             <div>
-              <span className="text-[9px] uppercase tracking-widest font-bold font-mono text-blue-400 block leading-none">Instantpay PH</span>
-              <h3 className="text-xs font-bold leading-normal text-white">Gales Mobile Checkout</h3>
+              <span className="text-[9px] uppercase tracking-widest font-bold font-mono text-blue-400 block leading-none">GCash Checkout</span>
+              <h3 className="text-xs font-bold leading-normal text-white">Gales Secure GCash</h3>
             </div>
           </div>
           
@@ -179,7 +171,7 @@ export default function MobilePaySimulator() {
             </div>
             
             <div className="text-right">
-              <span className="text-[9px] text-slate-400 block uppercase font-bold">Converted Amount</span>
+              <span className="text-[9px] text-slate-400 block uppercase font-bold">Total Bill</span>
               <span className="text-[15px] font-black text-blue-400 block">₱ {phpValue} PHP</span>
             </div>
           </div>
@@ -200,41 +192,24 @@ export default function MobilePaySimulator() {
                 className="space-y-6 flex-1 flex flex-col justify-between"
               >
                 <div className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-[10px] tracking-widest uppercase font-bold text-slate-400 font-mono">Select Payment Outlet</label>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedGateway('gcash')}
-                        className={`py-3 px-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 border transition ${
-                          selectedGateway === 'gcash'
-                            ? 'bg-blue-600/10 border-blue-500 text-blue-100'
-                            : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <Smartphone className="h-4 w-4" />
-                        GCash Mobile
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={() => setSelectedGateway('maya')}
-                        className={`py-3 px-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 border transition ${
-                          selectedGateway === 'maya'
-                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-100'
-                            : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <QrCode className="h-4 w-4" />
-                        PayMaya Standard
-                      </button>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] tracking-widest uppercase font-bold text-slate-400 font-mono">GCash Merchant Checkout</label>
+                    <div className="rounded-3xl border border-white/10 bg-[#0f172a] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">GCash Mobile Number</p>
+                          <p className="text-sm font-bold text-white">+63 {mobileNumber.replace(/(\d{4})(\d{3})(\d{4})/, '$1 $2 $3')}</p>
+                        </div>
+                        <div className="rounded-2xl bg-blue-600/15 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-blue-200">GCash</div>
+                      </div>
+                      <p className="mt-3 text-[10px] text-slate-500 leading-relaxed">
+                        Real GCash checkout form. Ensure this mobile number is registered with GCash and has sufficient balance before confirming payment.
+                      </p>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] tracking-widest uppercase font-bold text-slate-400 font-mono">
-                      {selectedGateway === 'gcash' ? 'GCash' : 'Maya'} Registered Mobile No.
-                    </label>
+                    <label className="text-[10px] tracking-widest uppercase font-bold text-slate-400 font-mono">Confirm GCash Number</label>
                     <div className="relative">
                       <span className="absolute left-4 top-2.5 text-xs text-slate-500 font-bold font-mono">+63</span>
                       <input
@@ -246,8 +221,8 @@ export default function MobilePaySimulator() {
                         onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
                       />
                     </div>
-                    <span className="text-[10px] text-slate-500 leading-normal block">
-                      Requires Philippine mobile carriers (Globe, Smart, DITO, TM, or TNT). No actual cash balances are drawn in this secure Sandbox node.
+                    <span className="text-[10px] text-slate-400 leading-normal block">
+                      This checkout is prepared for GCash only. The final transaction is recorded in your condominium dashboard after payment is confirmed.
                     </span>
                   </div>
                 </div>

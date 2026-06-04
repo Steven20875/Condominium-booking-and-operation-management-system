@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, Inquiry, Purchase } from '../types.ts';
 
+const GCASH_DEEPLINK_BASE = 'gcash://com.mynt.gcash/app/006300000800';
+
 interface ResidentDashboardProps {
   user: UserType;
   token: string;
@@ -72,12 +74,55 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
   const [cardCVC, setCardCVC] = useState<string>('984');
   const [submittingPayment, setSubmittingPayment] = useState<boolean>(false);
 
-  // GCash & QR PH Payment states (Ph context)
-  const [paymentOption, setPaymentOption] = useState<'gcash' | 'qrph' | 'card'>('gcash');
-  const [gcashPhone, setGcashPhone] = useState<string>('09171234567');
-  const [gcashOtp, setGcashOtp] = useState<string>('');
-  const [gcashStep, setGcashStep] = useState<'phone' | 'otp'>('phone');
-  const [qrScanned, setQrScanned] = useState<boolean>(false);
+  // GCash & cash payment states
+  const [paymentOption, setPaymentOption] = useState<'gcash' | 'cash'>('gcash');
+  const gcashPhone = '09127068234';
+  const gcashName = 'Steven Christian Felarca';
+
+  const formatEmvField = (id: string, value: string) => `${id}${value.length.toString().padStart(2, '0')}${value}`;
+
+  const computeGcashQrCrc = (payload: string) => {
+    const bytes = new TextEncoder().encode(payload);
+    let crc = 0xffff;
+
+    for (const byte of bytes) {
+      crc ^= byte << 8;
+      for (let i = 0; i < 8; i += 1) {
+        crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ 0x1021) : (crc << 1);
+        crc &= 0xffff;
+      }
+    }
+
+    return crc.toString(16).toUpperCase().padStart(4, '0');
+  };
+
+  const buildGcashQrPayload = (amount: number, orderId: string) => {
+    const amountString = amount.toFixed(2);
+    const merchantAccountInfo =
+      formatEmvField('00', 'ph.ppmi.p2m') +
+      formatEmvField('01', 'SRCPPHM2XXX') +
+      formatEmvField('03', gcashPhone);
+
+    const additionalData =
+      formatEmvField('03', orderId) +
+      formatEmvField('10', 'GalesCondo');
+
+    const payloadWithoutCrc = [
+      formatEmvField('00', '01'),
+      formatEmvField('01', '12'),
+      formatEmvField('26', merchantAccountInfo),
+      formatEmvField('52', '0000'),
+      formatEmvField('53', '608'),
+      formatEmvField('54', amountString),
+      formatEmvField('58', 'PH'),
+      formatEmvField('59', 'Gales Condominium'),
+      formatEmvField('60', 'Iloilo'),
+      formatEmvField('62', additionalData),
+      '6304'
+    ].join('');
+
+    return payloadWithoutCrc + computeGcashQrCrc(payloadWithoutCrc);
+  };
 
   // Maintenance Filing Form State
   const [mIssueType, setMIssueType] = useState<string>('Plumbing');
@@ -131,55 +176,12 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
       })
       .catch(e => console.error(e));
 
-    // Fetch inquiries & purchases if backend exposes them (optional)
-    fetch('/api/inquiries', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => {
-        // no-op: UI may later display inquiries
-      })
-      .catch(() => {});
-
-    fetch('/api/purchases', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => {
-        // no-op: UI may later display purchases
-      })
-      .catch(() => {});
+    // Note: Inquiries and purchases are POST-only endpoints; no GET retrieval is supported
   };
 
   useEffect(() => {
     fetchAllData();
   }, [token]);
-
-  // Real-time mobile QR code check-polling loop
-  useEffect(() => {
-    if (!payingInvoice || paymentOption !== 'qrph') return;
-
-    let isActive = true;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/public/payments/${payingInvoice.id}`);
-        if (res.ok && isActive) {
-          const data = await res.json();
-          if (data.status === 'Paid') {
-            toast(`Instantpay PH: Mobile QR Code Payment of ₱${(data.amount * 57).toLocaleString(undefined, {minimumFractionDigits: 2})} settled successfully!`, 'success');
-            setPayingInvoice(null);
-            setQrScanned(false);
-            setGcashStep('phone');
-            setGcashOtp('');
-            fetchAllData();
-          }
-        }
-      } catch (err) {
-        // fail-safe fallback
-      }
-    }, 2200);
-
-    return () => {
-      isActive = false;
-      clearInterval(interval);
-    };
-  }, [payingInvoice, paymentOption]);
 
   // Profile update Handler
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -329,8 +331,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
     setSubmittingPayment(true);
 
     try {
-      const selectedMethod = customMethod || (paymentOption === 'gcash' ? 'GCash' : paymentOption === 'qrph' ? 'QR PH (Gales Pay)' : 'Credit Card');
-      const mockRef = (selectedMethod === 'GCash' ? 'GCSH-' : selectedMethod.startsWith('QR') ? 'QRPH-' : 'TXN-') + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const selectedMethod = customMethod || (paymentOption === 'gcash' ? 'GCash' : paymentOption === 'cash' ? 'Cash' : 'Credit Card');
+      const mockRef = (selectedMethod === 'GCash' ? 'GCSH-' : selectedMethod === 'Cash' ? 'CASH-' : selectedMethod.startsWith('QR') ? 'QRPH-' : 'TXN-') + Math.random().toString(36).substr(2, 6).toUpperCase();
       const res = await fetch(`/api/payments/${payingInvoice.id}/pay`, {
         method: 'POST',
         headers: {
@@ -349,16 +351,21 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
 
       toast(`Transaction settled! Paid ${formatPHP(payingInvoice.amount)} (${payingInvoice.amount.toLocaleString(undefined,{minimumFractionDigits:2})} USD) successfully via ${selectedMethod}.`, 'success');
       setPayingInvoice(null);
-      // Reset modes
-      setGcashStep('phone');
-      setGcashOtp('');
-      setQrScanned(false);
       fetchAllData();
     } catch (err: any) {
       toast(err.message, 'error');
     } finally {
       setSubmittingPayment(false);
     }
+  };
+
+  const gcashRawQrData = payingInvoice ? buildGcashQrPayload(payingInvoice.amount, payingInvoice.id) : '';
+  const gcashDeepLink = payingInvoice ? `${GCASH_DEEPLINK_BASE}?qrCode=${encodeURIComponent(gcashRawQrData)}` : '';
+
+  const handleOpenGcashApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!gcashDeepLink) return;
+    e.preventDefault();
+    window.location.href = gcashDeepLink;
   };
 
   const handleReceiptSettle = () => {
@@ -1527,17 +1534,10 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
             >
               <form onSubmit={(e) => {
                 e.preventDefault();
-                if (paymentOption === 'card') {
-                  handleSettleInvoice(e, 'Credit Card');
-                } else if (paymentOption === 'gcash') {
-                  if (gcashStep === 'phone') {
-                    setGcashStep('otp');
-                    toast('GCash Sandbox: SMS verification code sent to your phone!', 'info');
-                  } else {
-                    handleSettleInvoice(e, 'GCash Mobile');
-                  }
-                } else if (paymentOption === 'qrph') {
-                  handleSettleInvoice(e, 'QR Ph (GCash/Maya)');
+                if (paymentOption === 'gcash') {
+                  handleSettleInvoice(e, 'GCash');
+                } else {
+                  handleSettleInvoice(e, 'Cash');
                 }
               }}>
                 <div className="p-6 sm:p-8 space-y-6">
@@ -1550,9 +1550,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                       type="button" 
                       onClick={() => {
                         setPayingInvoice(null);
-                        setGcashStep('phone');
-                        setGcashOtp('');
-                        setQrScanned(false);
                       }}
                       aria-label="Close payment modal"
                       className="p-1 bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
@@ -1577,27 +1574,14 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPaymentOption('qrph')}
+                      onClick={() => setPaymentOption('cash')}
                       className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        paymentOption === 'qrph'
-                          ? 'bg-gradient-to-r from-red-500 via-blue-600 to-yellow-500 text-white shadow'
+                        paymentOption === 'cash'
+                          ? 'bg-amber-500 text-white shadow'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <QrCode className="h-3.5 w-3.5" />
-                      QR Ph Standard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentOption('card')}
-                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        paymentOption === 'card'
-                          ? 'bg-slate-900 text-white shadow'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <CreditCard className="h-3.5 w-3.5" />
-                      Card
+                      <span className="inline-flex items-center gap-1"><span className="font-bold">₱</span> Cash</span>
                     </button>
                   </div>
 
@@ -1606,204 +1590,58 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     <div className="space-y-4">
                       <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-4.5 rounded-2xl relative overflow-hidden flex flex-col justify-between shadow-inner">
                         <div className="flex justify-between items-start">
-                          <span className="text-[15px] font-bold tracking-tight bg-white text-blue-800 px-2 pl-2.5 pr-2.5 py-0.5 rounded-full">g) gcash</span>
+                          <span className="text-[15px] font-bold tracking-tight bg-white text-blue-800 px-2 pl-2.5 pr-2.5 py-0.5 rounded-full">GCash</span>
                           <span className="text-[8px] font-bold uppercase tracking-widest text-blue-200">Gales Secured</span>
                         </div>
                         <div className="mt-4">
-                          <span className="text-[9px] uppercase tracking-wider block text-blue-200">Linked Account Number</span>
-                          <span className="text-base font-mono tracking-widest block font-bold text-white mt-1">
-                            {gcashPhone ? gcashPhone.replace(/(\d{4})(\d{3})(\d{4})/, '$1 $2 $3') : '0917 123 4567'}
-                          </span>
+                          <span className="text-[9px] uppercase tracking-wider block text-blue-200">Recipient Name</span>
+                          <span className="text-base font-semibold block text-white mt-1">{gcashName}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[9px] uppercase font-mono text-blue-200 mt-3 pt-2 border-t border-white/10">
-                          <span>Instapay Philippines Network</span>
-                          <span className="flex items-center gap-1 text-white">
-                            <ShieldCheck className="h-3 w-3 text-emerald-400" /> Secure
-                          </span>
+                        <div className="mt-3">
+                          <span className="text-[9px] uppercase tracking-wider block text-blue-200">GCash Number</span>
+                          <span className="text-base font-mono tracking-widest block font-bold text-white mt-1">{gcashPhone.replace(/(\d{4})(\d{3})(\d{4})/, '$1 $2 $3')}</span>
                         </div>
                       </div>
 
-                      {gcashStep === 'phone' ? (
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <label htmlFor="gcash-phone" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">GCash Mobile Number</label>
-                            <div className="relative">
-                              <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold font-mono">+63</span>
-                              <input
-                                id="gcash-phone"
-                                type="tel"
-                                required
-                                placeholder="917 123 4567"
-                                className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 pl-12 pr-3 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-bold font-mono"
-                                value={gcashPhone.replace('+63', '')}
-                                onChange={(e) => setGcashPhone(e.target.value.replace(/\D/g, ''))}
-                              />
-                            </div>
-                            <span className="text-[10px] text-slate-400 block mt-1">Ensure this is linked to your GCash balance with sufficient funds.</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3.5 p-4 bg-slate-50 rounded-2xl border border-slate-200/50">
-                          <div className="text-center space-y-1">
-                            <div className="h-10 w-10 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center mx-auto">
-                              <span className="font-mono font-bold text-sm">6-digit</span>
-                            </div>
-                            <h4 className="text-xs font-bold text-slate-900 mt-2">Enter verification SMS Code</h4>
-                            <p className="text-[11px] text-slate-500">We simulate a Gales Pay secure token message to verify transaction.</p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <label htmlFor="gcash-otp" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Verification Code</label>
-                            <input
-                              id="gcash-otp"
-                              type="text"
-                              required
-                              maxLength={6}
-                              placeholder="885912"
-                              className="w-full bg-white border border-slate-300 text-center text-sm font-bold tracking-[0.4em] py-3 px-3 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono text-slate-900"
-                              value={gcashOtp}
-                              onChange={(e) => setGcashOtp(e.target.value.replace(/\D/g, ''))}
-                            />
-                            <div className="flex justify-between items-center text-[9px] text-slate-500 font-mono mt-1.5">
-                              <span>Token: <strong className="text-blue-600 font-bold">885912</strong> (Sandbox code)</span>
-                              <button 
-                                type="button" 
-                                onClick={() => setGcashOtp('885912')}
-                                className="text-blue-600 font-bold hover:underline"
-                              >
-                                Auto Fill
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* QR PH / QR CODE METHOD PANEL */}
-                  {paymentOption === 'qrph' && (
-                    <div className="space-y-4">
-                      <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-2xl text-center space-y-4">
-                        <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest bg-gradient-to-r from-red-600 via-blue-600 to-yellow-500 text-white py-1 px-3 rounded-full shadow">
-                          🇵🇭 QR Ph Unified Standard
-                        </span>
-                        
-                        {/* Beautiful QR Code representation matching Gales standard */}
-                        <div className="relative h-48 w-48 mx-auto bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
-                          <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                              `${window.location.origin}/pay-sim?id=${payingInvoice.id}&amount=${payingInvoice.amount}&name=${encodeURIComponent(user?.name || '')}`
-                            )}&color=0f172a`} 
-                            alt="QR Ph Genuine Connection Code" 
-                            className="h-full w-full object-contain rounded-xl"
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-3xl text-slate-950 space-y-4">
+                        <div className="text-sm font-bold">Scan this QR code with your mobile device to open GCash directly.</div>
+                        <div className="mx-auto w-48 h-48 rounded-3xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(gcashRawQrData)}&color=0f172a`}
+                            alt="GCash payment QR code"
+                            className="w-full h-full object-cover"
                             referrerPolicy="no-referrer"
                           />
                         </div>
-
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-bold text-slate-900">Scan via GCash, Maya, or Any Bank App</h4>
-                          <p className="text-[10px] text-slate-500 leading-relaxed max-w-xs mx-auto">
-                            Instantly settle dues utilizing your actual mobile phone! Scan the QR code above with your phone camera, complete the quick secure simulation, and watch this desktop screen update in real time.
-                          </p>
+                        <div className="space-y-2 text-[11px] text-slate-500">
+                          <p>Scan this QR code with your GCash scanner. It encodes a raw QRPh/EMVCo merchant payload with recipient, amount, and reference data.</p>
+                          <p className="font-semibold text-slate-700">Amount: {payingInvoice ? formatPHP(payingInvoice.amount) : '₱0.00'}</p>
                         </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setQrScanned(true);
-                            toast('QR Ph successfully scanned! Click Confirm below to process.', 'success');
-                          }}
-                          className={`flex-1 py-2 border rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                            qrScanned
-                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
-                          }`}
+                        <a
+                          href={gcashDeepLink}
+                          onClick={handleOpenGcashApp}
+                          className="inline-flex w-full items-center justify-center rounded-2xl bg-blue-950 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-blue-900 transition"
                         >
-                          <CheckCircle className={`h-3.5 w-3.5 ${qrScanned ? 'text-emerald-500' : 'text-slate-400'}`} />
-                          {qrScanned ? '✓ QR Code Scanned' : '⚡ Simulate QR Scan'}
-                        </button>
+                          Open in GCash App
+                        </a>
                       </div>
                     </div>
                   )}
 
-                  {/* DEBIT / CREDIT CARD METHOD PANEL */}
-                  {paymentOption === 'card' && (
+                  {/* Cash method panel */}
+                  {paymentOption === 'cash' && (
                     <div className="space-y-4">
-                      <div className="p-4 bg-slate-900 text-white rounded-2xl relative overflow-hidden flex flex-col justify-between h-40 shadow-inner">
-                        <div className="flex justify-between items-start">
-                          <Building className="h-5 w-5 text-emerald-400" />
-                          <span className="text-[9px] font-serif tracking-widest uppercase text-slate-300">Gales Secure Card</span>
-                        </div>
-
-                        <p className="font-mono text-base tracking-widest text-slate-200 select-none">{cardNumber}</p>
-                        
-                        <div className="flex justify-between items-end text-[10px] uppercase font-mono text-slate-400">
+                      <div className="bg-amber-50 border border-amber-200 p-5 rounded-2xl text-amber-950">
+                        <div className="flex items-center justify-between gap-3">
                           <div>
-                            <span className="block text-[8px] text-slate-500">holder</span>
-                            <span>{cardHolder}</span>
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-amber-600">Cash Payment</p>
+                            <h4 className="text-sm font-bold">Pay cash at the property office or with the Gales cashier.</h4>
                           </div>
-                          <div>
-                            <span className="block text-[8px] text-slate-500">expires</span>
-                            <span>{cardExpiry}</span>
-                          </div>
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-700">In-person</span>
                         </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label htmlFor="card-holder" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Cardholder Name</label>
-                          <input
-                            id="card-holder"
-                            type="text"
-                            required={paymentOption === 'card'}
-                            className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-semibold"
-                            value={cardHolder}
-                            onChange={(e) => setCardHolder(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label htmlFor="card-number" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Credit Card Number</label>
-                          <input
-                            id="card-number"
-                            type="text"
-                            required={paymentOption === 'card'}
-                            className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none font-mono text-slate-900 font-semibold"
-                            value={cardNumber}
-                            onChange={(e) => setCardNumber(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <label htmlFor="card-expiry" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Expiry Date</label>
-                            <input
-                              id="card-expiry"
-                              type="text"
-                              required={paymentOption === 'card'}
-                              placeholder="MM/YY"
-                              className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-center text-slate-900 font-semibold"
-                              value={cardExpiry}
-                              onChange={(e) => setCardExpiry(e.target.value)}
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label htmlFor="card-cvc" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">CVC Code</label>
-                            <input
-                              id="card-cvc"
-                              type="password"
-                              required={paymentOption === 'card'}
-                              maxLength={3}
-                              placeholder="•••"
-                              className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-center font-bold text-slate-900"
-                              value={cardCVC}
-                              onChange={(e) => setCardCVC(e.target.value)}
-                            />
-                          </div>
-                        </div>
+                        <p className="text-[11px] text-amber-700 leading-relaxed mt-4">
+                          After you settle the amount in cash, click Confirm Settle to register payment in your dashboard.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1822,9 +1660,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                     type="button"
                     onClick={() => {
                       setPayingInvoice(null);
-                      setGcashStep('phone');
-                      setGcashOtp('');
-                      setQrScanned(false);
                     }}
                     className="flex-1 py-3 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
                   >
@@ -1832,15 +1667,10 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
                   </button>
                   <button
                     type="submit"
-                    disabled={submittingPayment || (paymentOption === 'qrph' && !qrScanned)}
+                    disabled={submittingPayment}
                     className="flex-1 py-3 bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed"
                   >
-                    {submittingPayment 
-                      ? 'Processing...' 
-                      : (paymentOption === 'gcash' && gcashStep === 'phone') 
-                        ? 'Next: Send OTP' 
-                        : 'Confirm Settle'
-                    }
+                    {submittingPayment ? 'Processing...' : 'Confirm Settle'}
                   </button>
                 </div>
               </form>

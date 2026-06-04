@@ -153,10 +153,10 @@
         "Premium Sound System",
         "Double Bed"
       ],
-      "availability": true,
+      "availability": false,
       "capacity": 2,
       "floorNumber": 8,
-      "status": "Available",
+      "status": "Booked",
       "images": [
         "https://images.unsplash.com/photo-1502672014263-04e87abe90b3?auto=format&fit=crop&w=800&q=80"
       ],
@@ -185,6 +185,21 @@
     }
   ],
   "bookings": [
+    {
+      "id": "book-v6kprs7k0",
+      "unitId": "unit-105",
+      "unitName": "The Crimson Executive Lounge",
+      "residentId": "user-resident-1",
+      "residentName": "steven felarca",
+      "residentEmail": "john@condo.com",
+      "startDate": "2026-06-15",
+      "endDate": "2026-06-18",
+      "totalPrice": 450,
+      "status": "Approved",
+      "guestsCount": 2,
+      "notes": "",
+      "createdAt": "2026-06-04T05:55:48.284Z"
+    },
     {
       "id": "book-wj66nhpqk",
       "unitId": "unit-104",
@@ -262,6 +277,32 @@
     }
   ],
   "payments": [
+    {
+      "id": "pay-usgm8iaev",
+      "bookingId": "book-v6kprs7k0",
+      "residentId": "user-resident-1",
+      "residentName": "steven felarca",
+      "unitName": "The Crimson Executive Lounge",
+      "amount": 450,
+      "status": "Paid",
+      "method": "GCash Mobile",
+      "referenceNumber": "TXN-KPZJXH",
+      "createdAt": "2026-06-04T05:55:48.284Z",
+      "paidAt": "2026-06-04T05:56:09.846Z"
+    },
+    {
+      "id": "pay-ohm0langx",
+      "bookingId": "manual",
+      "residentId": "user-resident-1",
+      "residentName": "steven felarca",
+      "unitName": "Periodic Association Dues",
+      "amount": 200,
+      "status": "Paid",
+      "method": "Cash",
+      "referenceNumber": "CASH-QC48Y1",
+      "createdAt": "2026-06-03T07:59:52.453Z",
+      "paidAt": "2026-06-04T06:20:51.211Z"
+    },
     {
       "id": "pay-w1t79yn56",
       "bookingId": "manual",
@@ -402,6 +443,36 @@
   ],
   "notifications": [
     {
+      "id": "notif-0let85nlk",
+      "title": "Payment Received",
+      "message": "steven felarca submitted a payment of $200 for Periodic Association Dues (Ref: CASH-QC48Y1).",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "success",
+      "createdAt": "2026-06-04T06:20:51.213Z"
+    },
+    {
+      "id": "notif-ewjycxdd6",
+      "title": "Payment Received",
+      "message": "steven felarca submitted a payment of $450 for The Crimson Executive Lounge (Ref: TXN-KPZJXH).",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "success",
+      "createdAt": "2026-06-04T05:56:09.847Z"
+    },
+    {
+      "id": "notif-us3mg6vj5",
+      "title": "New Reservation Pending",
+      "message": "steven felarca submitted a request to book The Crimson Executive Lounge from 2026-06-15 to 2026-06-18.",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-06-04T05:55:48.284Z"
+    },
+    {
       "id": "notif-59goupm3q",
       "title": "Payment Received",
       "message": "steven felarca submitted a payment of $360 for The Zenith Suite (Ref: TXN-PYY5KO).",
@@ -513,6 +584,42 @@
     }
   ],
   "activityLogs": [
+    {
+      "id": "log-3pmk3dzlw",
+      "userId": "user-resident-1",
+      "userName": "steven felarca",
+      "userRole": "resident",
+      "action": "Payment Submitted",
+      "details": "Paid $200 references CASH-QC48Y1",
+      "createdAt": "2026-06-04T06:20:51.231Z"
+    },
+    {
+      "id": "log-saith4hjf",
+      "userId": "user-resident-1",
+      "userName": "steven felarca",
+      "userRole": "resident",
+      "action": "Payment Submitted",
+      "details": "Paid $450 references TXN-KPZJXH",
+      "createdAt": "2026-06-04T05:56:09.865Z"
+    },
+    {
+      "id": "log-zkk1d2pct",
+      "userId": "user-resident-1",
+      "userName": "steven felarca",
+      "userRole": "resident",
+      "action": "Booking Created",
+      "details": "Requested booking for The Crimson Executive Lounge",
+      "createdAt": "2026-06-04T05:55:48.300Z"
+    },
+    {
+      "id": "log-qqcaycgml",
+      "userId": "user-admin-1",
+      "userName": "Sarah Jenkins",
+      "userRole": "admin",
+      "action": "Invoice Generated",
+      "details": "Created manual invoice of $200 for resident",
+      "createdAt": "2026-06-03T07:59:52.462Z"
+    },
     {
       "id": "log-qq7m781in",
       "userId": "user-resident-1",

@@ -346,45 +346,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
     }
   };
 
-  // Resolve residents list locally based on bookings to ensure 100% crash proof stability
-  const getSimulatedResidents = () => {
-    const mapReg: Record<string, UserType> = {};
-    
-    // Default mock rosters
-    mapReg['user-resident-1'] = {
-      id: 'user-resident-1',
-      email: 'Steven@gmail.com',
-      name: 'Steven Felarca',
-      role: 'resident',
-      phone: '09127068234',
-      unitNumber: 'Unit 1204',
-      createdAt: new Date().toISOString()
-    };
-    
-    mapReg['user-resident-2'] = {
-      id: 'user-resident-2',
-      email: 'al@condo.com',
-      name: 'Donna Talam',
-      role: 'resident',
-      phone: '09127068233',
-      unitNumber: 'Unit 102',
-      createdAt: new Date().toISOString()
-    };
-
-    // Aggregate dynamic registrees from bookings logs
-    bookings.forEach(b => {
-      if (b.residentId && !mapReg[b.residentId]) {
-        mapReg[b.residentId] = {
-          id: b.residentId,
-          email: b.residentEmail || 'tenant@condo.com',
-          name: b.residentName || 'New Resident',
-          role: 'resident',
-          createdAt: b.createdAt
-        };
-      }
-    });
-
-    return Object.values(mapReg).filter(res => {
+  // Get filtered residents from actual backend data
+  const getFilteredResidents = () => {
+    return residents.filter(res => {
       return res.name.toLowerCase().includes(searchRes.toLowerCase()) || 
              res.email.toLowerCase().includes(searchRes.toLowerCase());
     });
@@ -820,11 +784,11 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </button>
                   <button
                     onClick={() => {
-                      if (getSimulatedResidents().length === 0) {
+                      if (getFilteredResidents().length === 0) {
                         toast('No targets found to invoice.', 'warning');
                         return;
                       }
-                      setTargetResidentBillId(getSimulatedResidents()[0].id);
+                      setTargetResidentBillId(getFilteredResidents()[0].id);
                       setShowCreateInvoiceModal(true);
                     }}
                     className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold py-2.5 px-4 rounded-xl uppercase tracking-wider shadow-sm"
@@ -853,7 +817,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       </tr>
                     </thead>
                     <tbody>
-                      {getSimulatedResidents().map((res) => (
+                      {getFilteredResidents().map((res) => (
                         <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                           <td className="py-4 px-3 font-semibold text-slate-950 flex items-center gap-2.5">
                             <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
@@ -1596,7 +1560,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         value={targetResidentBillId}
                         onChange={(e) => setTargetResidentBillId(e.target.value)}
                       >
-                        {getSimulatedResidents().map(r => (
+                        {getFilteredResidents().map(r => (
                           <option key={r.id} value={r.id} className="text-slate-900 font-medium">👤 {r.name} ({r.unitNumber || 'Un-assigned'})</option>
                         ))}
                       </select>
