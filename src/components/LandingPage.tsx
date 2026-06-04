@@ -47,6 +47,51 @@ const mockChartData = [
   { name: 'Jun', occupancy: 96, revenue: 28000 }
 ];
 
+const fallbackUnits: Unit[] = [
+  {
+    id: 'unit-103',
+    name: 'The Oasis Garden Loft',
+    type: '1-Bedroom Loft',
+    description: 'Charming duplex loft featuring exposed structural brickwork, reclaimed timber accents, and a lush private garden terrace perfect for morning coffee.',
+    price: 180,
+    amenities: ['Garden Terrace', 'Exposed Brick Style', 'Coffee Station', 'Dedicated Workspace', 'Smart Locks', 'Queen Bed', 'In-unit Laundry'],
+    availability: true,
+    capacity: 3,
+    floorNumber: 4,
+    status: 'Available',
+    images: ['https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800&q=80'],
+    createdAt: '2026-05-28T04:07:00.916Z'
+  },
+  {
+    id: 'unit-105',
+    name: 'The Crimson Executive Lounge',
+    type: 'Executive Studio',
+    description: 'Sleek, moody minimalist studio designed for corporate leaders. Soundproofed glazing, high-end acoustic systems, and dynamic ambient lighting presets.',
+    price: 150,
+    amenities: ['Acoustic Soundproofing', 'Curved Monitor Workspace', 'RGB Diffused Lighting', 'Premium Sound System', 'Double Bed'],
+    availability: false,
+    capacity: 2,
+    floorNumber: 8,
+    status: 'Booked',
+    images: ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80'],
+    createdAt: '2026-05-28T04:07:00.916Z'
+  },
+  {
+    id: 'unit-104',
+    name: 'The Solarium Duplex',
+    type: '2-Bedroom Suite',
+    description: 'Bathed in glorious natural light, this southwest-facing duplex offers a spectacular layout ideal for small families or business travelers seeking upscale comfort.',
+    price: 240,
+    amenities: ['Wraparound Glass', 'Kitchen Island', 'Home Office Corner', 'Walk-in Closet', 'Nespresso Machine', 'Two Queen Beds', 'Bath Tub'],
+    availability: false,
+    capacity: 4,
+    floorNumber: 15,
+    status: 'Booked',
+    images: ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80'],
+    createdAt: '2026-05-28T04:07:00.916Z'
+  }
+];
+
 export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPageProps) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
@@ -62,13 +107,23 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
 
   useEffect(() => {
     fetch('/api/units')
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) {
+          throw new Error(`Unit API request failed with status ${res.status}`);
+        }
+        return res.json();
+      })
       .then(data => {
         if (Array.isArray(data)) {
           setUnits(data.slice(0, 3)); // show first 3 for showcase
+        } else {
+          setUnits(fallbackUnits);
         }
       })
-      .catch(err => console.error('Failed fetching units on landing:', err));
+      .catch(err => {
+        console.error('Failed fetching units on landing:', err);
+        setUnits(fallbackUnits);
+      });
   }, []);
 
   const handleNextTestimonial = () => {
