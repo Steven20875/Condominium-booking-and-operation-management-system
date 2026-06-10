@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'node:path';
 import { createServer as createViteServer } from 'vite';
-import { db } from './server/db.ts';
+import { db, dbEvents } from './server/db.ts';
 import { GoogleGenAI } from '@google/genai';
 
 // Add environment variables support if needed
@@ -560,6 +560,53 @@ async function startServer() {
   // 7. SYSTEM PERFORMANCE & AUDITS
   app.get('/api/dashboard/stats', requireAuth, (req: Request, res: Response) => {
     res.json(db.getDashboardStats());
+  });
+
+  // Server-Sent Events stream for realtime updates (requires token query or Bearer header)
+  app.get('/api/events', (req: Request, res: Response) => {
+    const token = (req.query.token && String(req.query.token).trim()) || (String(req.headers.authorization || '').startsWith('Bearer ') ? String(req.headers.authorization).split(' ')[1] : '');
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required for event stream.' });
+    }
+
+    const user = db.findUserById(token);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid event stream token.' });
+    }
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ error: 'Event stream access restricted to administrators.' });
+    }
+
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    // Send initial stats
+    try {
+      res.write('event: stats\n');
+      res.write(`data: ${JSON.stringify(db.getDashboardStats())}\n\n`);
+    } catch (err) {
+      console.error('Failed sending initial SSE payload:', err);
+    }
+
+    const onChange = (payload: any) => {
+      try {
+        res.write('event: stats\n');
+        res.write(`data: ${JSON.stringify(payload?.stats || payload)}\n\n`);
+      } catch (err) {
+        console.error('SSE write error:', err);
+      }
+    };
+
+    dbEvents.on('change', onChange);
+
+    req.on('close', () => {
+      dbEvents.off('change', onChange);
+      try { res.end(); } catch (e) {}
+    });
   });
 
   app.get('/api/logs', requireAdmin, (req: Request, res: Response) => {

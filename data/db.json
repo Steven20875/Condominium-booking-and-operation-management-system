@@ -42,6 +42,17 @@
       "unitNumber": "",
       "avatarUrl": "https://api.dicebear.com/7.x/adventurer/svg?seed=teban1",
       "createdAt": "2026-06-03T01:40:57.647Z"
+    },
+    {
+      "id": "user-5khnb151f",
+      "email": "goboy@gmail.com",
+      "password": "goboy1",
+      "name": "goboy joseph",
+      "role": "resident",
+      "phone": "0912795234",
+      "unitNumber": "",
+      "avatarUrl": "https://api.dicebear.com/7.x/adventurer/svg?seed=goboy%20joseph",
+      "createdAt": "2026-06-07T13:55:47.381Z"
     }
   ],
   "units": [
@@ -277,6 +288,18 @@
     }
   ],
   "payments": [
+    {
+      "id": "pay-9efna6t85",
+      "bookingId": "manual",
+      "residentId": "user-resident-1",
+      "residentName": "steven felarca",
+      "unitName": "Periodic Association Dues",
+      "amount": 200,
+      "status": "Pending",
+      "method": "Credit Card",
+      "referenceNumber": "TXN-GEN-7O9XET",
+      "createdAt": "2026-06-07T13:50:59.327Z"
+    },
     {
       "id": "pay-usgm8iaev",
       "bookingId": "book-v6kprs7k0",
@@ -584,6 +607,24 @@
     }
   ],
   "activityLogs": [
+    {
+      "id": "log-608g3s2p0",
+      "userId": "user-5khnb151f",
+      "userName": "goboy joseph",
+      "userRole": "resident",
+      "action": "User Registered",
+      "details": "Account created with email goboy@gmail.com",
+      "createdAt": "2026-06-07T13:55:47.406Z"
+    },
+    {
+      "id": "log-5up7nrczc",
+      "userId": "user-admin-1",
+      "userName": "Sarah Jenkins",
+      "userRole": "admin",
+      "action": "Invoice Generated",
+      "details": "Created manual invoice of $200 for resident",
+      "createdAt": "2026-06-07T13:50:59.340Z"
+    },
     {
       "id": "log-3pmk3dzlw",
       "userId": "user-resident-1",

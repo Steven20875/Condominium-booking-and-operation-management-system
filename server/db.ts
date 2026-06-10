@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { EventEmitter } from 'events';
 import { 
   User, 
   Unit, 
@@ -254,6 +255,8 @@ const defaultLogs: ActivityLog[] = [
   }
 ];
 
+export const dbEvents = new EventEmitter();
+
 class MockDatabase {
   private data: DatabaseSchema = {
     users: [],
@@ -320,6 +323,13 @@ class MockDatabase {
         fs.mkdirSync(DB_DIR, { recursive: true });
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
+      // Emit a change event so external listeners (SSE/websockets) can react
+      try {
+        dbEvents.emit('change', { stats: this.getDashboardStats(), timestamp: Date.now() });
+      } catch (err) {
+        // swallow emitter errors
+        console.error('dbEvents emit error:', err);
+      }
     } catch (err) {
       console.error('Error writing database to disk:', err);
     }

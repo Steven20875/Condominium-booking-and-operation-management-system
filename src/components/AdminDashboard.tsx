@@ -132,6 +132,44 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
     fetchAllData();
   }, [token]);
 
+  // Realtime updates via Server-Sent Events (SSE)
+  useEffect(() => {
+    if (!token) return;
+
+    const url = `/api/events?token=${encodeURIComponent(token)}`;
+    let es: EventSource | null = null;
+
+    try {
+      es = new EventSource(url as any);
+
+      const handleStats = (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse((e as any).data);
+          setStats(payload);
+        } catch (err) {
+          console.error('Failed parsing SSE stats payload', err);
+        }
+      };
+
+      es.addEventListener('stats', handleStats as any);
+      es.onopen = () => console.log('SSE connected to /api/events');
+      es.onerror = (err) => {
+        console.error('SSE connection error', err);
+        // keep EventSource alive; browser will retry automatically
+      };
+    } catch (err) {
+      console.error('Failed to create EventSource', err);
+    }
+
+    return () => {
+      try {
+        if (es) {
+          es.close();
+        }
+      } catch (e) {}
+    };
+  }, [token]);
+
   // Handler for adding dynamic units
   const handleAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -13,15 +13,15 @@ interface LandingPageProps {
 
 const testimonialsData = [
   {
-    name: 'Emily Vance',
+    name: 'Nenia  May Buganas',
     role: 'Tower B Executive Resident',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    avatar: 'data/assets/nenia',
     comment: 'The booking interface has simplified managing our corporate suites completely. Settle bills, schedule gym passes, and coordinate with room mechanics under just 3 minutes.',
     stars: 5,
     unit: 'The Grand Horizon Penthouse'
   },
   {
-    name: 'Marcus K. Sterling',
+    name: 'Steven Christian Felarca',
     role: 'Property Committee President',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
     comment: 'From a general administrative perspective, this dashboard delivers high financial clarity. The automated receipts, tenant rosters, and maintenance tracking cut operations friction by 40%.',
@@ -29,7 +29,7 @@ const testimonialsData = [
     unit: 'Penthouse East Owner'
   },
   {
-    name: 'Rebecca Lopez',
+    name: 'Donna May Talam',
     role: 'Resident & Chef Specialist',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80',
     comment: 'Submitting a support request through the portal takes seconds, and the assigned technician actually gives live status notes directly in our conversation stream.',
