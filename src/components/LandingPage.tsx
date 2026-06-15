@@ -4,6 +4,7 @@ import {
   Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronLeft, ChevronRight, Star, Heart, ArrowUpRight, ArrowRight 
 } from 'lucide-react';
 import { Unit } from '../types.ts';
+import FerrofluidBackground from './FerrofluidBackground.tsx';
 import { ResponsiveContainer, AreaChart as RechartAreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface LandingPageProps {
@@ -186,11 +187,20 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
 
       {/* HERO SECTION */}
       <section id="hero" className="relative py-20 md:py-32 px-6 overflow-hidden text-white select-none">
-        
-        {/* Absolute Background Rendering */}
+        {/* Ferrofluid animated hero background (subtle, performance tuned) */}
+        <FerrofluidBackground
+          colors={["#2563EB", "#0EA5E9", "#06B6D4"]}
+          speed={0.25}
+          scale={2}
+          turbulence={0.6}
+          glow={1.2}
+          opacity={0.5}
+        />
+
+        {/* Absolute Background Rendering (texture & overlay) */}
         <div className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.22] scale-[1.02] mix-blend-multiply landing-hero-background" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/60 to-[#0f172a]/20 z-0" />
-        
+
         {/* Subtle decorative lights overlay */}
         <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-500/10 blur-3xl rounded-full mix-blend-screen pointer-events-none" />
 

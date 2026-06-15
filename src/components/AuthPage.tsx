@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
+import FerrofluidBackground from './FerrofluidBackground.tsx';
 import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, ChevronRight, Check } from 'lucide-react';
 import { User as UserType } from '../types.ts';
 
@@ -120,6 +121,8 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   return (
     <div id="auth-root" className="min-h-screen bg-transparent flex flex-col justify-between overflow-hidden relative font-sans">
       
+      {/* Decorative animated background (subtle) */}
+      <FerrofluidBackground colors={["#2563EB", "#0EA5E9", "#06B6D4"]} speed={0.25} scale={1.6} turbulence={0.6} glow={0.9} opacity={0.35} particles={8} />
       {/* Decorative Blur Background Elements */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-blue-500/5 blur-3xl opacity-40 pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-purple-500/5 blur-3xl opacity-40 pointer-events-none" />
