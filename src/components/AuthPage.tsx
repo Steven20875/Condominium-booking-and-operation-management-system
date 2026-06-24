@@ -269,7 +269,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       variant="primary"
                       fullWidth
                       onClick={handleCompleteVerification}
-                      icon={<Check className="h-4 w-4" />}
+                      icon={Check}
                       iconPosition="right"
                     >
                       Verify Account
@@ -329,7 +329,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         variant="primary"
                         fullWidth
                         disabled={isLoading}
-                        loading={isLoading}
+                        isLoading={isLoading}
                       >
                         {isLoading ? 'Processing Recovery...' : 'Dispatch Reset Email'}
                       </Button>
@@ -420,7 +420,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       value={email}
                       onChange={(e) => handleEmailChange(e.target.value)}
                       error={!emailValid ? 'Enter a valid email address to continue.' : undefined}
-                      icon={<Mail className="h-4 w-4" />}
+                      icon={Mail}
                       required
                     />
 
@@ -473,8 +473,8 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       variant="primary"
                       fullWidth
                       disabled={isLoading}
-                      loading={isLoading}
-                      icon={<ArrowRight className="h-4 w-4" />}
+                      isLoading={isLoading}
+                      icon={ArrowRight}
                       iconPosition="right"
                     >
                       {isLoading ? 'Signing In Securely...' : 'Sign In Securely'}
@@ -518,7 +518,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         placeholder="Johnathan Doe"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        icon={<User className="h-4 w-4" />}
+                        icon={User}
                         required
                       />
 
@@ -529,7 +529,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         placeholder="+1 (555) 122-874"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        icon={<Phone className="h-4 w-4" />}
+                        icon={Phone}
                       />
                     </div>
 
@@ -552,7 +552,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         placeholder="Unit 1204"
                         value={unitNumber}
                         onChange={(e) => setUnitNumber(e.target.value)}
-                        icon={<Home className="h-4 w-4" />}
+                        icon={Home}
                       />
                     </div>
 
@@ -563,7 +563,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      icon={<Lock className="h-4 w-4" />}
+                      icon={Lock}
                       required
                     />
 
@@ -572,7 +572,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       variant="primary"
                       fullWidth
                       disabled={isLoading}
-                      loading={isLoading}
+                      isLoading={isLoading}
                     >
                       {isLoading ? 'Verifying Portfolio...' : 'Begin Secure Enrolment'}
                     </Button>
