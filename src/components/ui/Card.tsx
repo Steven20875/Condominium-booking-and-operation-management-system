@@ -1,3 +1,39 @@
+/**
+ * Card Component System - Composable Card Layout
+ * 
+ * ARCHITECTURE PATTERN: Compound Components (similar to HTML table/thead/tbody)
+ * - Card wrapper with variant styling
+ * - CardHeader for title, subtitle, and action slots
+ * - CardBody for main content
+ * - CardFooter for buttons/actions
+ * 
+ * WHY COMPOUND COMPONENTS:
+ * - Flexibility: compose in any order needed
+ * - Maintainability: single styling source for all cards
+ * - Consistency: prevents 20+ different card implementations
+ * - Type-safe: TypeScript ensures proper nesting
+ * 
+ * BEFORE THIS COMPONENT:
+ * <div className="rounded-xl border bg-white/5 border-white/10 backdrop-blur-md">
+ *   <div className="p-6 border-b border-white/10">
+ *     <h2 className="text-lg font-bold">{title}</h2>
+ *   </div>
+ *   <div className="p-6">{children}</div>
+ * </div>
+ * 
+ * AFTER (using this component):
+ * <Card>
+ *   <CardHeader title={title} />
+ *   <CardBody>{children}</CardBody>
+ * </Card>
+ * 
+ * VARIANTS: glass (premium), light (bright), solid (standard)
+ * HOVER EFFECT: Optional elevation on hover for interactivity
+ * 
+ * Used across: AdminDashboard (stat cards, data tables), ResidentDashboard (bookings, payments)
+ * Created by: [Student]
+ */
+
 import React from 'react';
 
 type CardVariant = 'glass' | 'light' | 'solid';

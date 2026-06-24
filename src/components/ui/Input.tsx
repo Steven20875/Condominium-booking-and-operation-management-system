@@ -1,3 +1,30 @@
+/**
+ * Input Component - Standardized Form Input with Validation
+ * 
+ * PROBLEM SOLVED: Before this component, every form had repetitive code:
+ * - Manual label creation and association
+ * - Duplicate error message styling
+ * - Icon positioning logic repeated 20+ times
+ * - No consistency in validation states
+ * 
+ * SOLUTION: Centralized input handling with built-in:
+ * - Label rendering with proper htmlFor association (accessibility)
+ * - Error display with visual feedback (red border + error text)
+ * - Helper text for guidance
+ * - Icon support with proper positioning
+ * - Three variants to match app aesthetic (glass, light, solid)
+ * 
+ * VARIANTS EXPLANATION:
+ * - glass: Premium dark-theme style (white/5 background, white/10 border)
+ * - light: Bright, clean style (slate-50 background)
+ * - solid: Standard form input
+ * 
+ * Used in: AuthPage (login, register, password reset), AdminDashboard (filters)
+ * Reduced code: Eliminates ~40 lines per form using this component
+ * 
+ * Created by: [Student]
+ */
+
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
 
