@@ -488,12 +488,15 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
         </div>
 
         <div className="pt-4 border-t border-white/10 px-3">
-          <button
+          <Button
+            variant="danger"
+            size="sm"
+            fullWidth
             onClick={() => setShowLogoutModal(true)}
-            className="w-full flex items-center gap-3 py-2.5 text-slate-400 hover:text-rose-400 transition-colors text-xs font-semibold tracking-wider uppercase cursor-pointer"
+            icon={<LogOut className="h-4 w-4" />}
           >
-            <LogOut className="h-4 w-4" /> Quit Admin Gate
-          </button>
+            Quit Admin Gate
+          </Button>
         </div>
       </aside>
 
@@ -511,12 +514,14 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
           </div>
 
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="primary"
+              size="md"
               onClick={fetchAllData}
-              className="bg-gradient-to-r from-blue-600/80 to-indigo-600/80 hover:from-blue-600 hover:to-indigo-600 border border-white/15 text-xs font-semibold text-white px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/10 cursor-pointer backdrop-blur-sm"
+              loading={loading}
             >
               ↻ Sync Data
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -816,13 +821,17 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 </div>
 
                 <div className="flex gap-2">
-                  <button
+                  <Button
+                    variant="primary"
+                    size="md"
                     onClick={() => setShowAddResidentModal(true)}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl uppercase tracking-wider shadow"
+                    icon={<Plus className="h-4 w-4" />}
                   >
                     Add Resident
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
                     onClick={() => {
                       if (getFilteredResidents().length === 0) {
                         toast('No targets found to invoice.', 'warning');
@@ -831,10 +840,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       setTargetResidentBillId(getFilteredResidents()[0].id);
                       setShowCreateInvoiceModal(true);
                     }}
-                    className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold py-2.5 px-4 rounded-xl uppercase tracking-wider shadow-sm"
                   >
                     Generate Invoice
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -870,15 +878,16 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           <td className="py-4 px-3 font-bold text-slate-900">{res.unitNumber || 'Suite pending'}</td>
                           <td className="py-4 px-3 text-slate-400 text-[10px]">{new Date(res.createdAt).toLocaleDateString()}</td>
                           <td className="py-4 px-3 text-right">
-                            <button
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={() => {
                                 setTargetResidentBillId(res.id);
                                 setShowCreateInvoiceModal(true);
                               }}
-                              className="text-[10px] uppercase tracking-wider font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-200"
                             >
                               Bill
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -942,22 +951,18 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           <td className="py-4 px-3 text-right">
                             {b.status === 'Pending' ? (
                               <div className="flex gap-1.5 justify-end">
-                                <button
-                                  type="button"
-                                  aria-label="Approve booking"
+                                <Button
+                                  variant="success"
+                                  size="sm"
+                                  icon={<Check className="h-4 w-4" />}
                                   onClick={() => handleBookingApproval(b.id, 'Approved')}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white p-1.5 rounded-lg"
-                                >
-                                  <Check className="h-4.5 w-4.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label="Reject booking"
+                                />
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  icon={<X className="h-4 w-4" />}
                                   onClick={() => handleBookingApproval(b.id, 'Rejected')}
-                                  className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded-lg"
-                                >
-                                  <X className="h-4.5 w-4.5" />
-                                </button>
+                                />
                               </div>
                             ) : (
                               <span className="text-[10px] text-slate-400 font-semibold uppercase">{b.status} Validated</span>
@@ -1023,14 +1028,16 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           </td>
                           <td className="py-4 px-3 text-right font-bold text-slate-700">
                             {p.status === 'Paid' ? (
-                              <button
+                              <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => {
                                   toast('Receipt downloaded safely inside local database stream.', 'success');
                                 }}
-                                className="text-[10px] tracking-wider uppercase bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-1 rounded-lg"
+                                icon={<FileText className="h-4 w-4" />}
                               >
-                                Download Receipt
-                              </button>
+                                Download
+                              </Button>
                             ) : (
                               <span className="text-[10px] text-slate-400 font-semibold">Invoiced pending</span>
                             )}
@@ -1101,16 +1108,18 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             {ticket.assignedStaff && <span className="block text-[9px] text-slate-400 font-normal">{ticket.assignedStaff}</span>}
                           </td>
                           <td className="py-4 px-3 text-right">
-                            <button
+                            <Button
+                              variant="primary"
+                              size="sm"
                               onClick={() => {
                                 setDispatchTicket(ticket);
                                 setDispatchStatus(ticket.status);
                                 setDispatchStaff(ticket.assignedStaff || 'Robert Mclean (Plumbing Specialist)');
                               }}
-                              className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] px-3.5 py-1.5 rounded-xl uppercase tracking-wider"
+                              icon={<Wrench className="h-4 w-4" />}
                             >
                               Dispatch
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -1195,13 +1204,15 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   />
                 </div>
 
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
+                  fullWidth
                   disabled={submittingBroadcast}
-                  className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md mt-6"
+                  loading={submittingBroadcast}
                 >
-                  {submittingBroadcast ? 'Dispersing Signals...' : 'Broadcast Bulletin Signals'}
-                </button>
+                  Broadcast Bulletin Signals
+                </Button>
               </form>
             </motion.div>
           )}
@@ -1766,22 +1777,24 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               </div>
 
               <div className="flex gap-3 pt-2 font-sans">
-                <button
+                <Button
+                  variant="outline"
+                  fullWidth
                   onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
                 >
                   Stay in Cabin
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  fullWidth
                   onClick={() => {
                     setShowLogoutModal(false);
                     onLogout();
                     toast('Session logged out securely.', 'info');
                   }}
-                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md"
                 >
                   Leave Gates
-                </button>
+                </Button>
               </div>
             </motion.div>
           </div>
