@@ -493,7 +493,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             size="sm"
             fullWidth
             onClick={() => setShowLogoutModal(true)}
-            icon={<LogOut className="h-4 w-4" />}
+            icon={LogOut}
           >
             Quit Admin Gate
           </Button>
@@ -518,7 +518,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               variant="primary"
               size="md"
               onClick={fetchAllData}
-              loading={loading}
+              isLoading={loading}
             >
               ↻ Sync Data
             </Button>
@@ -954,13 +954,13 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                                 <Button
                                   variant="success"
                                   size="sm"
-                                  icon={<Check className="h-4 w-4" />}
+                                  icon={Check}
                                   onClick={() => handleBookingApproval(b.id, 'Approved')}
                                 />
                                 <Button
                                   variant="danger"
                                   size="sm"
-                                  icon={<X className="h-4 w-4" />}
+                                  icon={X}
                                   onClick={() => handleBookingApproval(b.id, 'Rejected')}
                                 />
                               </div>
@@ -1034,7 +1034,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                                 onClick={() => {
                                   toast('Receipt downloaded safely inside local database stream.', 'success');
                                 }}
-                                icon={<FileText className="h-4 w-4" />}
+                                icon={FileText}
                               >
                                 Download
                               </Button>
@@ -1116,7 +1116,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                                 setDispatchStatus(ticket.status);
                                 setDispatchStaff(ticket.assignedStaff || 'Robert Mclean (Plumbing Specialist)');
                               }}
-                              icon={<Wrench className="h-4 w-4" />}
+                              icon={Wrench}
                             >
                               Dispatch
                             </Button>
@@ -1209,7 +1209,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   variant="primary"
                   fullWidth
                   disabled={submittingBroadcast}
-                  loading={submittingBroadcast}
+                  isLoading={submittingBroadcast}
+                  loadingText="Dispersing Signals..."
                 >
                   Broadcast Bulletin Signals
                 </Button>
