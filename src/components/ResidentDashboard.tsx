@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
 import { 
-  Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, Heart, X, Sparkles, Upload, FileText, Smartphone, DollarSign, HelpCircle, QrCode, ShieldCheck 
+  Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, ChevronLeft, ChevronRight, Sun, Heart, X, Sparkles, Upload, FileText, Smartphone, DollarSign, HelpCircle, QrCode, ShieldCheck 
 } from 'lucide-react';
 import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, Inquiry, Purchase } from '../types.ts';
 
@@ -22,6 +22,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
   
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState<boolean>(false);
 
   // States
   const [units, setUnits] = useState<Unit[]>([]);
@@ -260,6 +262,13 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
     toast('Profile avatar set. Commit updates below or press save.', 'info');
   };
 
+  const currentDateString = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+  const weatherSummary = '29°C • Partly Cloudy';
+
   // Calculate booking cost
   const calculateDays = () => {
     try {
@@ -473,24 +482,24 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
     <div id="res-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
       
       {/* 1. SIDE NAVIGATION BAR */}
-      <aside className="w-full md:w-64 bg-slate-950/40 backdrop-blur-md text-white shrink-0 flex flex-col justify-between py-6 px-4 border-r border-white/10 md:h-screen sticky top-0 md:top-auto z-40">
+      <aside className={`w-full ${isSidebarCollapsed ? 'md:w-20' : 'md:w-72'} bg-slate-950/40 backdrop-blur-md text-white shrink-0 flex flex-col justify-between py-6 px-4 border-r border-white/10 md:h-screen sticky top-0 md:top-auto z-40 transition-all duration-300`}>
         <div className="space-y-6">
-          <div className="flex items-center gap-2.5 px-3">
+          <div className={`flex items-center gap-2.5 px-3 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
             <div className="bg-gradient-to-tr from-blue-500 to-purple-500 text-white p-2 rounded-xl">
               <Building className="h-5 w-5" />
             </div>
-            <div>
+            <div className={`${isSidebarCollapsed ? 'hidden' : ''}`}>
               <p className="font-bold text-sm tracking-widest text-white leading-none uppercase font-serif">One Spatial Iloilo</p>
               <p className="text-[10px] text-blue-400 font-mono tracking-wider mt-1 uppercase">Gales Urban Haven</p>
             </div>
           </div>
 
           {/* Mini Resident Info */}
-          <div className="bg-white/5 p-3 rounded-xl border border-white/10 flex items-center gap-2.5">
+          <div className={`bg-white/5 p-3 rounded-xl border border-white/10 flex items-center gap-2.5 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
             <div className="h-9 w-9 bg-white/10 rounded-full border border-white/15 overflow-hidden shrink-0">
               <img src={user.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80'} alt="Avatar" />
             </div>
-            <div className="overflow-hidden">
+            <div className={`overflow-hidden transition-all ${isSidebarCollapsed ? 'opacity-0 w-0' : ''}`}>
               <p className="font-bold text-xs truncate max-w-[130px]">{user.name}</p>
               <p className="text-[10px] text-slate-400 truncate max-w-[130px]">{user.unitNumber || 'One Spatial Guest'}</p>
             </div>
@@ -500,11 +509,12 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
           <nav className="space-y-1">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+              className={`w-full flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center' : 'justify-start'} px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                 activeTab === 'overview' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Building className="h-4 w-4" /> Overview Dashboard
+              <Building className="h-4 w-4" />
+              <span className={`${isSidebarCollapsed ? 'hidden' : ''}`}>Overview Dashboard</span>
             </button>
             <button
               onClick={() => setActiveTab('browse')}
@@ -557,13 +567,22 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
           </nav>
         </div>
 
-        {/* LOG OUT TRIGGER BUTTON */}
-        <div className="pt-4 border-t border-white/10 px-3">
+        <div className="space-y-3">
           <button
+            type="button"
             onClick={() => setShowLogoutModal(true)}
-            className="w-full flex items-center gap-3 py-2.5 text-slate-400 hover:text-rose-400 transition-colors text-xs font-semibold tracking-wider uppercase cursor-pointer"
+            className={`w-full flex items-center gap-3 py-2.5 text-slate-400 hover:text-rose-400 transition-colors text-xs font-semibold tracking-wider uppercase cursor-pointer ${isSidebarCollapsed ? 'justify-center' : ''}`}
           >
-            <LogOut className="h-4 w-4" /> Sign Out Session
+            <LogOut className="h-4 w-4" />
+            <span className={`${isSidebarCollapsed ? 'hidden' : ''}`}>Sign Out Session</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-slate-300 hover:text-white transition-colors text-xs font-semibold uppercase tracking-wider border border-white/10 rounded-xl"
+          >
+            {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            <span className={`${isSidebarCollapsed ? 'hidden' : ''}`}>Collapse</span>
           </button>
         </div>
       </aside>
@@ -572,26 +591,87 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser 
       <main className="flex-1 overflow-y-auto px-4 py-8 md:p-12 md:max-h-screen">
         
         {/* TOP STATUS HEADER BAR */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <span className="text-xs font-bold font-mono tracking-wider text-blue-400 uppercase py-0.5">Welcome Panel</span>
-            <h1 className="text-2xl sm:text-3xl font-serif font-black text-white mt-0.5">
-              Refined Living, {user.name}
-            </h1>
+        <header className="flex flex-col gap-6 mb-8">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div>
+              <span className="text-xs font-bold font-mono tracking-wider text-blue-400 uppercase py-0.5">Welcome Back</span>
+              <h1 className="text-3xl md:text-4xl font-serif font-black text-white mt-3 leading-tight">Welcome Back, {user.name}</h1>
+              <p className="text-sm text-slate-400 mt-2 max-w-2xl">Resident • {profileUnit || 'Unit 1204'} • {currentDateString}</p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="glass-card p-3 rounded-3xl border border-white/10 shadow-sm min-w-[170px]">
+                <div className="flex items-center gap-2">
+                  <Sun className="h-4 w-4 text-amber-300" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Weather</p>
+                    <p className="text-sm font-semibold text-white">{weatherSummary}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="glass-card p-3 rounded-3xl border border-white/10 shadow-sm min-w-[170px]">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-blue-300" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Notifications</p>
+                    <p className="text-sm font-semibold text-white">{notifications.length} unread</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-semibold">
-            {profileUnit && (
-              <span className="bg-white/5 text-slate-200 px-3.5 py-2 rounded-xl shadow-sm border border-white/10 flex items-center gap-1.5">
-                <Building className="h-4 w-4 text-blue-400" /> Unit: {profileUnit}
-              </span>
-            )}
-            <button
-              onClick={fetchAllData}
-              className="bg-white/5 hover:bg-white/15 border border-white/10 text-white px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
-            >
-              Reload Live Feeds
-            </button>
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4 items-center">
+            <div className="glass-card p-4 rounded-3xl border border-white/10 shadow-sm flex items-center gap-3">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search bookings, payments, maintenance, residents..."
+                className="w-full bg-transparent placeholder:text-slate-500 text-sm text-white focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={handleClearAllNotifications}
+                className="glass-button-secondary text-xs px-4 py-3 rounded-3xl"
+              >
+                Clear Alert Inbox
+              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  className="glass-card p-3 rounded-3xl border border-white/10 shadow-sm flex items-center gap-3"
+                >
+                  <div className="h-10 w-10 rounded-2xl overflow-hidden bg-slate-800 border border-white/10">
+                    <img src={profileAvatar || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80'} alt="Resident profile" className="h-full w-full object-cover" />
+                  </div>
+                  <div className={`${isSidebarCollapsed ? 'hidden' : ''}`}>
+                    <p className="text-sm text-white font-semibold leading-none">{profileName}</p>
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Account Settings</p>
+                  </div>
+                </button>
+                {profileMenuOpen && (
+                  <div className="absolute right-0 mt-3 w-60 rounded-3xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-2xl shadow-slate-950/50 p-3 z-50">
+                    {['Profile', 'Settings', 'Notifications', 'Security', 'Help Center', 'Logout'].map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          if (item === 'Logout') setShowLogoutModal(true);
+                        }}
+                        className="w-full text-left px-3 py-3 rounded-2xl text-sm text-slate-200 hover:bg-white/5 transition-colors"
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </header>
 

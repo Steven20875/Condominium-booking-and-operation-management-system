@@ -511,7 +511,7 @@
       "message": "Your maintenance ticket concerning \"Plumbing\" is now: IN PROGRESS. Assigned to: Robert Mclean (Plumber Lead).",
       "recipientId": "user-resident-1",
       "recipientRole": "resident",
-      "isRead": false,
+      "isRead": true,
       "type": "info",
       "createdAt": "2026-06-03T01:44:34.666Z"
     },
@@ -541,7 +541,7 @@
       "message": "Your maintenance ticket concerning \"Plumbing\" is now: IN PROGRESS. Assigned to: Robert Mclean (Plumber Lead).",
       "recipientId": "user-resident-1",
       "recipientRole": "resident",
-      "isRead": false,
+      "isRead": true,
       "type": "info",
       "createdAt": "2026-06-01T02:00:26.428Z"
     },
@@ -571,7 +571,7 @@
       "message": "Your reservation request for \"The Oasis Garden Loft\" has been cancelled.",
       "recipientId": "user-resident-1",
       "recipientRole": "resident",
-      "isRead": false,
+      "isRead": true,
       "type": "alert",
       "createdAt": "2026-06-01T01:13:57.567Z"
     },
@@ -591,7 +591,7 @@
       "message": "The outdoor infinity ozone-pool on the 3rd floor deck has passed safety checks and is now fully reopened for swimming hours.",
       "recipientId": "all",
       "recipientRole": "all",
-      "isRead": false,
+      "isRead": true,
       "type": "success",
       "createdAt": "2026-05-28T02:07:00.917Z"
     },
@@ -601,7 +601,7 @@
       "message": "We will conduct localized duct clearing and exhaust disinfection between May 30th and June 2nd. Please check notice boards for timings.",
       "recipientId": "all",
       "recipientRole": "resident",
-      "isRead": false,
+      "isRead": true,
       "type": "info",
       "createdAt": "2026-05-28T04:07:00.917Z"
     }

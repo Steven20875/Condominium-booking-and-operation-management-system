@@ -10,6 +10,7 @@ import {
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
+import { Button, Input, Select, Badge, StatusBadge, Modal, ModalHeader, ModalBody, ModalFooter, ConfirmationDialog } from './ui';
 
 interface AdminDashboardProps {
   user: UserType;
@@ -502,18 +503,19 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
         {/* TOP METRIC MONITOR BAR */}
         <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
-            <span className="text-xs font-bold font-mono tracking-wider text-purple-400 uppercase">Tower Administration Room</span>
-            <h1 className="text-2xl sm:text-3xl font-serif font-black text-white mt-1">
-              Building Analytics Terminal
+            <span className="text-xs font-bold font-mono tracking-wider text-blue-400 uppercase">Operations Hub</span>
+            <h1 className="text-3xl sm:text-4xl font-serif font-black text-white mt-1 tracking-tight">
+              Property Management Dashboard
             </h1>
+            <p className="text-xs text-slate-400 mt-2 font-medium">Real-time operations analytics & administrative controls</p>
           </div>
 
           <div className="flex gap-2">
             <button
               onClick={fetchAllData}
-              className="bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white px-4 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
+              className="bg-gradient-to-r from-blue-600/80 to-indigo-600/80 hover:from-blue-600 hover:to-indigo-600 border border-white/15 text-xs font-semibold text-white px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/10 cursor-pointer backdrop-blur-sm"
             >
-              Reload API Feeds
+              ↻ Sync Data
             </button>
           </div>
         </header>
@@ -550,7 +552,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               {/* Row Widgets */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Residents</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.totalResidents}</p>
@@ -560,7 +562,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Condo Units Listed</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.totalUnits}</p>
@@ -570,7 +572,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Space Occupancy Rate</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.occupancyRate}%</p>
@@ -580,7 +582,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LEDGER Gross Income</p>
                     <p className="text-2xl font-serif font-bold text-emerald-400">{formatCurrency(stats.totalRevenue)}</p>
@@ -593,7 +595,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Invoices</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.totalInvoices}</p>
@@ -603,7 +605,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Payments</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.pendingPayments}</p>
@@ -613,7 +615,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tickets</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.unresolvedMaintenance}</p>
@@ -623,7 +625,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between hover:shadow-lg hover:border-white/15 transition-all hover:-translate-y-1 cursor-default">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Bookings</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.bookingStatusData.find(entry => entry.name === 'Pending Approval')?.value || 0}</p>
@@ -635,7 +637,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-8 glass-card p-6 rounded-3xl border border-white/10 shadow-sm">
+                <div className="lg:col-span-8 glass-card p-6 rounded-3xl border border-white/10 shadow-sm hover:shadow-lg hover:border-white/15 transition-all">
                   <h3 className="font-serif font-bold text-white text-base">Revenue Trend</h3>
                   <div className="h-80 mt-6">
                     <ResponsiveContainer width="100%" height="100%">
@@ -655,7 +657,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 </div>
               </div>
 
-                <div className="lg:col-span-4 glass-card p-6 rounded-3xl border border-white/10 shadow-sm flex flex-col justify-between">
+                <div className="lg:col-span-4 glass-card p-6 rounded-3xl border border-white/10 shadow-sm hover:shadow-lg hover:border-white/15 transition-all flex flex-col justify-between">
                   <h3 className="font-serif font-bold text-white text-base">Reservations Status Ratio</h3>
                   <div className="h-64 mt-4 select-none flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
@@ -694,19 +696,21 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               exit={{ opacity: 0, y: -15 }}
               className="space-y-6 animate-fade-in"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card p-4 rounded-2xl border border-white/10 shadow-sm">
-                <div className="relative max-w-sm w-full">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-450" />
-                  <input
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card p-4 rounded-2xl border border-white/10 shadow-sm hover:shadow-md hover:border-white/15 transition-all">
+                <div className="max-w-sm w-full">
+                  <Input
                     type="text"
-                    className="w-full glass-input text-xs text-white pl-9 pr-4 py-2.5 rounded-xl focus:outline-none placeholder:text-slate-500 font-semibold"
                     placeholder="Search suite configurations..."
                     value={searchUnit}
                     onChange={(e) => setSearchUnit(e.target.value)}
+                    icon={<Search className="h-4 w-4" />}
+                    variant="glass"
+                    fullWidth
                   />
                 </div>
 
-                <button
+                <Button
+                  variant="primary"
                   onClick={() => {
                     setEditUnitItem(null);
                     setUnitName('');
@@ -715,10 +719,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     setUnitAmenities('Wi-Fi, Queen Bed, Kitchenette, TV');
                     setShowAddUnitModal(true);
                   }}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 px-5 rounded-xl uppercase tracking-wider shadow-md flex items-center gap-1.5"
+                  icon={<Plus className="h-4 w-4" />}
                 >
-                  <Plus className="h-4 w-4" /> Add Premium Suite
-                </button>
+                  Add Premium Suite
+                </Button>
               </div>
 
               {/* Grid listings cards */}
@@ -757,9 +761,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       </div>
 
                       <div className="flex gap-2">
-                        <button
-                          type="button"
-                          aria-label="Edit unit"
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => {
                             setEditUnitItem(item);
                             setUnitName(item.name);
@@ -772,18 +776,16 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             setUnitImages(item.images);
                             setShowAddUnitModal(true);
                           }}
-                          className="bg-white hover:bg-slate-100 border border-slate-200 p-2 rounded-xl text-slate-700"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Delete unit"
+                          icon={<Edit2 className="h-3.5 w-3.5" />}
+                          aria-label="Edit unit"
+                        />
+                        <Button
+                          variant="danger"
+                          size="sm"
                           onClick={() => handleDeleteUnit(item.id)}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 p-2 rounded-xl"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          icon={<Trash2 className="h-3.5 w-3.5" />}
+                          aria-label="Delete unit"
+                        />
                       </div>
                     </div>
                   </div>
@@ -930,7 +932,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           <td className="py-4 px-3 font-black text-slate-950">{formatCurrency(b.totalPrice)}</td>
                           <td className="py-4 px-3 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono tracking-wider font-bold uppercase ${
-                              b.status === 'Approved' ? 'bg-emerald-55 bg-emerald-100 text-emerald-800' :
+                              b.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
                               b.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
                               'bg-slate-100 text-slate-500'
                             }`}>
@@ -1250,7 +1252,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="bg-white text-slate-900 rounded-3xl border border-slate-100 shadow-2xl max-w-lg w-full overflow-hidden"
+              className="bg-white text-slate-900 rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden backdrop-blur-sm"
             >
               <form onSubmit={handleAddUnit} className="space-y-6">
                 <div className="p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[500px]">
@@ -1261,14 +1263,14 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         {editUnitItem ? 'Modify Listed Suite' : 'List New Premium Suite'}
                       </h3>
                     </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setShowAddUnitModal(false)}
-                      aria-label="Close unit modal"
-                      className="p-1.5 bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddUnitModal(false)}
+                    aria-label="Close unit modal"
+                    className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                   </div>
 
                   {/* Device upload simulation */}
@@ -1393,21 +1395,23 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-                  <button
-                    type="button"
+                <div className="p-6 bg-slate-50 border-t border-slate-200 flex gap-3">
+                  <Button
+                    variant="secondary"
+                    fullWidth
                     onClick={() => setShowAddUnitModal(false)}
-                    className="flex-1 py-3 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
+                    variant="primary"
+                    fullWidth
                     disabled={submittingUnit}
-                    className="flex-1 py-3 bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                    loading={submittingUnit}
                   >
                     {submittingUnit ? 'Saving Records...' : 'Save Layout Listing'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </motion.div>
@@ -1423,7 +1427,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="bg-white text-slate-900 rounded-3xl border border-slate-100 shadow-2xl max-w-sm w-full overflow-hidden"
+              className="bg-white text-slate-900 rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full overflow-hidden backdrop-blur-sm"
             >
               <form onSubmit={async (e) => {
                 e.preventDefault();
@@ -1467,7 +1471,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       type="button" 
                       aria-label="Close resident modal"
                       onClick={() => setShowAddResidentModal(false)}
-                      className="p-1 bg-slate-100 rounded-full text-slate-400 cursor-pointer"
+                      className="p-1 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -1540,21 +1544,23 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-                  <button
-                    type="button"
+                <div className="p-6 bg-slate-50 border-t border-slate-200 flex gap-3">
+                  <Button
+                    variant="secondary"
+                    fullWidth
                     onClick={() => setShowAddResidentModal(false)}
-                    className="flex-1 py-3 border border-slate-200 bg-white text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
+                    variant="primary"
+                    fullWidth
                     disabled={submittingResident}
-                    className="flex-1 py-3 bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md cursor-pointer"
+                    loading={submittingResident}
                   >
                     {submittingResident ? 'Saving...' : 'Add Resident'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </motion.div>
@@ -1570,7 +1576,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="bg-white text-slate-900 rounded-3xl border border-slate-100 shadow-2xl max-w-sm w-full overflow-hidden"
+              className="bg-white text-slate-900 rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full overflow-hidden backdrop-blur-sm"
             >
               <form onSubmit={handleGenerateInvoice} className="space-y-4">
                 <div className="p-6 sm:p-8 space-y-4">
@@ -1660,7 +1666,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-sm w-full overflow-hidden"
+              className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full overflow-hidden backdrop-blur-sm"
             >
               <form onSubmit={handleMaintenanceDispatch}>
                 <div className="p-6 sm:p-8 space-y-4 font-sans">
@@ -1716,20 +1722,21 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 </div>
 
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-                  <button
-                    type="button"
+                <div className="p-6 bg-slate-50 border-t border-slate-200 flex gap-3">
+                  <Button
+                    variant="secondary"
+                    fullWidth
                     onClick={() => setDispatchTicket(null)}
-                    className="flex-1 py-3 border border-slate-200 bg-white text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
-                    className="flex-1 py-3 bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md animate-pulse"
+                    variant="primary"
+                    fullWidth
                   >
                     Confirm Dispatch
-                  </button>
+                  </Button>
                 </div>
               </form>
             </motion.div>
@@ -1745,7 +1752,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 space-y-5 text-center"
+              className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-200 space-y-5 text-center backdrop-blur-sm"
             >
               <div className="inline-flex p-3 bg-rose-50 rounded-full text-rose-600">
                 <LogOut className="h-6 w-6" />

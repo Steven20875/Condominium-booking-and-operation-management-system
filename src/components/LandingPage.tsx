@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronLeft, ChevronRight, Star, Heart, ArrowUpRight, ArrowRight 
+  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star, Heart, ArrowUpRight, ArrowRight, CreditCard, Twitter, Instagram, Linkedin 
 } from 'lucide-react';
 import { Unit } from '../types.ts';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
@@ -93,9 +93,84 @@ const fallbackUnits: Unit[] = [
   }
 ];
 
+const trustStats = [
+  { value: 500, suffix: '+', label: 'Happy Residents' },
+  { value: 98, suffix: '%', label: 'Occupancy Rate' },
+  { value: 24, suffix: '/7', label: 'Security' },
+  { value: 100, suffix: '%', label: 'Online Booking' }
+];
+
+const whyChooseData = [
+  { icon: Calendar, title: 'Online Booking', description: 'Reserve units in seconds with real-time availability and secure confirmation.' },
+  { icon: UserCheck, title: 'Resident Portal', description: 'A central dashboard for residents to manage bookings, announcements, and service requests.' },
+  { icon: CreditCard, title: 'Digital Payments', description: 'Secure billing and payment flows for deposits, utilities, and rent statements.' },
+  { icon: Wrench, title: 'Maintenance Requests', description: 'Streamlined service tickets with live progress updates and technician assignment.' },
+  { icon: Bell, title: 'Visitor Management', description: 'Approve guests, track arrivals, and secure building entries effortlessly.' },
+  { icon: AreaChart, title: 'Analytics Dashboard', description: 'Executive metrics for occupancy, revenue, and resident satisfaction trends.' },
+  { icon: ShieldCheck, title: 'Secure Authentication', description: 'Role-based access for residents, admins, and operations staff.' },
+  { icon: Mail, title: 'Announcements', description: 'Broadcast urgent updates and community notices instantly to every resident.' }
+];
+
+const processSteps = [
+  { title: 'Create Account', description: 'Register your resident profile and verify credentials through the secure portal.', icon: UserCheck },
+  { title: 'Choose a Unit', description: 'Browse curated residences and compare pricing, amenities, and availability.', icon: Building },
+  { title: 'Submit Requirements', description: 'Upload necessary documentation and finalize reservation details online.', icon: Mail },
+  { title: 'Move In', description: 'Complete check-in, receive access details, and settle into premium condominium living.', icon: ArrowUpRight }
+];
+
+const faqItems = [
+  { question: 'How do I book a condo unit?', answer: 'Use the Book Your Unit button to access live listings, choose your preferred suite, and submit a secure reservation request in minutes.' },
+  { question: 'What payment methods are accepted?', answer: 'We support digital payment channels for bookings, maintenance fees, and security deposits through our secure billing system.' },
+  { question: 'What documents do I need for move-in?', answer: 'Typically you need a valid ID, residency details, and proof of payment to complete the booking process with our operations team.' },
+  { question: 'How does maintenance support work?', answer: 'Submit a request through the portal and our maintenance team will triage, assign, and update status in real time until resolution.' },
+  { question: 'Can guests be registered in advance?', answer: 'Yes, visitor registration is managed through the platform so guests receive seamless building access approval.' }
+];
+
+function AnimatedStat({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
+  const [current, setCurrent] = useState(0);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      let frame = 0;
+      const duration = 900;
+      const step = Math.max(1, Math.round(value / (duration / 16)));
+      const counter = () => {
+        frame += step;
+        if (frame >= value) {
+          setCurrent(value);
+          observer.disconnect();
+          return;
+        }
+        setCurrent(frame);
+        requestAnimationFrame(counter);
+      };
+      requestAnimationFrame(counter);
+    }, { threshold: 0.4 });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [value]);
+
+  return (
+    <div ref={ref} className="space-y-2 text-center">
+      <p className="text-4xl sm:text-5xl font-serif font-black text-white tracking-tight">
+        {current}
+        <span className="text-blue-400">{suffix}</span>
+      </p>
+      <p className="text-xs uppercase tracking-[0.32em] text-slate-400 font-semibold">{label}</p>
+    </div>
+  );
+}
+
 export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPageProps) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);
   const [contactSuccess, setContactSuccess] = useState(false);
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -151,33 +226,51 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
     <div id="landing-root" className="min-h-screen bg-transparent text-slate-200 font-sans selection:bg-blue-600 selection:text-white">
       
       {/* HEADER SECTION */}
-      <nav id="landing-nav" className="sticky top-0 z-50 bg-slate-950/30 backdrop-blur-md border-b border-white/10 py-4 px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-gradient-to-tr from-blue-500 to-purple-500 text-white p-2 rounded-xl">
+      <nav id="landing-nav" className="sticky top-0 z-50 min-h-[78px] bg-slate-950/25 backdrop-blur-xl border-b border-white/10 transition-all duration-500">
+        <div className="max-w-7xl mx-auto h-full flex items-center justify-between gap-6 px-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-tr from-blue-500 to-cyan-400 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20">
               <Building className="h-5 w-5" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-white font-serif">ONE SPATIAL ILOILO</span>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.4em] text-slate-400">One Spatial</p>
+              <p className="font-semibold text-lg text-white font-serif">Iloilo</p>
+            </div>
           </div>
 
           <div className="hidden md:flex items-center gap-8">
-            <a href="#about" className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">About</a>
-            <a href="#features" className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">Features</a>
-            <a href="#showcase" className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">Residences</a>
-            <a href="#analytics" className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">Analytics</a>
-            <a href="#contact" className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">Contact</a>
+            <a href="#about" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              About
+              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
+            <a href="#features" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              Features
+              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
+            <a href="#showcase" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              Residences
+              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
+            <a href="#analytics" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              Analytics
+              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
+            <a href="#contact" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              Contact
+              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
           </div>
 
           <div className="flex items-center gap-3">
             <button 
               onClick={onLoginClick}
-              className="text-sm font-bold text-slate-200 hover:text-white transition-all bg-white/5 hover:bg-white/15 px-4 py-2 rounded-xl border border-white/10"
+              className="text-sm font-semibold text-slate-200 hover:text-white transition-all bg-white/10 hover:bg-white/20 px-5 py-3 rounded-[16px] border border-white/10"
             >
               Sign In
             </button>
             <button 
               onClick={onBrowseClick}
-              className="text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 hover:shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all px-5 py-2.5 rounded-xl flex items-center gap-1"
+              className="text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-400 hover:to-cyan-300 shadow-lg shadow-cyan-500/20 px-5 py-3 rounded-[16px] transition-all hover:-translate-y-0.5"
             >
               Book Now <ArrowUpRight className="h-4 w-4" />
             </button>
@@ -187,7 +280,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
 
       {/* HERO SECTION */}
       <section id="hero" className="relative py-20 md:py-32 px-6 overflow-hidden text-white select-none">
-        {/* Ferrofluid animated hero background (subtle, performance tuned) */}
         <FerrofluidBackground
           colors={["#2563EB", "#0EA5E9", "#06B6D4"]}
           speed={0.25}
@@ -197,108 +289,170 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
           opacity={0.5}
         />
 
-        {/* Absolute Background Rendering (texture & overlay) */}
-        <div className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.22] scale-[1.02] mix-blend-multiply landing-hero-background" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/60 to-[#0f172a]/20 z-0" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.94),rgba(15,23,42,0.98))] z-0" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.14),transparent_24%)] opacity-90" />
 
-        {/* Subtle decorative lights overlay */}
-        <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-500/10 blur-3xl rounded-full mix-blend-screen pointer-events-none" />
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 rounded-full w-[420px] h-[420px] bg-blue-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute right-20 top-16 rounded-full w-56 h-56 bg-cyan-400/10 blur-3xl pointer-events-none" />
 
-        <div className="max-w-5xl mx-auto text-center relative z-10 space-y-8">
+        <div className="max-w-5xl mx-auto relative z-10">
           <motion.div 
-            initial={{ opacity: 0, y: 15 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 bg-slate-900/40 border border-white/10 rounded-full px-4 py-1.5 backdrop-blur-md"
-          >
-            <Sparkles className="h-4 w-4 text-blue-400" />
-            <span className="text-xs font-semibold tracking-widest text-slate-200 font-mono uppercase">Premier Condo Club Portal</span>
-          </motion.div>
-
-          <motion.h1 
-            initial={{ opacity: 0, y: 30 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-4xl sm:text-6xl md:text-7xl font-serif font-black tracking-tight leading-[1.1] text-white"
-          >
-            Urban Havens, <br />
-            <span className="bg-gradient-to-r from-blue-400 via-teal-400 to-indigo-400 bg-clip-text text-transparent">Seamlessly Orchestrated</span>
-          </motion.h1>
-
-          <motion.p 
             initial={{ opacity: 0, y: 20 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-slate-300 text-base md:text-lg max-w-2xl mx-auto font-normal leading-relaxed"
+            transition={{ duration: 0.65 }}
+            className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/30 px-4 py-2 text-xs uppercase tracking-[0.32em] text-slate-300 shadow-xl shadow-slate-950/40"
           >
-            Proudly managed by <strong className="text-white font-semibold">GALES URBAN HAVEN</strong>, One Spatial Iloilo delivers modern, accessible, and convenient condominium living in the heart of Iloilo City. Perfect for young professionals, small families, and students.
+            <Sparkles className="h-4 w-4 text-cyan-300" />
+            <span>Condo Booking & Operations, Reimagined</span>
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.1 }}
+            className="text-5xl sm:text-6xl md:text-7xl font-serif font-black tracking-tight leading-[0.95]"
+          >
+            Smart Condominium Living,
+            <br />
+            <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">Simplified.</span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.2 }}
+            className="mx-auto mt-6 max-w-3xl text-base sm:text-lg text-slate-300 tracking-normal leading-8"
+          >
+            Book units, manage reservations, monitor residents, and experience seamless condominium living—all from one intelligent platform built for modern condominium communities.
           </motion.p>
 
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.3 }}
+            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <button 
+            <button
               onClick={onBrowseClick}
-              className="w-full sm:w-auto text-sm font-semibold tracking-wide text-white bg-blue-600 hover:bg-blue-500 border border-blue-400/30 px-8 py-4 rounded-xl shadow-xl shadow-blue-650/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="relative overflow-hidden rounded-[16px] bg-gradient-to-r from-blue-500 to-cyan-400 px-8 py-4 text-sm font-semibold text-white shadow-[0_25px_75px_rgba(59,130,246,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_32px_100px_rgba(59,130,246,0.25)]"
             >
-              Book Available Suites <Calendar className="h-4 w-4" />
+              Book Your Unit
+              <span className="ml-2 inline-flex"><ArrowUpRight className="h-4 w-4" /></span>
             </button>
-            <button 
+            <button
               onClick={onLoginClick}
-              className="w-full sm:w-auto text-sm font-semibold tracking-wide text-white bg-white/10 hover:bg-white/20 border border-white/10 px-8 py-4 rounded-xl active:scale-[0.98] transition-all cursor-pointer"
+              className="rounded-[16px] border border-white/15 bg-white/10 px-8 py-4 text-sm font-semibold text-white transition-all duration-300 hover:bg-white/15 hover:shadow-lg hover:shadow-slate-900/20"
             >
-              Get Started Gate
+              Explore Features
             </button>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.4 }}
+            className="mx-auto mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl"
+          >
+            {[
+              { label: 'Live Availability', icon: Calendar },
+              { label: 'Resident Portal', icon: UserCheck },
+              { label: 'Secure Pay', icon: CreditCard },
+              { label: '24/7 Support', icon: Bell }
+            ].map((item, idx) => {
+              const Icon = item.icon;
+              return (
+                <div key={idx} className="flex items-center gap-3 rounded-3xl border border-white/10 bg-slate-950/70 p-4 shadow-lg shadow-slate-950/20">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-300 shadow-inner shadow-blue-500/10">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-100">{item.label}</p>
+                </div>
+              );
+            })}
           </motion.div>
         </div>
       </section>
 
-      {/* ABOUT SECTION */}
-      <section id="about" className="py-24 px-6 max-w-7xl mx-auto scroll-mt-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
-          <div className="lg:col-span-6 space-y-6">
-            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">Architecture & Purpose</span>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold tracking-tight text-white leading-tight">
-              An Affordable, High-Amenities Escape Built for Modern Life.
-            </h2>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              One Spatial Iloilo, brought to you by <strong className="text-blue-400 font-semibold">Gales Urban Haven</strong>, reimagines property management & condominium renting in Iloilo City. We serve young professionals, busy university students, and cozy small families looking for convenience, central location, and modern security.
-            </p>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              We eliminated the headaches of manual ledger tracking, cash-handling bottlenecks, and delayed maintenance responses. Our unified digital system centralizes booking approvals, ledger tracking, broadcast bulletins, and tech repair claims in real-time, delivering ultimate piece of mind.
-            </p>
+      <section id="trust" className="py-16 px-6 bg-slate-950/70 border-t border-white/10">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          {trustStats.map((stat) => (
+            <div key={stat.label} className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl">
+              <AnimatedStat label={stat.label} value={stat.value} suffix={stat.suffix} />
+            </div>
+          ))}
+        </div>
+      </section>
 
-            <div className="grid grid-cols-2 gap-6 pt-4 border-t border-white/10">
-              <div>
-                <p className="text-3xl font-bold font-serif text-white">98.4%</p>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">Satisfaction Index</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold font-serif text-white">20 Mins</p>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">Avg Resolution Time</p>
-              </div>
+      {/* WHY CHOOSE US SECTION */}
+      <section id="about" className="py-24 px-6 max-w-7xl mx-auto scroll-mt-10">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-16 items-center">
+          <div className="xl:col-span-5 space-y-6">
+            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">Why Choose One Spatial Iloilo</span>
+            <h2 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight text-white leading-tight">
+              Built for premium condominium operations and effortless resident living.
+            </h2>
+            <p className="text-slate-300 text-base leading-8 max-w-xl">
+              One Spatial Iloilo brings a luxury-grade resident experience, property management automation, and booking intelligence together in a secure cloud-native control panel.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {whyChooseData.slice(0, 4).map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.title} className="rounded-3xl border border-white/10 bg-slate-950/60 p-5 shadow-lg shadow-slate-950/20 backdrop-blur-xl transition-all hover:-translate-y-1">
+                    <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-300">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white">{item.title}</h3>
+                    <p className="mt-2 text-sm text-slate-400 leading-relaxed">{item.description}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <div className="lg:col-span-6 relative">
-            <div className="bg-slate-950 rounded-3xl overflow-hidden shadow-2xl group border border-white/10">
-              <img 
-                src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80" 
-                alt="Architecture" 
-                className="w-full h-[450px] object-cover hover:scale-102 transition-transform duration-700 brightness-90"
-              />
-            </div>
-            
-            {/* Soft Overlay details card */}
-            <div className="absolute -bottom-6 -left-6 bg-[#131c31]/95 border border-white/10 backdrop-blur-xl p-5 rounded-2xl shadow-2xl max-w-xs hidden sm:block">
-              <p className="font-serif font-bold text-white">Five-Star Amenities</p>
-              <p className="text-xs text-slate-400 mt-1 leading-normal">
-                Includes rooftop ozone pools, smart temperature climate zones, localized backup generators, and secure 24/7 staff support logs.
-              </p>
-            </div>
+          <div className="xl:col-span-7 grid grid-cols-1 gap-6">
+            {whyChooseData.slice(4).map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-lg shadow-slate-950/20 backdrop-blur-xl transition-all hover:-translate-y-1">
+                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-3xl bg-cyan-400/10 text-cyan-300">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-white">{item.title}</h3>
+                  <p className="mt-3 text-sm text-slate-400 leading-relaxed">{item.description}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* PROCESS SECTION */}
+      <section id="how-it-works" className="py-24 px-6 bg-slate-950/70 border-t border-white/10">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-14">
+            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">How It Works</span>
+            <h2 className="mt-4 text-4xl sm:text-5xl font-serif font-bold text-white tracking-tight">A premium booking flow in four effortless steps.</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {processSteps.map((step, index) => {
+              const Icon = step.icon;
+              const isLast = index === processSteps.length - 1;
+              return (
+                <div key={step.title} className="relative rounded-3xl border border-white/10 bg-slate-950/70 p-8 text-center shadow-2xl shadow-slate-950/20 backdrop-blur-xl">
+                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-lg shadow-cyan-500/20">
+                    <Icon className="h-7 w-7" />
+                  </div>
+                  <div className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-blue-300">Step {index + 1}</div>
+                  <h3 className="text-xl font-semibold text-white">{step.title}</h3>
+                  <p className="mt-3 text-sm text-slate-400 leading-relaxed">{step.description}</p>
+                  {!isLast && (
+                    <div className="absolute right-4 top-1/2 hidden h-px w-24 -translate-y-1/2 bg-blue-400/20 md:block"></div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -589,6 +743,75 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
         </div>
       </section>
 
+      {/* FAQ SECTION */}
+      <section id="faq" className="py-24 px-6 max-w-7xl mx-auto scroll-mt-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <div className="space-y-4">
+            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">FAQ</span>
+            <h2 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-tight">Answers for the most common resident and booking questions.</h2>
+            <p className="text-slate-400 text-sm leading-7 max-w-xl">
+              We built the platform to be transparent and easy to use, with each step supported by secure forms and responsive operations.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {faqItems.map((item, index) => {
+              const isOpen = index === faqOpenIndex;
+              return (
+                <button
+                  key={item.question}
+                  type="button"
+                  onClick={() => setFaqOpenIndex(isOpen ? null : index)}
+                  className="w-full rounded-3xl border border-white/10 bg-slate-950/70 p-5 text-left shadow-lg shadow-slate-950/20 backdrop-blur-xl transition-all hover:border-blue-400/30"
+                  aria-expanded={isOpen}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-base font-semibold text-white">{item.question}</p>
+                    </div>
+                    <span className="text-slate-400">
+                      {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                    </span>
+                  </div>
+                  {isOpen && (
+                    <p className="mt-4 text-sm text-slate-400 leading-7">{item.answer}</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* CALL TO ACTION */}
+      <section id="cta" className="py-24 px-6 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-t border-white/10">
+        <div className="max-w-7xl mx-auto rounded-[32px] border border-white/10 bg-slate-950/80 p-12 shadow-2xl shadow-slate-950/40 backdrop-blur-xl">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="max-w-2xl">
+              <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">Ready to elevate your condo operations?</span>
+              <h2 className="mt-4 text-4xl sm:text-5xl font-serif font-black text-white tracking-tight">Ready to Find Your Perfect Home?</h2>
+              <p className="mt-4 text-sm text-slate-300 leading-7 max-w-xl">
+                Experience a modern condominium booking and operations platform designed for residents, managers, and property portfolio teams who demand speed and polish.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <button
+                onClick={onBrowseClick}
+                className="rounded-[16px] bg-gradient-to-r from-blue-500 to-cyan-400 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition-all hover:-translate-y-0.5"
+              >
+                Book Now
+              </button>
+              <button
+                onClick={onLoginClick}
+                className="rounded-[16px] border border-white/15 bg-white/10 px-8 py-4 text-sm font-semibold text-white transition-all hover:bg-white/15"
+              >
+                Contact Us
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CONTACT SECTION & MOCK GOOGLE MAP INTEGRATION */}
       <section id="contact" className="py-24 px-6 scroll-mt-10 bg-white/5 border-t border-white/5 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16">
@@ -786,13 +1009,11 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               One Spatial Iloilo, Mandurriao <br />
               Iloilo City, Iloilo, Philippines
             </p>
-          </div>
-
-        </div>
-
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 font-medium">
-          <p>© 2026 One Spatial Iloilo Condominiums Club. Engineered safely for AI Studio development container profiles.</p>
-          <div className="flex gap-4 mt-4 sm:mt-0">
+              <div className="flex items-center gap-3 pt-4">
+                <a href="#" className="text-slate-400 hover:text-white transition-colors" aria-label="Twitter"><Twitter className="h-4 w-4" /></a>
+                <a href="#" className="text-slate-400 hover:text-white transition-colors" aria-label="Instagram"><Instagram className="h-4 w-4" /></a>
+                <a href="#" className="text-slate-400 hover:text-white transition-colors" aria-label="LinkedIn"><Linkedin className="h-4 w-4" /></a>
+              </div>
             <a href="#landing-root" className="hover:text-slate-400">Legal Agreement</a>
             <a href="#landing-root" className="hover:text-slate-400">Privacy Charter</a>
             <a href="#landing-root" className="hover:text-slate-400 font-bold uppercase text-slate-300">Back To Peak ↑</a>

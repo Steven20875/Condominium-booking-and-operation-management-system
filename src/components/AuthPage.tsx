@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
-import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, ChevronRight, Check } from 'lucide-react';
+import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, UserCheck, Bell } from 'lucide-react';
 import { User as UserType } from '../types.ts';
+import { Button, Input } from './ui';
 
 interface AuthPageProps {
   onLoginSuccess: (user: UserType, token: string) => void;
@@ -26,7 +27,24 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   const [phone, setPhone] = useState<string>('');
   const [unitNumber, setUnitNumber] = useState<string>('');
   const [rememberMe, setRememberMe] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [emailValid, setEmailValid] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const validateEmail = (value: string) => /^\S+@\S+\.\S+$/.test(value);
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    setEmailValid(value === '' || validateEmail(value));
+  };
+
+  const copyDemoCredentials = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast('Demo credentials copied to clipboard.', 'success');
+    } catch {
+      toast('Clipboard access failed; please copy manually.', 'warning');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,10 +139,9 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   return (
     <div id="auth-root" className="min-h-screen bg-transparent flex flex-col justify-between overflow-hidden relative font-sans">
       
-      {/* Decorative animated background (subtle) */}
-      <FerrofluidBackground colors={["#2563EB", "#0EA5E9", "#06B6D4"]} speed={0.25} scale={1.6} turbulence={0.6} glow={0.9} opacity={0.35} particles={8} />
       {/* Decorative Blur Background Elements */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-blue-500/5 blur-3xl opacity-40 pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-purple-500/5 blur-3xl opacity-40 pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-purple-500/5 blur-3xl opacity-40 pointer-events-none" />
 
       {/* Header Bar */}
@@ -152,31 +169,48 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
           
           {/* Left Visual Banner Section */}
           <div className="lg:col-span-5 bg-slate-950/40 p-8 sm:p-12 flex flex-col justify-between text-white relative overflow-hidden border-r border-white/5">
+            <FerrofluidBackground colors={["#2563EB", "#0EA5E9", "#06B6D4"]} speed={0.18} scale={1.8} turbulence={0.5} glow={0.9} opacity={0.32} particles={8} />
             {/* Background Texture Image overlay */}
-            <div className="absolute inset-0 z-0 bg-cover bg-center mix-blend-overlay opacity-30 scale-105 hover:scale-100 transition-all duration-1000 auth-hero-image" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent z-1" />
+            <div className="absolute inset-0 z-10 bg-cover bg-center mix-blend-overlay opacity-30 scale-105 hover:scale-100 transition-all duration-1000 auth-hero-image" />
+            <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
 
             <div className="relative z-10">
-              <span className="text-blue-400 font-mono text-xs font-bold tracking-widest uppercase py-1 px-3 bg-blue-950/80 rounded-full border border-blue-900">
-                Gales Urban Haven
+              <span className="text-blue-400 font-mono text-xs font-bold tracking-widest uppercase py-1 px-3 bg-blue-950/90 rounded-full border border-blue-900">
+                Premium Resident Portal
               </span>
               <h2 className="mt-6 text-3xl sm:text-4xl font-serif font-semibold tracking-tight leading-tight">
-                Refined Urban Living. Centralized Portal.
+                Experience Modern Condominium Living
               </h2>
               <p className="mt-4 text-sm text-slate-300 font-normal leading-relaxed">
-                Welcome to One Spatial Iloilo's official management engine. Settle digital assessments, reserve convenient student and professional suites, request immediate maintenance, and view active announcements on an integrated platform.
+                Everything you need to book, manage, and enjoy your condominium in one intelligent resident portal.
               </p>
+
+              <div className="mt-8 grid gap-3">
+                {[
+                  { icon: <Sparkles className="h-4 w-4 text-blue-300" />, label: 'Online Booking' },
+                  { icon: <ShieldCheck className="h-4 w-4 text-blue-300" />, label: 'Secure Authentication' },
+                  { icon: <Building className="h-4 w-4 text-blue-300" />, label: 'Visitor Management' },
+                  { icon: <Clipboard className="h-4 w-4 text-blue-300" />, label: 'Digital Billing' },
+                  { icon: <Bell className="h-4 w-4 text-blue-300" />, label: 'Real-Time Notifications' },
+                  { icon: <User className="h-4 w-4 text-blue-300" />, label: 'Resident Dashboard' },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/5 p-3">
+                    <div className="rounded-2xl bg-blue-500/10 p-2 text-blue-300">{item.icon}</div>
+                    <p className="text-sm text-slate-200 font-medium">{item.label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="relative z-10 mt-12 bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
-              <p className="text-xs text-slate-400 italic">"The automated booking platform made booking the Grand Horizon Suite incredibly straightforward."</p>
-              <div className="flex items-center gap-2 mt-3">
-                <div className="h-6 w-6 rounded-full bg-slate-700 overflow-hidden">
-                  <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80" alt="avatar" />
+            <div className="relative z-10 mt-10 bg-white/5 border border-white/10 rounded-3xl p-5 backdrop-blur-xl shadow-2xl shadow-slate-950/30">
+              <p className="text-xs text-slate-400 italic">"The smartest condominium platform we've ever used."</p>
+              <div className="flex items-center gap-3 mt-4">
+                <div className="h-11 w-11 rounded-full bg-slate-700 overflow-hidden border border-white/10">
+                  <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80" alt="Resident avatar" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold">Alice Cooper</p>
-                  <p className="text-[10px] text-slate-400">Resident of Level 24</p>
+                  <p className="text-sm text-white font-semibold">Alex Cooper</p>
+                  <p className="text-[11px] text-slate-400 uppercase tracking-[0.24em]">Resident</p>
                 </div>
               </div>
             </div>
@@ -211,32 +245,35 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-300">Verification Pin</label>
-                    <input
+                    <Input
                       type="text"
-                      className="w-full glass-input placeholder:text-slate-500 focus:outline-none transition-all duration-250 px-4 py-3 rounded-xl font-mono text-center text-xl tracking-widest"
+                      label="Verification Pin"
+                      variant="glass"
                       placeholder="XXXX"
                       maxLength={4}
                       value={verificationCode}
                       onChange={(e) => setVerificationCode(e.target.value)}
+                      helperText="Enter 4611 to simulate verification"
                     />
                   </div>
 
                   <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      fullWidth
                       onClick={() => setIsEmailVerifying(false)}
-                      className="flex-1 glass-button-secondary font-semibold px-4 py-3 rounded-xl transition-colors text-sm cursor-pointer"
                     >
                       Back
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="primary"
+                      fullWidth
                       onClick={handleCompleteVerification}
-                      className="flex-1 glass-button-primary font-semibold px-4 py-3 rounded-xl transition-all shadow-md text-sm flex items-center justify-center gap-2 cursor-pointer"
+                      icon={<Check className="h-4 w-4" />}
+                      iconPosition="right"
                     >
-                      Verify Account <Check className="h-4 w-4" />
-                    </button>
+                      Verify Account
+                    </Button>
                   </div>
                 </motion.div>
               ) : isForgotPassword ? (
@@ -276,28 +313,26 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                     </div>
                   ) : (
                     <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300">Email Address</label>
-                        <div className="relative">
-                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                          <input
-                            type="email"
-                            required
-                            placeholder="john@condo.com"
-                            className="w-full glass-input pl-10 pr-4 py-3 text-sm focus:outline-none transition-all placeholder:text-slate-500 font-semibold"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                          />
-                        </div>
-                      </div>
+                      <Input
+                        type="email"
+                        label="Email Address"
+                        variant="glass"
+                        placeholder="john@condo.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        icon={<Mail className="h-4 w-4" />}
+                        required
+                      />
 
-                      <button
+                      <Button
                         type="submit"
+                        variant="primary"
+                        fullWidth
                         disabled={isLoading}
-                        className="w-full glass-button-primary disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md text-sm flex items-center justify-center gap-2 cursor-pointer"
+                        loading={isLoading}
                       >
                         {isLoading ? 'Processing Recovery...' : 'Dispatch Reset Email'}
-                      </button>
+                      </Button>
 
                       <div className="text-center pt-2">
                         <button
@@ -328,53 +363,69 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                   </div>
 
                   {/* Preloaded credentials guide helper */}
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs space-y-2">
-                    <p className="font-bold text-slate-200">Demo Account Profiles:</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="auth-demo-card">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.28em] text-slate-400 font-semibold">Resident Demo</p>
+                          <p className="mt-2 text-sm font-semibold text-white">Resident Account</p>
+                        </div>
+                        <div className="rounded-2xl bg-blue-500/15 p-3 text-blue-300">
+                          <UserCheck className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <div className="mt-4 space-y-1 text-slate-300 text-[11px]">
+                        <p>Email: <span className="text-white font-semibold">john@condo.com</span></p>
+                        <p>Password: <span className="text-white font-semibold">john123</span></p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          setEmail('john@condo.com');
-                          setPassword('john123');
-                        }}
-                        className="text-left bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-white/15 hover:border-blue-400/50 transition-colors cursor-pointer"
+                        onClick={() => copyDemoCredentials('john@condo.com:john123')}
+                        className="auth-copy-button"
                       >
-                        <p className="font-semibold text-white">🔑 Steven Felarca (Resident)</p>
-                        <p className="text-slate-400 font-mono mt-0.5 text-[10px]">Email: steven@condo.com <br/>Pass: steven123</p>
+                        Copy Resident Credentials
                       </button>
-                      
+                    </div>
+
+                    <div className="auth-demo-card">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.28em] text-slate-400 font-semibold">Administrator Demo</p>
+                          <p className="mt-2 text-sm font-semibold text-white">Admin Control</p>
+                        </div>
+                        <div className="rounded-2xl bg-violet-500/15 p-3 text-violet-300">
+                          <ShieldCheck className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <div className="mt-4 space-y-1 text-slate-300 text-[11px]">
+                        <p>Email: <span className="text-white font-semibold">admin@condo.com</span></p>
+                        <p>Password: <span className="text-white font-semibold">admin123</span></p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          setEmail('admin@condo.com');
-                          setPassword('admin123');
-                        }}
-                        className="text-left bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-white/15 hover:border-purple-400/50 transition-colors cursor-pointer"
+                        onClick={() => copyDemoCredentials('admin@condo.com:admin123')}
+                        className="auth-copy-button"
                       >
-                        <p className="font-semibold text-white">🔑 Donna Talam (Admin)</p>
-                        <p className="text-slate-400 font-mono mt-0.5 text-[10px]">Email: admin@condo.com <br/>Pass: admin123</p>
+                        Copy Admin Credentials
                       </button>
                     </div>
                   </div>
 
                   <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Email Address</label>
-                      <div className="relative">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                        <input
-                          type="email"
-                          required
-                          placeholder="john@condo.com"
-                          className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                    <Input
+                      type="email"
+                      label="Email Address"
+                      variant="glass"
+                      placeholder="john@condo.com"
+                      value={email}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      error={!emailValid ? 'Enter a valid email address to continue.' : undefined}
+                      icon={<Mail className="h-4 w-4" />}
+                      required
+                    />
 
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center mb-2">
                         <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Secure Password</label>
                         <button
                           type="button"
@@ -385,15 +436,23 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         </button>
                       </div>
                       <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10" />
                         <input
-                          type="password"
+                          type={showPassword ? 'text' : 'password'}
                           required
                           placeholder="••••••••"
-                          className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
+                          className="w-full glass-input rounded-xl pl-10 pr-11 py-3 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
@@ -409,14 +468,17 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       </label>
                     </div>
 
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
+                      fullWidth
                       disabled={isLoading}
-                      className="w-full glass-button-primary disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md text-sm mt-3 flex items-center justify-center gap-2 group cursor-pointer"
+                      loading={isLoading}
+                      icon={<ArrowRight className="h-4 w-4" />}
+                      iconPosition="right"
                     >
-                      {isLoading ? 'Signing you in...' : 'Sign In To Premium Gate'}
-                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
+                      {isLoading ? 'Signing In Securely...' : 'Sign In Securely'}
+                    </Button>
                   </form>
 
                   <div className="text-center pt-2 border-t border-white/5">
@@ -449,89 +511,71 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
                   <form onSubmit={handleRegister} className="space-y-3.5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Full Legal Name</label>
-                        <div className="relative">
-                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                          <input
-                            type="text"
-                            required
-                            placeholder="Johnathan Doe"
-                            className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                          />
-                        </div>
-                      </div>
+                      <Input
+                        type="text"
+                        label="Full Legal Name"
+                        variant="glass"
+                        placeholder="Johnathan Doe"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        icon={<User className="h-4 w-4" />}
+                        required
+                      />
 
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Mobile Phone</label>
-                        <div className="relative">
-                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                          <input
-                            type="tel"
-                            placeholder="+1 (555) 122-874"
-                            className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                          />
-                        </div>
-                      </div>
+                      <Input
+                        type="tel"
+                        label="Mobile Phone"
+                        variant="glass"
+                        placeholder="+1 (555) 122-874"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        icon={<Phone className="h-4 w-4" />}
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Email Address</label>
-                        <div className="relative">
-                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                          <input
-                            type="email"
-                            required
-                            placeholder="john@condo.com"
-                            className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                          />
-                        </div>
-                      </div>
+                      <Input
+                        type="email"
+                        label="Email Address"
+                        variant="glass"
+                        placeholder="john@condo.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        icon={<Mail className="h-4 w-4" />}
+                        required
+                      />
 
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Unit ID / Suite (Optional)</label>
-                        <div className="relative">
-                          <Home className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                          <input
-                            type="text"
-                            placeholder="Unit 1204"
-                            className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
-                            value={unitNumber}
-                            onChange={(e) => setUnitNumber(e.target.value)}
-                          />
-                        </div>
-                      </div>
+                      <Input
+                        type="text"
+                        label="Unit ID / Suite (Optional)"
+                        variant="glass"
+                        placeholder="Unit 1204"
+                        value={unitNumber}
+                        onChange={(e) => setUnitNumber(e.target.value)}
+                        icon={<Home className="h-4 w-4" />}
+                      />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Setup Secure Password</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                        <input
-                          type="password"
-                          required
-                          placeholder="••••••••"
-                          className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                    <Input
+                      type="password"
+                      label="Setup Secure Password"
+                      variant="glass"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      icon={<Lock className="h-4 w-4" />}
+                      required
+                    />
 
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
+                      fullWidth
                       disabled={isLoading}
-                      className="w-full glass-button-primary disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md text-sm mt-4 flex items-center justify-center gap-2 cursor-pointer"
+                      loading={isLoading}
                     >
                       {isLoading ? 'Verifying Portfolio...' : 'Begin Secure Enrolment'}
-                    </button>
+                    </Button>
                   </form>
 
                   <div className="text-center pt-2 border-t border-white/5">

@@ -138,25 +138,11 @@ export default function FerrofluidBackground({
   return (
     <div
       aria-hidden
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 0,
-        overflow: 'hidden',
-        pointerEvents: 'none',
-        filter: `blur(${Math.max(6, glow * 6)}px) saturate(120%)`,
-        opacity: 1,
-      }}
+      className="absolute inset-0 z-0 overflow-hidden pointer-events-none ferrofluid-background-root"
     >
       <canvas
         ref={canvasRef}
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          transform: 'scale(1.02)',
-          mixBlendMode: 'screen',
-        }}
+        className="ferrofluid-background-canvas"
       />
     </div>
   );
