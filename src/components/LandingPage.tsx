@@ -239,20 +239,20 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
           </div>
 
           <div className="hidden md:flex items-center gap-8">
+            <a href="#hero" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              Home
+              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
             <a href="#about" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
               About
               <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
             </a>
+            <a href="#showcase" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              Units
+              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
             <a href="#features" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
               Features
-              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
-            </a>
-            <a href="#showcase" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
-              Residences
-              <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
-            </a>
-            <a href="#analytics" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
-              Analytics
               <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
             </a>
             <a href="#contact" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
@@ -267,12 +267,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               className="text-sm font-semibold text-slate-200 hover:text-white transition-all bg-white/10 hover:bg-white/20 px-5 py-3 rounded-[16px] border border-white/10"
             >
               Sign In
-            </button>
-            <button 
-              onClick={onBrowseClick}
-              className="text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-400 hover:to-cyan-300 shadow-lg shadow-cyan-500/20 px-5 py-3 rounded-[16px] transition-all hover:-translate-y-0.5"
-            >
-              Book Now <ArrowUpRight className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -763,7 +757,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                   type="button"
                   onClick={() => setFaqOpenIndex(isOpen ? null : index)}
                   className="w-full rounded-3xl border border-white/10 bg-slate-950/70 p-5 text-left shadow-lg shadow-slate-950/20 backdrop-blur-xl transition-all hover:border-blue-400/30"
-                  aria-expanded={!!isOpen.toString()}
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div>

@@ -27,6 +27,7 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [pendingBookingRedirect, setPendingBookingRedirect] = useState<boolean>(false);
 
   // Restore authenticated session from localStorage
   useEffect(() => {
@@ -82,6 +83,26 @@ function AppContent() {
     };
   }, [toast]);
 
+  useEffect(() => {
+    if (pendingBookingRedirect && user && token) {
+      const timeoutHandle = window.setTimeout(() => {
+        setPendingBookingRedirect(false);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutHandle);
+    }
+  }, [pendingBookingRedirect, user, token]);
+
+  const handleBookingRedirect = () => {
+    setPendingBookingRedirect(true);
+
+    if (user && token) {
+      return;
+    }
+
+    setCurrentView('auth');
+  };
+
   const handleLoginSuccess = (loggedInUser: User, sessionToken: string) => {
     setUser(loggedInUser);
     setToken(sessionToken);
@@ -99,6 +120,7 @@ function AppContent() {
 
     setUser(null);
     setToken('');
+    setPendingBookingRedirect(false);
     localStorage.removeItem('vista_token');
     localStorage.removeItem('vista_user');
     setCurrentView('auth');
@@ -142,6 +164,7 @@ function AppContent() {
           token={token} 
           onLogout={handleLogout} 
           onUpdateUser={handleUpdateUser}
+          initialActiveTab={pendingBookingRedirect ? 'browse' : undefined}
         />
       );
     }
@@ -161,7 +184,7 @@ function AppContent() {
         viewContent = (
           <LandingPage 
             onLoginClick={() => setCurrentView('auth')} 
-            onBrowseClick={() => setCurrentView('auth')} 
+            onBrowseClick={handleBookingRedirect}
           />
         );
         break;

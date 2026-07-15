@@ -192,8 +192,17 @@ You can test the two fundamental system levels using these seeded accounts:
 | Role | Username / Email | Password | Allowed Capabilities |
 | :--- | :--- | :--- | :--- |
 | **Administrator (Gales Urban Haven)** | `admin@condo.com` | `admin123` | Analytics, Approval management, Maintenance assigning, Log telemetry, Resident registry |
-| **Steven Felarca (Resident)** | `john@condo.com` | `john123` | Booking requests, Track QR Ph payment bills, File plumbing tasks |
+| **Steven Felarca (Resident)** | `resident@gmail.com` | `Resident@2026` | Booking requests, Track QR Ph payment bills, File plumbing tasks |
 | **Resident 2** | `alice@condo.com` | `alice123` | Dynamic reservations, View invoices, Notification desk |
+
+## ✨ Recent UX Update
+
+The landing experience has been simplified to reduce duplicate actions and make booking access more intuitive:
+
+- The top navigation now keeps a single Sign In action.
+- The hero section still offers Book Your Unit and Explore Features.
+- Selecting Book Your Unit now sends unauthenticated visitors to the login flow and authenticated visitors directly into the booking experience.
+- The existing authentication and booking logic remains unchanged; only the redirect behavior was updated.
 
 
 

@@ -13,14 +13,21 @@ interface ResidentDashboardProps {
   token: string;
   onLogout: () => void;
   onUpdateUser: (updatedUser: UserType) => void;
+  initialActiveTab?: TabType;
 }
 
 type TabType = 'overview' | 'browse' | 'bookings' | 'payments' | 'maintenance' | 'notifications' | 'profile';
 
-export default function ResidentDashboard({ user, token, onLogout, onUpdateUser }: ResidentDashboardProps) {
+export default function ResidentDashboard({ user, token, onLogout, onUpdateUser, initialActiveTab }: ResidentDashboardProps) {
   const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  useEffect(() => {
+    if (initialActiveTab) {
+      setActiveTab(initialActiveTab);
+    }
+  }, [initialActiveTab]);
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState<boolean>(false);
