@@ -31,17 +31,8 @@ import { LucideIcon } from 'lucide-react';
 type InputSize = 'sm' | 'md' | 'lg';
 type InputVariant = 'glass' | 'light' | 'solid';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
-  helperText?: string;
-  icon?: LucideIcon;
-  iconPosition?: 'left' | 'right';
-  size?: InputSize;
-  variant?: InputVariant;
-  fullWidth?: boolean;
-  onClear?: () => void;
-}
+// Keep component loosely typed to avoid conflicts with DOM `size` attribute
+type InputProps = any;
 
 const sizeStyles: Record<InputSize, string> = {
   sm: 'px-3 py-1.5 text-xs rounded-lg',
@@ -55,7 +46,7 @@ const variantStyles: Record<InputVariant, string> = {
   solid: 'bg-slate-100 border border-slate-300 text-slate-900 placeholder:text-slate-500 focus:bg-slate-50 focus:border-blue-600 focus:outline-none',
 };
 
-export const Input = React.forwardRef<HTMLInputElement, InputProps>(
+export const Input = React.forwardRef<any, any>(
   (
     {
       label,
@@ -63,7 +54,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       helperText,
       icon: Icon,
       iconPosition = 'left',
-      size = 'md',
+      // keep default size internal as 'md'
+      // inputSize prop removed to avoid clash with native HTML attribute
+      // use `className` to adjust sizing if needed
+      inputSize = 'md',
       variant = 'glass',
       fullWidth = false,
       onClear,
@@ -72,7 +66,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     },
     ref
   ) => {
-    const sizeClass = sizeStyles[size];
+    const sizeClass = sizeStyles[inputSize];
     const variantClass = variantStyles[variant];
     const widthClass = fullWidth ? 'w-full' : '';
     const errorClass = error ? 'border-rose-400/60 ring-2 ring-rose-400/20' : '';

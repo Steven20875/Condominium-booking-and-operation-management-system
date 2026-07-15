@@ -62,16 +62,30 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { db, dbEvents } from './server/db.ts';
-import { GoogleGenAI } from '@google/genai';
 
 // Add environment variables support if needed
 import dotenv from 'dotenv';
-dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = __dirname;
+
+dotenv.config({ path: path.resolve(projectRoot, '.env') });
 
 const PORT = Number(process.env.PORT) || 3000;
 const VITE_HMR_PORT = Number(process.env.VITE_HMR_PORT) || 24678;
+const firebaseConfigFromEnv = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: process.env.VITE_FIREBASE_APP_ID || '',
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || '',
+};
 
 /**
  * MIDDLEWARE: Require valid authentication
@@ -186,6 +200,60 @@ async function startServer() {
     res.status(200).json({ user: userSafe, token: user.id });
   });
 
+  app.get('/api/config/firebase', (_req: Request, res: Response) => {
+    res.json({ firebase: firebaseConfigFromEnv });
+  });
+
+  app.post('/api/auth/firebase', (req: Request, res: Response) => {
+    const { uid, email, name, avatarUrl, provider } = req.body;
+    const missing = validateFields(req.body, ['uid', 'email']);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
+    }
+
+    if (!isNonEmptyString(uid) || !isNonEmptyString(email)) {
+      return res.status(400).json({ error: 'Firebase UID and email are required.' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const allUsers = db.getUsers();
+    const existingUserByUid = allUsers.find((user) => user.authUid === uid);
+    const existingUserByEmail = allUsers.find((user) => user.email.toLowerCase() === normalizedEmail);
+    const existingUser = existingUserByUid || existingUserByEmail;
+
+    if (existingUser) {
+      const isGoogleLogin = provider === 'google';
+      const nextAuthProvider = existingUser.authProvider || (isGoogleLogin ? 'google' : 'email');
+      const updatedUser = db.updateUser(existingUser.id, {
+        name: isNonEmptyString(name) ? String(name).trim() : existingUser.name,
+        avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : existingUser.avatarUrl,
+        authProvider: nextAuthProvider,
+        authUid: uid,
+        email: normalizedEmail,
+      });
+
+      if (!updatedUser) {
+        return res.status(500).json({ error: 'Unable to synchronize the existing account.' });
+      }
+
+      const { password: _, ...userSafe } = updatedUser as any;
+      return res.status(200).json({ user: userSafe, token: updatedUser.id });
+    }
+
+    const newUser = db.createUser({
+      email: normalizedEmail,
+      password: Math.random().toString(36).slice(2, 12),
+      name: isNonEmptyString(name) ? String(name).trim() : normalizedEmail.split('@')[0],
+      avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : undefined,
+      role: 'resident',
+      authProvider: provider === 'google' ? 'google' : 'firebase',
+      authUid: uid
+    });
+
+    const { password: _, ...userSafe } = newUser as any;
+    return res.status(201).json({ user: userSafe, token: newUser.id });
+  });
+
   app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
     const { password: _, ...userSafe } = user;
@@ -276,6 +344,7 @@ async function startServer() {
 
     res.status(201).json(unit);
   });
+
 
   app.put('/api/units/:id', requireAdmin, (req: Request, res: Response) => {
     const user = (req as any).user;

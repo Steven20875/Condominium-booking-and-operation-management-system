@@ -10,7 +10,7 @@ import {
   CondoNotification, 
   ActivityLog,
   DashboardStats
-} from '../src/types.ts';
+} from './types';
 
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
@@ -267,7 +267,6 @@ class MockDatabase {
     notifications: [],
     activityLogs: []
   };
-
   constructor() {
     this.init();
   }
@@ -382,6 +381,8 @@ class MockDatabase {
       phone: user.phone || '',
       unitNumber: user.unitNumber || '',
       avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name || 'user')}`,
+      authProvider: user.authProvider || 'email',
+      authUid: user.authUid || '',
       createdAt: new Date().toISOString()
     };
     this.data.users.push(newUser);

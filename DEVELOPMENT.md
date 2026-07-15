@@ -184,7 +184,7 @@ Systematically integrated components into:
 
 **Areas I'd Improve:**
 - Could add E2E testing (Playwright/Cypress)
-- Could implement real authentication (JWT properly sealed)
+- Could implement additional provider-specific security hardening for Firebase sessions
 - Could add comprehensive logging
 - Could create API documentation (OpenAPI/Swagger)
 

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
 import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, UserCheck, Bell } from 'lucide-react';
 import { User as UserType } from '../types.ts';
 import { Button, Input } from './ui';
+import { createAccountWithEmailPassword, signInWithEmailPassword, signInWithGoogle, getFirebaseConfigStatus, initializeFirebase, getGoogleRedirectResult } from '../lib/firebase.ts';
 
 interface AuthPageProps {
   onLoginSuccess: (user: UserType, token: string) => void;
@@ -18,7 +19,6 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   const [isForgotPassword, setIsForgotPassword] = useState<boolean>(false);
   const [isEmailSent, setIsEmailSent] = useState<boolean>(false);
   const [isEmailVerifying, setIsEmailVerifying] = useState<boolean>(false);
-  const [verificationCode, setVerificationCode] = useState<string>('');
 
   // Form states
   const [email, setEmail] = useState<string>('');
@@ -30,6 +30,67 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [emailValid, setEmailValid] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [firebaseConfigStatus, setFirebaseConfigStatus] = useState(getFirebaseConfigStatus());
+
+  useEffect(() => {
+    let mounted = true;
+    void initializeFirebase().then((nextStatus) => {
+      if (mounted) {
+        setFirebaseConfigStatus(nextStatus);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getGoogleRedirectResult();
+        if (!mounted || !result?.user) {
+          return;
+        }
+
+        const response = await fetch('/api/auth/firebase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: result.user.uid,
+            email: result.user.email,
+            name: result.user.displayName || result.user.email?.split('@')[0],
+            avatarUrl: result.user.photoURL || undefined,
+            provider: 'google'
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Google sign-in failed.');
+        }
+
+        toast(`Welcome, ${data.user.name}!`, 'success');
+        onLoginSuccess(data.user, data.token);
+      } catch (err: any) {
+        const message = err?.code === 'auth/popup-closed-by-user'
+          ? 'Google sign-in was cancelled.'
+          : err?.message || 'Google sign-in failed.';
+        toast(message, 'warning');
+      }
+    };
+
+    void handleRedirectResult();
+
+    return () => {
+      mounted = false;
+    };
+  }, [onLoginSuccess, toast]);
+
+  const isFirebaseConfigured = firebaseConfigStatus.isConfigured;
+  const isLocalAuthFallback = !isFirebaseConfigured;
 
   const validateEmail = (value: string) => /^\S+@\S+\.\S+$/.test(value);
   const handleEmailChange = (value: string) => {
@@ -55,19 +116,45 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
     setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      const nextStatus = await initializeFirebase();
+      setFirebaseConfigStatus(nextStatus);
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Login failed. Please verify credentials.');
+      if (nextStatus.isConfigured) {
+        const credential = await signInWithEmailPassword(email.trim(), password);
+        const response = await fetch('/api/auth/firebase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: credential.user.uid,
+            email: credential.user.email,
+            name: credential.user.displayName || name || credential.user.email?.split('@')[0],
+            avatarUrl: credential.user.photoURL || undefined,
+            provider: 'email'
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to create or sync your resident account.');
+        }
+
+        toast(`Welcome back, ${data.user.name}! Enjoy your stay.`, 'success');
+        onLoginSuccess(data.user, data.token);
+      } else {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Local email/password sign-in failed.');
+        }
+
+        toast(`Welcome back, ${data.user.name}! Local sign-in succeeded.`, 'success');
+        onLoginSuccess(data.user, data.token);
       }
-
-      toast(`Welcome back, ${data.user.name}! Enjoy your stay.`, 'success');
-      onLoginSuccess(data.user, data.token);
     } catch (err: any) {
       toast(err.message || 'Server error occurred during sign-in.', 'error');
     } finally {
@@ -84,38 +171,97 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
     setIsLoading(true);
     try {
-      // Step: Simulated Email Verification before full completion
-      setIsEmailVerifying(true);
-      toast('A dynamic verification pin was dispatched to your email address.', 'info');
+      const nextStatus = await initializeFirebase();
+      setFirebaseConfigStatus(nextStatus);
+
+      if (nextStatus.isConfigured) {
+        const credential = await createAccountWithEmailPassword(email.trim(), password);
+        const response = await fetch('/api/auth/firebase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: credential.user.uid,
+            email: credential.user.email,
+            name: name.trim(),
+            avatarUrl: credential.user.photoURL || undefined,
+            provider: 'email'
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Account registration failed.');
+        }
+
+        toast('Your resident account is ready. Welcome to One Spatial Iloilo.', 'success');
+        onLoginSuccess(data.user, data.token);
+      } else {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            password,
+            name: name.trim(),
+            phone: phone.trim() || undefined,
+            unitNumber: unitNumber.trim() || undefined
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Local registration failed.');
+        }
+
+        toast('Your resident account is ready. Welcome to One Spatial Iloilo.', 'success');
+        onLoginSuccess(data.user, data.token);
+      }
     } catch (err: any) {
       toast(err.message || 'Registration failed.', 'error');
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCompleteVerification = async () => {
-    if (verificationCode.trim() !== '4611') {
-      toast('Invalid security pin. Entering 4611 overrides verification safely.', 'error');
-      return;
-    }
-
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, phone, unitNumber })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Account registration failed.');
+      const nextStatus = await initializeFirebase();
+      if (!nextStatus.isConfigured) {
+        throw new Error('Google sign-in requires Firebase configuration. Use email/password login for local sandbox mode.');
       }
 
-      toast('Email verified and resident account initialized successfully!', 'success');
-      setIsEmailVerifying(false);
+      setFirebaseConfigStatus(nextStatus);
+
+      const credential = await signInWithGoogle();
+      if (!credential?.user) {
+        return;
+      }
+
+      const response = await fetch('/api/auth/firebase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: credential.user.uid,
+          email: credential.user.email,
+          name: credential.user.displayName || credential.user.email?.split('@')[0],
+          avatarUrl: credential.user.photoURL || undefined,
+          provider: 'google'
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Google sign-in failed.');
+      }
+
+      toast(`Welcome, ${data.user.name}!`, 'success');
       onLoginSuccess(data.user, data.token);
     } catch (err: any) {
-      toast(err.message, 'error');
+      const message = err?.code === 'auth/popup-closed-by-user'
+        ? 'Google sign-in was cancelled.'
+        : err?.message || 'Google sign-in failed.';
+      toast(message, 'warning');
     } finally {
       setIsLoading(false);
     }
@@ -220,63 +366,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
           <div className="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-center bg-transparent">
             
             <AnimatePresence mode="wait">
-              {isEmailVerifying ? (
-                /* Dynamic Verification Overlay */
-                <motion.div 
-                  key="verify-email" 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="space-y-6"
-                >
-                  <div>
-                    <span className="text-xs font-mono font-bold tracking-widest uppercase text-blue-400">Step 2: Security Validation</span>
-                    <h3 className="text-2xl font-serif font-bold text-white mt-1">Check Your Inbox</h3>
-                    <p className="text-sm text-slate-400 mt-2 leading-relaxed">
-                      We’ve simulated routing an authentication pin to you. To confirm your identity and register safely, please insert the verification code below.
-                    </p>
-                  </div>
-                  
-                  <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex gap-4 items-start">
-                    <Clipboard className="h-5 w-5 text-emerald-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-slate-300 leading-normal">
-                      <strong className="text-white">Quick-Pass Override:</strong> In this testing container, enter the security code <strong className="font-mono text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">4611</strong> to simulate verification validation.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Input
-                      type="text"
-                      label="Verification Pin"
-                      variant="glass"
-                      placeholder="XXXX"
-                      maxLength={4}
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
-                      helperText="Enter 4611 to simulate verification"
-                    />
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      variant="secondary"
-                      fullWidth
-                      onClick={() => setIsEmailVerifying(false)}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      variant="primary"
-                      fullWidth
-                      onClick={handleCompleteVerification}
-                      icon={Check}
-                      iconPosition="right"
-                    >
-                      Verify Account
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : isForgotPassword ? (
+              {isForgotPassword ? (
                 /* Forgot Password Form */
                 <motion.div
                   key="forgot-password"
@@ -319,8 +409,8 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         variant="glass"
                         placeholder="john@condo.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        icon={<Mail className="h-4 w-4" />}
+                        onChange={(e: any) => setEmail(e.target.value)}
+                        icon={Mail}
                         required
                       />
 
@@ -418,7 +508,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       variant="glass"
                       placeholder="john@condo.com"
                       value={email}
-                      onChange={(e) => handleEmailChange(e.target.value)}
+                      onChange={(e: any) => handleEmailChange(e.target.value)}
                       error={!emailValid ? 'Enter a valid email address to continue.' : undefined}
                       icon={Mail}
                       required
@@ -479,6 +569,29 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                     >
                       {isLoading ? 'Signing In Securely...' : 'Sign In Securely'}
                     </Button>
+
+                    <div className="pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        fullWidth
+                        onClick={handleGoogleSignIn}
+                        disabled={!isFirebaseConfigured || isLoading}
+                      >
+                        <span className="flex items-center justify-center gap-2">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 shrink-0">
+                            <path fill="#4285F4" d="M21.6 12.23c0-.82-.07-1.6-.2-2.35H12v4.48h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.66z" />
+                            <path fill="#34A853" d="M12 22c2.7 0 4.96-.89 6.62-2.41l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22z" />
+                            <path fill="#FBBC05" d="M6.41 13.93A5.99 5.99 0 0 1 6.41 10.07V7.49H3.07a10 10 0 0 0 0 12.89l3.34-2.45z" />
+                            <path fill="#EA4335" d="M12 6.04c1.47 0 2.8.5 3.84 1.49l2.88-2.88A9.99 9.99 0 0 0 3.07 7.49l3.34 2.44C7.2 7.8 9.4 6.04 12 6.04z" />
+                          </svg>
+                          {isLoading ? 'Connecting to Google...' : (!isFirebaseConfigured ? 'Google needs Firebase setup' : 'Continue with Google')}
+                        </span>
+                      </Button>
+                    </div>
+                    {isLocalAuthFallback ? (
+                      <p className="text-xs text-amber-300 mt-3">Firebase is not configured. Local email/password sign-in is enabled. Google sign-in is disabled until Firebase configuration is added.</p>
+                    ) : null}
                   </form>
 
                   <div className="text-center pt-2 border-t border-white/5">
@@ -517,7 +630,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         variant="glass"
                         placeholder="Johnathan Doe"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(e: any) => setName(e.target.value)}
                         icon={User}
                         required
                       />
@@ -528,7 +641,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         variant="glass"
                         placeholder="+1 (555) 122-874"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e: any) => setPhone(e.target.value)}
                         icon={Phone}
                       />
                     </div>
@@ -540,8 +653,8 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         variant="glass"
                         placeholder="john@condo.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        icon={<Mail className="h-4 w-4" />}
+                        onChange={(e: any) => setEmail(e.target.value)}
+                        icon={Mail}
                         required
                       />
 
@@ -551,7 +664,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         variant="glass"
                         placeholder="Unit 1204"
                         value={unitNumber}
-                        onChange={(e) => setUnitNumber(e.target.value)}
+                        onChange={(e: any) => setUnitNumber(e.target.value)}
                         icon={Home}
                       />
                     </div>
@@ -562,7 +675,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       variant="glass"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e: any) => setPassword(e.target.value)}
                       icon={Lock}
                       required
                     />

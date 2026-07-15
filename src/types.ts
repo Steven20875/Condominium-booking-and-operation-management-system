@@ -12,6 +12,8 @@ export interface User {
   phone?: string;
   unitNumber?: string;
   avatarUrl?: string;
+  authProvider?: 'email' | 'google' | 'firebase';
+  authUid?: string;
   createdAt: string;
   password?: string; // Kept in backend, stripped on API responses
 }

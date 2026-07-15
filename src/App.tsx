@@ -8,6 +8,7 @@ import AmbientBackground from './components/AmbientBackground.tsx';
 import { User } from './types.ts';
 import Chatbot from './components/Chatbot.tsx';
 import MobilePaySimulator from './components/MobilePaySimulator.tsx';
+import { signOutFirebaseSession } from './lib/firebase.ts';
 
 /**
  * Split Content component to ensure context hooks are safely located under the ToastProvider tree
@@ -84,16 +85,23 @@ function AppContent() {
   const handleLoginSuccess = (loggedInUser: User, sessionToken: string) => {
     setUser(loggedInUser);
     setToken(sessionToken);
+    setCurrentView('auth');
     localStorage.setItem('vista_token', sessionToken);
     localStorage.setItem('vista_user', JSON.stringify(loggedInUser));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOutFirebaseSession();
+    } catch {
+      // Ignore sign-out issues and still clear local session.
+    }
+
     setUser(null);
     setToken('');
     localStorage.removeItem('vista_token');
     localStorage.removeItem('vista_user');
-    setCurrentView('landing');
+    setCurrentView('auth');
   };
 
   const handleUpdateUser = (updatedUser: User) => {

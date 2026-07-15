@@ -364,6 +364,41 @@ fix: Correct icon usage in AuthPage Button components
 
 ---
 
+## Decision 11: Google OAuth (SSIN) Integration
+
+**Date:** June 24, 2026
+**Status:** ✅ PARTIALLY IMPLEMENTED (server redirect + callback flow)
+
+### Context
+Course requirement to support SSIN (Single Sign-In) using Google credentials and OTP.
+
+### Options Considered
+1. Implement OAuth2 Authorization Code Flow with Google (recommended)
+2. Use Firebase Authentication (simpler but external dependency)
+3. Use proprietary SSO provider (not necessary for demo)
+
+### Decision
+**Selected: OAuth2 Authorization Code Flow with Google (server-side exchange)**
+
+### Rationale
+- Full control over user provisioning (find-or-create users)
+- No external vendor lock-in for demo environment
+- Meets course requirement for SSIN using Google credentials
+- Compatible with existing JSON DB and local deployments
+
+### Implementation Notes
+- Server endpoints added: `/api/auth/google` (redirect), `/api/auth/google/callback` (exchange code)
+- Requires environment variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, optional `GOOGLE_REDIRECT_URI`
+- On successful exchange, server finds or creates a user and redirects to frontend with token
+- For classroom/demo, tokens are simple user IDs (not secure for production)
+
+### Next Steps
+- Add server-side token cookie handling for smoother UX
+- Add frontend handling to consume token and persist session
+- Optionally support `state` and CSRF protection for production
+
+---
+
 ## Summary: Architecture Diagram
 
 ```

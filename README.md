@@ -140,7 +140,52 @@ npm run start
 
 ---
 
-## 🔑 Demo Access Accounts
+## � Environment Variables
+Create a `.env` file in the project root with the following values:
+
+```env
+PORT=3000
+APP_URL=http://localhost:3000
+GEMINI_API_KEY=your_gemini_api_key_here
+
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+```
+
+> The project already includes a working `.env` file for local development. If you are setting it up on a new machine, copy the values from your Firebase project settings and keep them in this file.
+
+## 🔑 Firebase Authentication & Google Sign-In
+This project uses Firebase Authentication for modern sign-in flows.
+
+### What is configured
+- Email/password authentication
+- Google OAuth sign-in
+- Automatic sync of Firebase users into the app's backend user store
+- Support for resident and admin role-based access after login
+
+### Firebase Console setup
+1. Open Firebase Console and select your project.
+2. Go to Authentication → Sign-in method.
+3. Enable Google as a provider.
+4. Go to Authentication → Settings → Authorized domains and add:
+   - `localhost`
+5. In your Google OAuth client, add these redirect URIs:
+   - `http://localhost:3000`
+   - `http://localhost:3000/__/auth/handler`
+   - `http://localhost:3001`
+   - `http://localhost:3001/__/auth/handler`
+
+### Local development behavior
+- The app loads Firebase config from `.env` when started locally.
+- Google sign-in works through the browser and the app automatically creates or links the account in the backend.
+- If Firebase is not configured, the app falls back to the local demo accounts for sandbox use.
+
+## 🧪 Demo Access Accounts
 
 You can test the two fundamental system levels using these seeded accounts:
 

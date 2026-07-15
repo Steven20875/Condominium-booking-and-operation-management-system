@@ -707,8 +707,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     type="text"
                     placeholder="Search suite configurations..."
                     value={searchUnit}
-                    onChange={(e) => setSearchUnit(e.target.value)}
-                    icon={<Search className="h-4 w-4" />}
+                    onChange={(e: any) => setSearchUnit(e.target.value)}
+                    icon={Search}
                     variant="glass"
                     fullWidth
                   />
@@ -724,7 +724,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     setUnitAmenities('Wi-Fi, Queen Bed, Kitchenette, TV');
                     setShowAddUnitModal(true);
                   }}
-                  icon={<Plus className="h-4 w-4" />}
+                  icon={Plus}
                 >
                   Add Premium Suite
                 </Button>
@@ -781,14 +781,14 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             setUnitImages(item.images);
                             setShowAddUnitModal(true);
                           }}
-                          icon={<Edit2 className="h-3.5 w-3.5" />}
+                          icon={Edit2}
                           aria-label="Edit unit"
                         />
                         <Button
                           variant="danger"
                           size="sm"
                           onClick={() => handleDeleteUnit(item.id)}
-                          icon={<Trash2 className="h-3.5 w-3.5" />}
+                          icon={Trash2}
                           aria-label="Delete unit"
                         />
                       </div>
@@ -825,7 +825,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     variant="primary"
                     size="md"
                     onClick={() => setShowAddResidentModal(true)}
-                    icon={<Plus className="h-4 w-4" />}
+                    icon={Plus}
                   >
                     Add Resident
                   </Button>
@@ -1420,7 +1420,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     variant="primary"
                     fullWidth
                     disabled={submittingUnit}
-                    loading={submittingUnit}
+                    isLoading={submittingUnit}
                   >
                     {submittingUnit ? 'Saving Records...' : 'Save Layout Listing'}
                   </Button>
@@ -1569,7 +1569,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     variant="primary"
                     fullWidth
                     disabled={submittingResident}
-                    loading={submittingResident}
+                    isLoading={submittingResident}
                   >
                     {submittingResident ? 'Saving...' : 'Add Resident'}
                   </Button>

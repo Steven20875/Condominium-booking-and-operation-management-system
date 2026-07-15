@@ -763,7 +763,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                   type="button"
                   onClick={() => setFaqOpenIndex(isOpen ? null : index)}
                   className="w-full rounded-3xl border border-white/10 bg-slate-950/70 p-5 text-left shadow-lg shadow-slate-950/20 backdrop-blur-xl transition-all hover:border-blue-400/30"
-                  aria-expanded={isOpen}
+                  aria-expanded={!!isOpen.toString()}
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div>
