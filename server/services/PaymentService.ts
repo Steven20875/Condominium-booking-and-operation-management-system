@@ -4,20 +4,22 @@ import { db } from '../db';
  * PaymentService - OOP wrapper around payment operations
  */
 export class PaymentService {
+  constructor(private readonly database: typeof db = db) {}
+
   getPayments() {
-    return db.getPayments();
+    return this.database.getPayments();
   }
 
   getUserPayments(userId: string) {
-    return db.getUserPayments(userId);
+    return this.database.getUserPayments(userId);
   }
 
   submitPayment(paymentId: string, method: string, reference: string, amountPaid: number, residentId: string, residentName: string) {
-    return db.submitPayment(paymentId, method, reference, amountPaid, residentId, residentName);
+    return this.database.submitPayment(paymentId, method, reference, amountPaid, residentId, residentName);
   }
 
   generateManualPayment(payment: any, operatorId: string, operatorName: string) {
-    return db.generateManualPayment(payment, operatorId, operatorName);
+    return this.database.generateManualPayment(payment, operatorId, operatorName);
   }
 }
 

@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
 import { 
-  Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, ChevronLeft, ChevronRight, Sun, Heart, X, Sparkles, Upload, FileText, Smartphone, DollarSign, HelpCircle, QrCode, ShieldCheck 
+  Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, ChevronLeft, ChevronRight, Sun, Heart, X, Sparkles, Upload, FileText, DollarSign, HelpCircle, QrCode, Smartphone, ShieldCheck 
 } from 'lucide-react';
 import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, Inquiry, Purchase } from '../types.ts';
+import UserManual from './UserManual';
 
 const GCASH_DEEPLINK_BASE = 'gcash://com.mynt.gcash/app/006300000800';
 
@@ -31,6 +32,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState<boolean>(false);
+  const [showUserManual, setShowUserManual] = useState<boolean>(false);
 
   // States
   const [units, setUnits] = useState<Unit[]>([]);
@@ -83,10 +85,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [cardCVC, setCardCVC] = useState<string>('984');
   const [submittingPayment, setSubmittingPayment] = useState<boolean>(false);
 
-  // GCash & cash payment states
-  const [paymentOption, setPaymentOption] = useState<'gcash' | 'cash'>('gcash');
-  const gcashPhone = '09127068234';
-  const gcashName = 'Steven Christian Felarca';
+  // Cash payment state
+  const [paymentOption, setPaymentOption] = useState<'cash'>('cash');
+  const gcashPhone = user.phone || '09123456789';
 
   const formatEmvField = (id: string, value: string) => `${id}${value.length.toString().padStart(2, '0')}${value}`;
 
@@ -347,8 +348,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     setSubmittingPayment(true);
 
     try {
-      const selectedMethod = customMethod || (paymentOption === 'gcash' ? 'GCash' : paymentOption === 'cash' ? 'Cash' : 'Credit Card');
-      const mockRef = (selectedMethod === 'GCash' ? 'GCSH-' : selectedMethod === 'Cash' ? 'CASH-' : selectedMethod.startsWith('QR') ? 'QRPH-' : 'TXN-') + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const selectedMethod = customMethod || 'Cash';
+      const mockRef = (selectedMethod === 'Cash' ? 'CASH-' : selectedMethod.startsWith('QR') ? 'QRPH-' : 'TXN-') + Math.random().toString(36).substr(2, 6).toUpperCase();
       const res = await fetch(`/api/payments/${payingInvoice.id}/pay`, {
         method: 'POST',
         headers: {
@@ -373,15 +374,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     } finally {
       setSubmittingPayment(false);
     }
-  };
-
-  const gcashRawQrData = payingInvoice ? buildGcashQrPayload(payingInvoice.amount, payingInvoice.id) : '';
-  const gcashDeepLink = payingInvoice ? `${GCASH_DEEPLINK_BASE}?qrCode=${encodeURIComponent(gcashRawQrData)}` : '';
-
-  const handleOpenGcashApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!gcashDeepLink) return;
-    e.preventDefault();
-    window.location.href = gcashDeepLink;
   };
 
   const handleReceiptSettle = () => {
@@ -668,7 +660,11 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                         type="button"
                         onClick={() => {
                           setProfileMenuOpen(false);
-                          if (item === 'Logout') setShowLogoutModal(true);
+                          if (item === 'Help Center') {
+                            setShowUserManual(true);
+                          } else if (item === 'Logout') {
+                            setShowLogoutModal(true);
+                          }
                         }}
                         className="w-full text-left px-3 py-3 rounded-2xl text-sm text-slate-200 hover:bg-white/5 transition-colors"
                       >
@@ -1621,11 +1617,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
             >
               <form onSubmit={(e) => {
                 e.preventDefault();
-                if (paymentOption === 'gcash') {
-                  handleSettleInvoice(e, 'GCash');
-                } else {
-                  handleSettleInvoice(e, 'Cash');
-                }
+                handleSettleInvoice(e, 'Cash');
               }}>
                 <div className="p-6 sm:p-8 space-y-6">
                   <div className="flex justify-between items-center">
@@ -1645,93 +1637,21 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     </button>
                   </div>
 
-                  {/* Multi-Method Selected Tabs */}
-                  <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentOption('gcash')}
-                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        paymentOption === 'gcash'
-                          ? 'bg-blue-600 text-white shadow'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <Smartphone className="h-3.5 w-3.5" />
-                      GCash PH
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentOption('cash')}
-                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        paymentOption === 'cash'
-                          ? 'bg-amber-500 text-white shadow'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span className="inline-flex items-center gap-1"><span className="font-bold">₱</span> Cash</span>
-                    </button>
-                  </div>
-
-                  {/* GCASH METHOD PANEL */}
-                  {paymentOption === 'gcash' && (
-                    <div className="space-y-4">
-                      <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-4.5 rounded-2xl relative overflow-hidden flex flex-col justify-between shadow-inner">
-                        <div className="flex justify-between items-start">
-                          <span className="text-[15px] font-bold tracking-tight bg-white text-blue-800 px-2 pl-2.5 pr-2.5 py-0.5 rounded-full">GCash</span>
-                          <span className="text-[8px] font-bold uppercase tracking-widest text-blue-200">Gales Secured</span>
-                        </div>
-                        <div className="mt-4">
-                          <span className="text-[9px] uppercase tracking-wider block text-blue-200">Recipient Name</span>
-                          <span className="text-base font-semibold block text-white mt-1">{gcashName}</span>
-                        </div>
-                        <div className="mt-3">
-                          <span className="text-[9px] uppercase tracking-wider block text-blue-200">GCash Number</span>
-                          <span className="text-base font-mono tracking-widest block font-bold text-white mt-1">{gcashPhone.replace(/(\d{4})(\d{3})(\d{4})/, '$1 $2 $3')}</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-3xl text-slate-950 space-y-4">
-                        <div className="text-sm font-bold">Scan this QR code with your mobile device to open GCash directly.</div>
-                        <div className="mx-auto w-48 h-48 rounded-3xl overflow-hidden border border-slate-200 bg-white shadow-sm">
-                          <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(gcashRawQrData)}&color=0f172a`}
-                            alt="GCash payment QR code"
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <div className="space-y-2 text-[11px] text-slate-500">
-                          <p>Scan this QR code with your GCash scanner. It encodes a raw QRPh/EMVCo merchant payload with recipient, amount, and reference data.</p>
-                          <p className="font-semibold text-slate-700">Amount: {payingInvoice ? formatPHP(payingInvoice.amount) : '₱0.00'}</p>
-                        </div>
-                        <a
-                          href={gcashDeepLink}
-                          onClick={handleOpenGcashApp}
-                          className="inline-flex w-full items-center justify-center rounded-2xl bg-blue-950 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-blue-900 transition"
-                        >
-                          Open in GCash App
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Cash method panel */}
-                  {paymentOption === 'cash' && (
-                    <div className="space-y-4">
-                      <div className="bg-amber-50 border border-amber-200 p-5 rounded-2xl text-amber-950">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-amber-600">Cash Payment</p>
-                            <h4 className="text-sm font-bold">Pay cash at the property office or with the Gales cashier.</h4>
-                          </div>
-                          <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-700">In-person</span>
+                  <div className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-200 p-5 rounded-2xl text-amber-950">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-widest font-bold text-amber-600">Cash Payment</p>
+                          <h4 className="text-sm font-bold">Pay cash at the property office or with the Gales cashier.</h4>
                         </div>
-                        <p className="text-[11px] text-amber-700 leading-relaxed mt-4">
-                          After you settle the amount in cash, click Confirm Settle to register payment in your dashboard.
-                        </p>
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-700">In-person</span>
                       </div>
+                      <p className="text-[11px] text-amber-700 leading-relaxed mt-4">
+                        After you settle the amount in cash, click Confirm Settle to register payment in your dashboard.
+                      </p>
                     </div>
-                  )}
+                  </div>
 
                   {/* Payment summary in local currency */}
                   <div className="p-4 bg-blue-50/60 rounded-2xl flex flex-col gap-1.5 border border-blue-100 font-sans">
@@ -1853,6 +1773,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       </AnimatePresence>
 
       {/* D. LOGOUT SECURITY CONFIRMATION MODAL */}
+      <UserManual isOpen={showUserManual} onClose={() => setShowUserManual(false)} />
+
       <AnimatePresence>
         {showLogoutModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4">

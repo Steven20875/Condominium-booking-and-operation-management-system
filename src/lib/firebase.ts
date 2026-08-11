@@ -91,6 +91,7 @@ function initializeFirebaseAuth() {
     console.log('[firebase] Initializing Firebase app...');
     app = initializeApp(firebaseConfig);
     console.log('[firebase] Firebase config loaded', firebaseConfig);
+    console.log('[firebase] Active Firebase projectId:', firebaseConfig.projectId);
   }
 
   if (!authInstance) {

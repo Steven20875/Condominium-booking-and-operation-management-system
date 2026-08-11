@@ -111,8 +111,8 @@ const defaultUsers: User[] = [
   },
   {
     id: 'user-resident-1',
-    email: 'teben@gmail.com',
-    password: 'teben123',
+    email: 'resident@gmail.com',
+    password: 'Resident@2026',
     name: 'Steven Felarca',
     role: 'resident',
     phone: '+1 (555) 0122-874',
@@ -155,7 +155,7 @@ const defaultBookings: Booking[] = [
     unitName: 'The Zenith Suite',
     residentId: 'user-resident-1',
     residentName: 'Steven Felarca',
-    residentEmail: 'john@condo.com',
+    residentEmail: 'resident@gmail.com',
     startDate: '2026-06-15',
     endDate: '2026-06-18',
     totalPrice: 360.00,
@@ -615,7 +615,6 @@ class MockDatabase {
     payment.referenceNumber = reference;
     payment.amount = amountPaid;
     payment.paidAt = new Date().toISOString();
-
     // Auto update booking if payment was fully paid
     const booking = this.findBookingById(payment.bookingId);
     if (booking && booking.status === 'Pending') {

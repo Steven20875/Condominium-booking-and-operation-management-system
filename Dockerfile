@@ -18,7 +18,6 @@ COPY --from=builder /app/data ./data
 COPY --from=builder /app/.env.example ./
 
 ENV NODE_ENV=production
-ENV PORT=3000
 
 EXPOSE 3000
-CMD ["node", "dist/server.cjs"]
+CMD ["node", "dist/server.mjs"]

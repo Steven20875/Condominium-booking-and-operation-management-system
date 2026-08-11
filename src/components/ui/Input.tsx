@@ -31,8 +31,17 @@ import { LucideIcon } from 'lucide-react';
 type InputSize = 'sm' | 'md' | 'lg';
 type InputVariant = 'glass' | 'light' | 'solid';
 
-// Keep component loosely typed to avoid conflicts with DOM `size` attribute
-type InputProps = any;
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+  error?: string;
+  helperText?: string;
+  icon?: LucideIcon;
+  iconPosition?: 'left' | 'right';
+  inputSize?: InputSize;
+  variant?: InputVariant;
+  fullWidth?: boolean;
+  onClear?: () => void;
+}
 
 const sizeStyles: Record<InputSize, string> = {
   sm: 'px-3 py-1.5 text-xs rounded-lg',
@@ -46,7 +55,7 @@ const variantStyles: Record<InputVariant, string> = {
   solid: 'bg-slate-100 border border-slate-300 text-slate-900 placeholder:text-slate-500 focus:bg-slate-50 focus:border-blue-600 focus:outline-none',
 };
 
-export const Input = React.forwardRef<any, any>(
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
     {
       label,
@@ -66,8 +75,8 @@ export const Input = React.forwardRef<any, any>(
     },
     ref
   ) => {
-    const sizeClass = sizeStyles[inputSize];
-    const variantClass = variantStyles[variant];
+    const sizeClass = sizeStyles[inputSize] ?? sizeStyles.md;
+    const variantClass = variantStyles[variant] ?? variantStyles.glass;
     const widthClass = fullWidth ? 'w-full' : '';
     const errorClass = error ? 'border-rose-400/60 ring-2 ring-rose-400/20' : '';
 

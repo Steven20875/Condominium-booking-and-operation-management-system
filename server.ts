@@ -65,6 +65,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { db, dbEvents } from './server/db.ts';
+import { bookingService } from './server/services/BookingService.ts';
+import { paymentService } from './server/services/PaymentService.ts';
+import { notificationService } from './server/services/NotificationService.ts';
+import { GoogleGenAI } from '@google/genai';
 
 // Add environment variables support if needed
 import dotenv from 'dotenv';
@@ -368,9 +372,9 @@ async function startServer() {
   app.get('/api/bookings', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
     if (user.role === 'admin') {
-      res.json(db.getBookings());
+      res.json(bookingService.getBookings());
     } else {
-      res.json(db.getUserBookings(user.id));
+      res.json(bookingService.getUserBookings(user.id));
     }
   });
 
@@ -399,7 +403,7 @@ async function startServer() {
       return res.status(400).json({ error: 'This unit is currently unavailable for booking.' });
     }
 
-    const booking = db.createBooking({
+    const booking = bookingService.createBooking({
       unitId,
       residentId: user.id,
       startDate: startDate.trim(),
@@ -474,7 +478,7 @@ async function startServer() {
       return res.status(400).json({ error: 'Invalid booking status request.' });
     }
 
-    const booking = db.findBookingById(req.params.id);
+    const booking = bookingService.findBookingById(req.params.id);
     if (!booking) {
       return res.status(404).json({ error: 'Reservation ticket not found.' });
     }
@@ -488,7 +492,7 @@ async function startServer() {
       return res.status(403).json({ error: 'Resident accounts are not authorized to self-approve bookings.' });
     }
 
-    const updated = db.updateBookingStatus(req.params.id, status, user.id, user.name);
+    const updated = bookingService.updateBookingStatus(req.params.id, status, user.id, user.name);
     res.json(updated);
   });
 
@@ -496,9 +500,9 @@ async function startServer() {
   app.get('/api/payments', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
     if (user.role === 'admin') {
-      res.json(db.getPayments());
+      res.json(paymentService.getPayments());
     } else {
-      res.json(db.getUserPayments(user.id));
+      res.json(paymentService.getUserPayments(user.id));
     }
   });
 
@@ -519,7 +523,7 @@ async function startServer() {
       return res.status(400).json({ error: 'Payment amount must be a valid positive number.' });
     }
 
-    const payment = db.submitPayment(
+    const payment = paymentService.submitPayment(
       req.params.id,
       method.trim(),
       referenceNumber.trim(),
@@ -537,7 +541,7 @@ async function startServer() {
 
   // 4b. PUBLIC PAYMENTS SANDBOX (QR CODE REAL-WORLD PH SIMULATION)
   app.get('/api/public/payments/:id', (req: Request, res: Response) => {
-    const payment = db.getPayments().find(p => p.id === req.params.id);
+    const payment = paymentService.getPayments().find((p: any) => p.id === req.params.id);
     if (!payment) {
       return res.status(404).json({ error: 'Invoice ledger entity not found.' });
     }
@@ -560,7 +564,7 @@ async function startServer() {
       return res.status(400).json({ error: 'Payment amount must be a valid positive number.' });
     }
 
-    const payment = db.submitPayment(
+    const payment = paymentService.submitPayment(
       req.params.id,
       method.trim(),
       referenceNumber.trim(),
@@ -584,7 +588,7 @@ async function startServer() {
       return res.status(400).json({ error: 'Please specify target residentId and billing amount.' });
     }
 
-    const payment = db.generateManualPayment({
+    const payment = paymentService.generateManualPayment({
       residentId,
       unitName: unitName || 'Periodic Condominium Maintenance Dues',
       amount: Number(amount),
@@ -645,18 +649,18 @@ async function startServer() {
   // 6. NOTIFICATIONS MODULE
   app.get('/api/notifications', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
-    res.json(db.getNotifications(user.id, user.role));
+    res.json(notificationService.getNotifications(user.id, user.role));
   });
 
   app.post('/api/notifications/read/:id', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
-    const success = db.markNotificationAsRead(req.params.id, user.id);
+    const success = notificationService.markAsRead(req.params.id, user.id);
     res.json({ success });
   });
 
   app.post('/api/notifications/read-all', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
-    db.markAllNotificationsAsRead(user.id, user.role);
+    notificationService.markAllAsRead(user.id, user.role);
     res.json({ success: true, message: 'All relevant notifications cleared.' });
   });
 
@@ -681,7 +685,7 @@ async function startServer() {
       ? normalizedType as any
       : 'info';
 
-    const notif = db.createNotification({
+    const notif = notificationService.enqueue({
       title: title.trim(),
       message: message.trim(),
       recipientId: 'all',
@@ -695,6 +699,11 @@ async function startServer() {
   // 7. SYSTEM PERFORMANCE & AUDITS
   app.get('/api/dashboard/stats', requireAuth, (req: Request, res: Response) => {
     res.json(db.getDashboardStats());
+  });
+
+  // Lightweight health check for Render / load balancers
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.status(200).json({ status: 'ok' });
   });
 
   // Server-Sent Events stream for realtime updates (requires token query or Bearer header)

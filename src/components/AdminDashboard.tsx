@@ -7,6 +7,7 @@ import {
 import { 
   User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, ActivityLog, DashboardStats 
 } from '../types.ts';
+import UserManual from './UserManual';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
@@ -27,6 +28,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
+  const [showUserManual, setShowUserManual] = useState<boolean>(false);
 
   const formatCurrency = (value: number | null | undefined): string => {
     if (value == null) {
@@ -513,7 +515,15 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <p className="text-xs text-slate-400 mt-2 font-medium">Real-time operations analytics & administrative controls</p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="secondary"
+              size="md"
+              icon={BookOpen}
+              onClick={() => setShowUserManual(true)}
+            >
+              Help Center
+            </Button>
             <Button
               variant="primary"
               size="md"
@@ -1757,6 +1767,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       </AnimatePresence>
 
       {/* 5. LOGOUT SECURITY CONFIRMATION MODAL */}
+      <UserManual isOpen={showUserManual} onClose={() => setShowUserManual(false)} />
+
       <AnimatePresence>
         {showLogoutModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4">

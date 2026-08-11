@@ -1,208 +1,255 @@
-# ONE SPATIAL ILOILO 🏢
-### Condominium Operation, Reservation, and Billing Management System
+# One Spatial Iloilo
+### Web-Based Condominium Booking and Operations Management System
 
-An offline-first, full-stack condominium operation and booking management system designed for **One Spatial Iloilo**. The application provides residents with an upscale portal to view available units, request reservations, pay bills via an interactive QR Ph simulation, and log maintenance tickets. Simultaneously, it equips administrators with a control room dashboard featuring live analytics, resident registries, booking approval queues, and logged activities.
+## Overview
 
-This README and the attached chapter documentation describe the same solution: a condominium booking and operations management system built to solve the business problems of One Spatial Iloilo. The project documentation explains the background, statement of the problem, and goals, while this web app is the actual implementation of those requirements.
+One Spatial Iloilo is a web-based Condominium Booking and Operations Management System developed as a Capstone Project. The system is designed to simplify the process of managing condominium reservations while providing residents with a convenient way to view available units and book online.
 
-## 🧾 Client Profile
-* Client Name: **GALES URBAN HAVEN**
-* Business Name: **One Spatial Iloilo**
-* Industry: **Real Estate / Residential Property Management**
-* Products/Services: Condominium rental and leasing, property management services, and residential amenities
-* Target Customers: Young professionals, small families, and students seeking affordable, convenient condominium living in Iloilo City
-* Current Challenge: Manually managing bookings, payments, revenue tracking, and maintenance due to the lack of a centralized system.
+A recent fix resolved a resident dashboard login issue where a missing icon reference caused a black screen after login. The dashboard now renders correctly after authentication.
+
+The application provides separate access for administrators and residents. Administrators can manage bookings, residents, payments, and reports, while residents can browse available units, reserve a condominium, and monitor their booking status through an easy-to-use web interface.
+
+To improve accessibility, the system also supports Google Sign-In through Firebase Authentication while keeping the existing email and password authentication connected to the backend database.
+
+---
+    
+## Objectives
+
+The main objectives of the project are:
+
+- Simplify the condominium reservation process.
+- Provide an organized booking management system.
+- Allow administrators to manage residents, bookings, payments, and reports efficiently.
+- Improve decision-making through analytics and reporting.
+- Provide a secure authentication system for users.
 
 ---
 
-## �‍💻 Student Development & Ownership
+## Key Features
 
-**This is a student-built project** demonstrating full-stack architecture and professional software engineering practices. The application was developed by implementing modern design patterns, architectural decisions, and enterprise-grade code quality.
+### Public Website
 
-### What I Built:
-✅ **Full-stack TypeScript application** - Unified frontend/backend language with strict typing
-✅ **Component library** - 7 reusable UI components with variants system (eliminated 50+ duplicate patterns)
-✅ **Authentication system** - JWT-based auth with role-based access control
-✅ **Real-time notifications** - Server-Sent Events (SSE) for live updates
-✅ **Admin analytics dashboard** - Interactive charts with Recharts
-✅ **Resident portal** - Self-service booking and payment system
-✅ **Database layer** - File-based transactional storage with automatic migrations
-✅ **API design** - RESTful endpoints with proper error handling
-✅ **Deployment pipeline** - Docker containerization and Render hosting
+- Modern landing page
+- About section
+- Available condominium units
+- Features overview
+- Contact information
 
-### Key Improvements (Refactoring Phase):
-- **Code Quality**: Reduced duplication from 50+ button patterns to 6 variants (30% reduction)
-- **TypeScript**: Strict mode compliance with zero type errors
-- **Accessibility**: ARIA attributes, semantic HTML, keyboard navigation
-- **Performance**: Optimized component rendering with React.memo and proper dependencies
-- **Architecture**: Component-driven design with composable, reusable patterns
-- **Documentation**: Meaningful commit history explaining every change
+### Resident Features
 
-### To Verify Ownership:
-1. Review [DEVELOPMENT.md](./DEVELOPMENT.md) for my personal development journey
-2. Review [TECH_DECISIONS.md](./TECH_DECISIONS.md) for architectural decision rationale
-3. Check git history: Each commit explains the "why" behind changes
-4. Test functionality end-to-end: All features work as designed
-5. Ask about any architectural choice: I can defend every decision
+- User Registration
+- Secure Login
+- Google Sign-In
+- Browse Available Units
+- Book Condominium Units
+- View Booking Status
+- Manage Personal Profile
 
----
+### Administrator Features
 
-## �🛠️ Technology Stack & Architecture
-
-Unlike traditional web projects that rely on older, scattered stacks (such as PHP + Apache + MySQL inside XAMPP), **One Spatial Iloilo** is engineered using a **Unified TypeScript Stack**. This allows both the frontend and backend to share system models and speak the exact same language seamlessly.
-
-**Frontend:** `React 19` with `TypeScript`, styled with `Tailwind CSS`, and built with `Vite`.
-
-**Backend:** `Node.js` with `Express`, written in `TypeScript`, and bundled with `tsx`/`esbuild`.
-
-### 1. Frontend (Client-Side)
-*   **React 19 & TypeScript**: Strong typing and modern functional rendering for scalable application modules.
-*   **Vite**: Next-generation lightning-fast frontend bundling tool replacing slower legacy bundlers.
-*   **Tailwind CSS (v4)**: Modern utility-first class styling giving the app its premium, high-contrast, ambient dark/light interfaces.
-*   **lucide-react**: Lightweight vector icon definitions.
-*   **Motion**: Fluid micro-animations for cards, drawers, transitions, and payment simulators.
-*   **Recharts**: Interactive charting library used to generate real-time metrics, monthly revenues, maintenance priority metrics, and occupancy curves.
-
-### 2. Backend (Server-Side)
-*   **Express.js & Node.js**: High-performance RESTful routing server that serves as the controller api layer for core operations (Authentication, booking status, maintenance updates, notifications, and telemetry).
-*   **tsx / esbuild**: Hot-loading and bundling pipeline to transpile server-side TypeScript code natively into optimized production modules (`server.ts` to `dist/server.cjs`).
-
-### 3. Database System (Why a JSON Disk DB is better than XAMPP / MySQL)
-Instead of forcing teachers or local developers to manually install complex database packages, start Apache/MySQL ports, or configure phpMyAdmin, the application features an elegant **server-controlled persistent dynamic file database**:
-*   **File Storage (`data/db.json`)**: Managed via `server/db.ts`, the server handles all database reads and writes transactionally directly on the server's disk space.
-*   **Dynamic Seeding**: On the first start, the database auto-generates default units, default residents, default mock logs, and admin credentials.
-*   **No Overhead**: It is fully transactional, portable, and runs out of the box in secondary sandboxes or local drives without extra setup.
-
-### 4. Artificial Intelligence (AI) Concierge
-*   **Google Gemini SDK (`@google/genai`)**: Fully integrated on the server-side to power an intelligent, contextual AI assistant bot. It helps residents answer common condo directory rules, booking directions, and operational guidelines without showing API keys to the browser.
+- Dashboard
+- Booking Management
+- Resident Management
+- Payment Monitoring
+- Unit Management
+- Reports
+- Analytics Dashboard
 
 ---
 
-## 📂 Core Project Structures & Subdirectory Mapping
+## Authentication
 
-```bash
-├── data/
-│   └── db.json                 # Persistent local JSON Database (The central database)
-├── server/
-│   └── db.ts                   # Database Controller (Inserts, Updates, Deletions, Seeds)
-├── server.ts                   # Express.js Application Endpoints & Vite API Proxy Layer
+The system uses two authentication methods.
+
+### Email and Password
+
+Email and password authentication is handled by the application's Express backend and database.
+
+### Google Sign-In
+
+Google authentication is implemented using Firebase Authentication. Once a user successfully signs in with Google, the account is synchronized with the application's backend before accessing the system.
+
+---
+
+## Technologies Used
+
+### Frontend
+
+- React
+- TypeScript
+- Vite
+- HTML5
+- CSS3
+
+### Backend
+
+- Express.js
+- Node.js
+
+### Database
+
+- Application Database
+- Firebase Authentication (Google Sign-In only)
+
+### Other Technologies
+
+- Firebase
+- REST API
+- Git
+- GitHub
+
+---
+
+## System Modules
+
+### Landing Page
+
+Displays project information, available units, features, and allows users to sign in.
+
+### Booking Module
+
+Allows residents to reserve available condominium units.
+
+### Resident Module
+
+Stores resident information and booking records.
+
+### Payment Module
+
+Tracks reservation payments and payment status.
+
+### Dashboard
+
+Provides administrators with an overview of system activities.
+
+### Analytics
+
+Displays booking trends and operational reports to support decision-making.
+
+---
+
+## User Roles
+
+### Administrator
+
+Administrators can:
+
+- Manage residents
+- Manage bookings
+- Manage condominium units
+- Monitor payments
+- View analytics
+- Generate reports
+
+### Resident
+
+Residents can:
+
+- Register an account
+- Log in securely
+- Sign in using Google
+- View available units
+- Book condominium units
+- View booking history
+
+---
+
+## Project Structure
+
+```
+condominium/
+│
 ├── src/
-│   ├── App.tsx                 # Main Application Orchestrator & View Controller
-│   ├── main.tsx                # Client Hydrator & Entry Node
-│   ├── index.css               # Google Font Import (Inter, Space Grotesk) & Tailwind Directives
-│   ├── types.ts                # Unified Type Schemas for bookings, payment logs, users, and tasks
-│   └── components/
-│       ├── LandingPage.tsx     # Modern interactive splash page with hero banners
-│       ├── AuthPage.tsx        # High-security, validated login, registration & unit selector
-│       ├── ResidentDashboard.tsx # Comprehensive portal for bookings, QR Ph billing & tickets
-│       ├── AdminDashboard.tsx   # Control console with interactive charts, registries, approvals
-│       ├── Chatbot.tsx         # Gemini AI Concierge interface with smart suggestions
-│       ├── MobilePaySimulator.tsx # Virtual checkout interface illustrating QR Ph simulation flow
-│       └── AmbientBackground.tsx # Fine-tuned micro-animation backdrops matching current user action
-├── package.json                # Dependencies, project metadata, and automation engines
-├── tsconfig.json               # TypeScript configurations for compiler compliance
-└── vite.config.ts              # Configuration for Vite bundler, dev servers, and React bindings
+├── server/
+├── data/
+├── docs/
+├── dist/
+├── package.json
+├── server.ts
+└── README.md
 ```
 
 ---
 
-## 🚀 How to Run the App Locally on Your Computer
+## Installation
 
-To run this on any computer, make sure **Node.js** (version 18 or above) is installed.
+Clone the repository.
 
-### Step 1: Install Dependencies
-Open your terminal inside the folder (`C:\Users\ASUS\Downloads\one-spatial-iloilo`) and run:
+```bash
+git clone https://github.com/Steven20875/Condominium-booking-and-operation-management-system.git
+```
+
+Open the project folder.
+
+```bash
+cd condominium
+```
+
+Install dependencies.
+
 ```bash
 npm install
 ```
 
-### Step 2: Configure Environment Variables
-Create a `.env` file in the root directory (based on `.env.example`):
-```env
-PORT=3000
-GEMINI_API_KEY=your_actual_gemini_api_key_here
-```
-*(Note: If the Gemini key is blank, the app will continue to work perfectly fine, and fallback responses will guide the interactive chatbot).*
+Create a `.env` file and configure your Firebase credentials.
 
-### Step 3: Launch both Backend and Frontend In Dev Mode
-To run the server and the frontend client simultaneously with live reload, write:
+```env
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+VITE_FIREBASE_MEASUREMENT_ID=
+```
+
+Run the development server.
+
 ```bash
 npm run dev
-```
-Now, simply navigate your browser to: **`http://localhost:3000`**
-
-### Step 4: Production Build and Direct Execution
-To build and compile the optimized app for permanent deployment or file sharing:
-```bash
-npm run build
-npm run start
 ```
 
 ---
 
-## � Environment Variables
-Create a `.env` file in the project root with the following values:
+## Google Authentication Setup
 
-```env
-PORT=3000
-APP_URL=http://localhost:3000
-GEMINI_API_KEY=your_gemini_api_key_here
+1. Create a Firebase Project.
+2. Enable Google Authentication.
+3. Add your Firebase Web App.
+4. Copy the Firebase configuration into the `.env` file.
+5. Restart the application.
 
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
-```
+---
 
-> The project already includes a working `.env` file for local development. If you are setting it up on a new machine, copy the values from your Firebase project settings and keep them in this file.
+## Future Improvements
 
-## 🔑 Firebase Authentication & Google Sign-In
-This project uses Firebase Authentication for modern sign-in flows.
+Possible improvements for future development include:
 
-### What is configured
-- Email/password authentication
-- Google OAuth sign-in
-- Automatic sync of Firebase users into the app's backend user store
-- Support for resident and admin role-based access after login
+- Online payment gateway integration
+- Email notifications
+- SMS notifications
+- QR Code for reservations
+- Mobile application
+- Maintenance request management
+- Visitor management system
+- Real-time notifications
 
-### Firebase Console setup
-1. Open Firebase Console and select your project.
-2. Go to Authentication → Sign-in method.
-3. Enable Google as a provider.
-4. Go to Authentication → Settings → Authorized domains and add:
-   - `localhost`
-5. In your Google OAuth client, add these redirect URIs:
-   - `http://localhost:3000`
-   - `http://localhost:3000/__/auth/handler`
-   - `http://localhost:3001`
-   - `http://localhost:3001/__/auth/handler`
+---
 
-### Local development behavior
-- The app loads Firebase config from `.env` when started locally.
-- Google sign-in works through the browser and the app automatically creates or links the account in the backend.
-- If Firebase is not configured, the app falls back to the local demo accounts for sandbox use.
+## Developers
 
-## 🧪 Demo Access Accounts
+Capstone Project
 
-You can test the two fundamental system levels using these seeded accounts:
+Bachelor of Science in Information Technology
 
-| Role | Username / Email | Password | Allowed Capabilities |
-| :--- | :--- | :--- | :--- |
-| **Administrator (Gales Urban Haven)** | `admin@condo.com` | `admin123` | Analytics, Approval management, Maintenance assigning, Log telemetry, Resident registry |
-| **Steven Felarca (Resident)** | `resident@gmail.com` | `Resident@2026` | Booking requests, Track QR Ph payment bills, File plumbing tasks |
-| **Resident 2** | `alice@condo.com` | `alice123` | Dynamic reservations, View invoices, Notification desk |
+PHINMA University of Iloilo
 
-## ✨ Recent UX Update
+Academic Year 2026–2027
 
-The landing experience has been simplified to reduce duplicate actions and make booking access more intuitive:
+---
 
-- The top navigation now keeps a single Sign In action.
-- The hero section still offers Book Your Unit and Explore Features.
-- Selecting Book Your Unit now sends unauthenticated visitors to the login flow and authenticated visitors directly into the booking experience.
-- The existing authentication and booking logic remains unchanged; only the redirect behavior was updated.
+## License
 
+This project was developed for academic purposes only.
 
-
+All rights reserved © 2026.

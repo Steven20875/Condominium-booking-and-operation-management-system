@@ -6,8 +6,10 @@ import { db } from '../db';
 export class NotificationService {
   private queue: any[] = [];
 
+  constructor(private readonly database: typeof db = db) {}
+
   enqueue(notification: any) {
-    const n = db.createNotification(notification);
+    const n = this.database.createNotification(notification);
     this.queue.push(n);
     // keep queue size reasonable
     if (this.queue.length > 200) this.queue.shift();
@@ -19,15 +21,15 @@ export class NotificationService {
   }
 
   getNotifications(userId: string, role: string) {
-    return db.getNotifications(userId, role);
+    return this.database.getNotifications(userId, role);
   }
 
   markAsRead(id: string, userId: string) {
-    return db.markNotificationAsRead(id, userId);
+    return this.database.markNotificationAsRead(id, userId);
   }
 
   markAllAsRead(userId: string, role: string) {
-    return db.markAllNotificationsAsRead(userId, role);
+    return this.database.markAllNotificationsAsRead(userId, role);
   }
 }
 

@@ -5,7 +5,7 @@ import FerrofluidBackground from './FerrofluidBackground.tsx';
 import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, UserCheck, Bell } from 'lucide-react';
 import { User as UserType } from '../types.ts';
 import { Button, Input } from './ui';
-import { createAccountWithEmailPassword, signInWithEmailPassword, signInWithGoogle, getFirebaseConfigStatus, initializeFirebase, getGoogleRedirectResult } from '../lib/firebase.ts';
+import { signInWithGoogle, getFirebaseConfigStatus, initializeFirebase, getGoogleRedirectResult } from '../lib/firebase.ts';
 
 interface AuthPageProps {
   onLoginSuccess: (user: UserType, token: string) => void;
@@ -116,45 +116,19 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
     setIsLoading(true);
     try {
-      const nextStatus = await initializeFirebase();
-      setFirebaseConfigStatus(nextStatus);
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password })
+      });
 
-      if (nextStatus.isConfigured) {
-        const credential = await signInWithEmailPassword(email.trim(), password);
-        const response = await fetch('/api/auth/firebase', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: credential.user.uid,
-            email: credential.user.email,
-            name: credential.user.displayName || name || credential.user.email?.split('@')[0],
-            avatarUrl: credential.user.photoURL || undefined,
-            provider: 'email'
-          })
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to create or sync your resident account.');
-        }
-
-        toast(`Welcome back, ${data.user.name}! Enjoy your stay.`, 'success');
-        onLoginSuccess(data.user, data.token);
-      } else {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim().toLowerCase(), password })
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Local email/password sign-in failed.');
-        }
-
-        toast(`Welcome back, ${data.user.name}! Local sign-in succeeded.`, 'success');
-        onLoginSuccess(data.user, data.token);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Local email/password sign-in failed.');
       }
+
+      toast(`Welcome back, ${data.user.name}! Local sign-in succeeded.`, 'success');
+      onLoginSuccess(data.user, data.token);
     } catch (err: any) {
       toast(err.message || 'Server error occurred during sign-in.', 'error');
     } finally {
@@ -171,51 +145,25 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
     setIsLoading(true);
     try {
-      const nextStatus = await initializeFirebase();
-      setFirebaseConfigStatus(nextStatus);
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          name: name.trim(),
+          phone: phone.trim() || undefined,
+          unitNumber: unitNumber.trim() || undefined
+        })
+      });
 
-      if (nextStatus.isConfigured) {
-        const credential = await createAccountWithEmailPassword(email.trim(), password);
-        const response = await fetch('/api/auth/firebase', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: credential.user.uid,
-            email: credential.user.email,
-            name: name.trim(),
-            avatarUrl: credential.user.photoURL || undefined,
-            provider: 'email'
-          })
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Account registration failed.');
-        }
-
-        toast('Your resident account is ready. Welcome to One Spatial Iloilo.', 'success');
-        onLoginSuccess(data.user, data.token);
-      } else {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            password,
-            name: name.trim(),
-            phone: phone.trim() || undefined,
-            unitNumber: unitNumber.trim() || undefined
-          })
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Local registration failed.');
-        }
-
-        toast('Your resident account is ready. Welcome to One Spatial Iloilo.', 'success');
-        onLoginSuccess(data.user, data.token);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Local registration failed.');
       }
+
+      toast('Your resident account is ready. Welcome to One Spatial Iloilo.', 'success');
+      onLoginSuccess(data.user, data.token);
     } catch (err: any) {
       toast(err.message || 'Registration failed.', 'error');
     } finally {
@@ -465,12 +413,12 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         </div>
                       </div>
                       <div className="mt-4 space-y-1 text-slate-300 text-[11px]">
-                        <p>Email: <span className="text-white font-semibold">john@condo.com</span></p>
-                        <p>Password: <span className="text-white font-semibold">john123</span></p>
+                        <p>Email: <span className="text-white font-semibold">resident@gmail.com</span></p>
+                        <p>Password: <span className="text-white font-semibold">Resident@2026</span></p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => copyDemoCredentials('john@condo.com:john123')}
+                        onClick={() => copyDemoCredentials('resident@gmail.com:Resident@2026')}
                         className="auth-copy-button"
                       >
                         Copy Resident Credentials

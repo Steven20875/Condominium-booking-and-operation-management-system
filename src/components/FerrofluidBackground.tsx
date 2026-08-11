@@ -30,19 +30,22 @@ export default function FerrofluidBackground({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const canvasElement = canvas;
+    const canvasContext = ctx;
+
     let dpr = Math.max(1, window.devicePixelRatio || 1);
-    let w = canvas.clientWidth || canvas.width;
-    let h = canvas.clientHeight || canvas.height;
+    let w = canvasElement.clientWidth || canvasElement.width;
+    let h = canvasElement.clientHeight || canvasElement.height;
     const isMobile = window.innerWidth < 640 || 'ontouchstart' in window;
     const targetParticles = particles ?? (isMobile ? 6 : 12);
 
     function resize() {
       dpr = Math.max(1, window.devicePixelRatio || 1);
-      w = canvas.clientWidth || canvas.width;
-      h = canvas.clientHeight || canvas.height;
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      w = canvasElement.clientWidth || canvasElement.width;
+      h = canvasElement.clientHeight || canvasElement.height;
+      canvasElement.width = Math.round(w * dpr);
+      canvasElement.height = Math.round(h * dpr);
+      canvasContext.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     resize();
@@ -76,13 +79,13 @@ export default function FerrofluidBackground({
       }
       lastFrameRef.current = now;
 
-      ctx.clearRect(0, 0, w, h);
+      canvasContext.clearRect(0, 0, w, h);
 
       // soft background darken for contrast
-      ctx.fillStyle = `rgba(6,10,16,${0.06 * (1 - opacity) + 0.12})`;
-      ctx.fillRect(0, 0, w, h);
+      canvasContext.fillStyle = `rgba(6,10,16,${0.06 * (1 - opacity) + 0.12})`;
+      canvasContext.fillRect(0, 0, w, h);
 
-      ctx.globalCompositeOperation = 'lighter';
+      canvasContext.globalCompositeOperation = 'lighter';
 
       particlesArr.forEach((p, idx) => {
         // simple oscillation for organic motion
@@ -96,15 +99,15 @@ export default function FerrofluidBackground({
         if (p.y < -p.r) p.y = h + p.r;
         if (p.y > h + p.r) p.y = -p.r;
 
-        const grad = ctx.createRadialGradient(p.x, p.y, Math.max(1, p.r * 0.05), p.x, p.y, p.r);
+        const grad = canvasContext.createRadialGradient(p.x, p.y, Math.max(1, p.r * 0.05), p.x, p.y, p.r);
         grad.addColorStop(0, hexToRgba(p.color, 0.9 * opacity));
         grad.addColorStop(0.4, hexToRgba(p.color, 0.45 * opacity));
         grad.addColorStop(1, hexToRgba('#0b1220', 0));
 
-        ctx.beginPath();
-        ctx.fillStyle = grad;
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
+        canvasContext.beginPath();
+        canvasContext.fillStyle = grad;
+        canvasContext.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        canvasContext.fill();
       });
 
       // subtle blur/glow via CSS filter on canvas container (handled in inline styles)

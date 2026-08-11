@@ -5,24 +5,26 @@ import { db } from '../db';
  * Provides a clear service boundary for business logic and easier unit testing
  */
 export class BookingService {
+  constructor(private readonly database: typeof db = db) {}
+
   createBooking(booking: any) {
-    return db.createBooking(booking);
+    return this.database.createBooking(booking);
   }
 
   getBookings() {
-    return db.getBookings();
+    return this.database.getBookings();
   }
 
   findBookingById(id: string) {
-    return db.findBookingById(id);
+    return this.database.findBookingById(id);
   }
 
   updateBookingStatus(id: string, status: 'Approved' | 'Rejected' | 'Cancelled' | 'Completed', operatorId: string, operatorName: string) {
-    return db.updateBookingStatus(id, status, operatorId, operatorName);
+    return this.database.updateBookingStatus(id, status, operatorId, operatorName);
   }
 
   getUserBookings(userId: string) {
-    return db.getUserBookings(userId);
+    return this.database.getUserBookings(userId);
   }
 }
 
