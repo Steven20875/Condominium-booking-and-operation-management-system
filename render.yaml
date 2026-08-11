@@ -1,38 +1,41 @@
 services:
   - type: web
     name: one-spatial-iloilo
-    env: docker
-    dockerfilePath: Dockerfile
-    plan: free
-    autoDeploy: true
-    buildCommand: "npm run build"
-    startCommand: "npm start"
-    healthCheckPath: "/api/health"
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    autoDeployTrigger: commit
+    healthCheckPath: /api/health
+
     disk:
       name: data-disk
-      sizeGb: 1
       mountPath: /app/data
-    # Non-secret environment variables declared here. Do NOT hardcode secret values.
+      sizeGB: 1
+
     envVars:
       - key: NODE_ENV
         value: production
 
-    # The following keys are expected to be configured as secrets or env vars
-    # within the Render dashboard (values intentionally left blank here):
-    envVars:
       - key: GEMINI_API_KEY
-        value: ""
+        sync: false
+
       - key: VITE_FIREBASE_API_KEY
-        value: ""
+        sync: false
+
       - key: VITE_FIREBASE_AUTH_DOMAIN
-        value: ""
+        sync: false
+
       - key: VITE_FIREBASE_PROJECT_ID
-        value: ""
+        sync: false
+
       - key: VITE_FIREBASE_STORAGE_BUCKET
-        value: ""
+        sync: false
+
       - key: VITE_FIREBASE_MESSAGING_SENDER_ID
-        value: ""
+        sync: false
+
       - key: VITE_FIREBASE_APP_ID
-        value: ""
+        sync: false
+
       - key: VITE_FIREBASE_MEASUREMENT_ID
-        value: ""
+        sync: false
