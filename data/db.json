@@ -653,6 +653,16 @@
       "createdAt": "2026-08-11T14:23:47.228Z"
     },
     {
+      "id": "notif-26r17iatf",
+      "title": "Deploy Test",
+      "message": "Persistence test",
+      "recipientId": "all",
+      "recipientRole": "all",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-08-11T14:23:47.228Z"
+    },
+    {
       "id": "notif-0s158ezfr",
       "title": "Maintenance Request Completed",
       "message": "Your maintenance ticket concerning \"HVAC / Cooling\" is now: COMPLETED. Assigned to: Robert Mclean (Plumbing Specialist).",
