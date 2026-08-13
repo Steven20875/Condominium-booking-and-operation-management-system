@@ -174,6 +174,10 @@ const defaultPayments: Payment[] = [
     residentName: 'Alice Cooper',
     unitName: 'The Grand Horizon Penthouse',
     amount: 3150.00,
+    totalAmount: 3150.00,
+    paidAmount: 3150.00,
+    remainingBalance: 0,
+    downpaymentAmount: 3150.00,
     status: 'Paid',
     method: 'Credit Card',
     referenceNumber: 'TXN-90812312-AB',
@@ -187,6 +191,10 @@ const defaultPayments: Payment[] = [
     residentName: 'Steven Felarca',
     unitName: 'The Zenith Suite',
     amount: 360.00,
+    totalAmount: 360.00,
+    paidAmount: 0,
+    remainingBalance: 360.00,
+    downpaymentAmount: 0,
     status: 'Pending',
     method: 'Debit Card',
     referenceNumber: 'TXN-PENDING-F7',
@@ -288,6 +296,8 @@ class MockDatabase {
         if (!this.data.maintenanceRequests) this.data.maintenanceRequests = [];
         if (!this.data.notifications) this.data.notifications = [];
         if (!this.data.activityLogs) this.data.activityLogs = [];
+
+        this.normalizeExistingPayments();
       } else {
         // Seed database
         this.data = {
@@ -313,6 +323,40 @@ class MockDatabase {
         notifications: defaultNotifications,
         activityLogs: defaultLogs
       };
+    }
+  }
+
+  private normalizeExistingPayments() {
+    let valuesUpdated = false;
+
+    this.data.payments = this.data.payments.map((payment: any) => {
+      // Normalize to authoritative fields. Ensure `amount` remains equal to the
+      // invoice total (totalAmount) to avoid confusing `amount` with the last
+      // payment value.
+      const total = typeof payment.totalAmount === 'number' ? payment.totalAmount : Number(payment.amount || 0);
+      const paid = typeof payment.paidAmount === 'number' ? payment.paidAmount : (payment.status === 'Paid' ? total : 0);
+      const remaining = typeof payment.remainingBalance === 'number' ? payment.remainingBalance : Math.max(0, total - paid);
+      const down = typeof payment.downpaymentAmount === 'number' ? payment.downpaymentAmount : (payment.status === 'Paid' ? paid : 0);
+
+      const normalized = {
+        ...payment,
+        totalAmount: total,
+        paidAmount: paid,
+        remainingBalance: remaining,
+        downpaymentAmount: down,
+        status: payment.status || 'Pending',
+        // keep `amount` as the invoice total for backward-compatibility
+        amount: total
+      };
+
+      if (JSON.stringify(normalized) !== JSON.stringify(payment)) {
+        valuesUpdated = true;
+      }
+      return normalized;
+    });
+
+    if (valuesUpdated) {
+      this.save();
     }
   }
 
@@ -520,6 +564,10 @@ class MockDatabase {
       residentName: newBooking.residentName,
       unitName: newBooking.unitName,
       amount: newBooking.totalPrice,
+      totalAmount: newBooking.totalPrice,
+      paidAmount: 0,
+      remainingBalance: newBooking.totalPrice,
+      downpaymentAmount: 0,
       status: 'Pending',
       method: 'Credit Card',
       referenceNumber: 'TXN-PENDING-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
@@ -610,46 +658,83 @@ class MockDatabase {
     if (idx === -1) return undefined;
     
     const payment = this.data.payments[idx];
-    payment.status = 'Paid';
+    // Compute remaining based on authoritative fields
+    const remainingBefore = (typeof payment.remainingBalance === 'number') ? payment.remainingBalance : ((typeof payment.totalAmount === 'number' ? payment.totalAmount : payment.amount) - (typeof payment.paidAmount === 'number' ? payment.paidAmount : 0));
+    if (amountPaid <= 0) {
+      return undefined;
+    }
+    if (amountPaid > remainingBefore) {
+      return undefined;
+    }
+
     payment.method = method as any;
     payment.referenceNumber = reference;
-    payment.amount = amountPaid;
     payment.paidAt = new Date().toISOString();
-    // Auto update booking if payment was fully paid
+    // Accumulate paid amount and recalc remaining; never overwrite invoice total
+    payment.paidAmount = (typeof payment.paidAmount === 'number' ? payment.paidAmount : 0) + amountPaid;
+    payment.totalAmount = typeof payment.totalAmount === 'number' ? payment.totalAmount : (typeof payment.amount === 'number' ? payment.amount : 0);
+    payment.remainingBalance = Math.max(0, payment.totalAmount - payment.paidAmount);
+
+    // Preserve the first downpayment as the downpaymentAmount; subsequent payments accumulate in paidAmount
+    if (!payment.downpaymentAmount || payment.downpaymentAmount <= 0) {
+      payment.downpaymentAmount = amountPaid;
+    }
+
+    // Set status according to paid vs total
+    if (payment.paidAmount < payment.totalAmount) {
+      payment.status = 'Partially Paid';
+    } else {
+      payment.status = 'Paid';
+    }
+
+    // Keep `amount` representing the invoice total for compatibility
+    payment.amount = payment.totalAmount;
+
     const booking = this.findBookingById(payment.bookingId);
-    if (booking && booking.status === 'Pending') {
-      booking.status = 'Approved';
-      // Mark Unit booked
-      const unit = this.findUnitById(booking.unitId);
-      if (unit) {
-        unit.status = 'Booked';
-        unit.availability = false;
+    if (booking) {
+      if (payment.status === 'Paid') {
+        if (booking.status === 'Pending' || booking.status === 'Partially Paid') {
+          booking.status = 'Approved';
+        }
+        const unit = this.findUnitById(booking.unitId);
+        if (unit) {
+          unit.status = 'Booked';
+          unit.availability = false;
+        }
+      } else if (payment.status === 'Partially Paid') {
+        if (booking.status === 'Pending') {
+          booking.status = 'Partially Paid';
+        }
       }
     }
 
-    // Notify admins
     this.createNotification({
       title: 'Payment Received',
-      message: `${residentName} submitted a payment of $${amountPaid} for ${payment.unitName || 'unit'} (Ref: ${reference}).`,
+      message: `${residentName} submitted a payment of ₱${amountPaid.toFixed(2)} for ${payment.unitName || 'unit'} (Ref: ${reference}).`,
       recipientId: 'all',
       recipientRole: 'admin',
       type: 'success'
     });
 
     this.save();
-    this.addActivityLog(residentId, residentName, 'resident', 'Payment Submitted', `Paid $${amountPaid} references ${reference}`);
+    this.addActivityLog(residentId, residentName, 'resident', 'Payment Submitted', `Paid ₱${amountPaid.toFixed(2)} references ${reference}`);
     return payment;
   }
 
   public generateManualPayment(payment: Partial<Payment>, operatorId: string, operatorName: string): Payment {
     const user = this.findUserById(payment.residentId!);
+    const totalAmount = Number(payment.amount) || 0;
     const newPayment: Payment = {
       id: 'pay-' + Math.random().toString(36).substr(2, 9),
       bookingId: payment.bookingId || 'manual',
       residentId: payment.residentId!,
       residentName: user ? user.name : 'Unknown Resident',
       unitName: payment.unitName || 'General service bill',
-      amount: Number(payment.amount) || 0,
+      amount: totalAmount,
+      totalAmount,
+      paidAmount: payment.status === 'Paid' ? totalAmount : 0,
+      remainingBalance: payment.status === 'Paid' ? 0 : totalAmount,
+      downpaymentAmount: payment.status === 'Paid' ? totalAmount : 0,
       status: payment.status || 'Pending',
       method: payment.method || 'Credit Card',
       referenceNumber: 'TXN-GEN-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
@@ -806,27 +891,42 @@ class MockDatabase {
     const bookedCount = units.filter(u => u.status === 'Booked' || !u.availability).length;
     const occupancyRate = units.length > 0 ? Math.round((bookedCount / units.length) * 100) : 0;
 
-    // Build monthly revenue charts (mock standard progression)
-    const monthlyRevenue = [
-      { month: 'Jan', revenue: 6200 },
-      { month: 'Feb', revenue: 7800 },
-      { month: 'Mar', revenue: 9400 },
-      { month: 'Apr', revenue: 11200 },
-      { month: 'May', revenue: totalRevenue > 0 ? Math.round(totalRevenue * 0.9) : 13500 },
-      { month: 'Jun (Proj)', revenue: Math.round(totalRevenue) || 15000 }
-    ];
+    // Derived monthly revenue from valid paid payment records only.
+    const paidPayments = payments.filter(p => p.status === 'Paid');
+    const paidPaymentRevenueByMonth = new Map<string, number>();
 
-    // Status distributions
+    paidPayments.forEach(p => {
+      const dateValue = p.paidAt || p.createdAt;
+      const parsedDate = new Date(dateValue);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return;
+      }
+
+      const monthName = parsedDate.toLocaleString('en-US', { month: 'short' });
+      const monthKey = monthName;
+      const existing = paidPaymentRevenueByMonth.get(monthKey) || 0;
+      paidPaymentRevenueByMonth.set(monthKey, existing + Number(p.amount || 0));
+    });
+
+    const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyRevenue = monthOrder
+      .filter(month => paidPaymentRevenueByMonth.has(month))
+      .map(month => ({
+        month,
+        revenue: Math.round(paidPaymentRevenueByMonth.get(month) || 0)
+      }));
+
+    // Status distributions from actual booking records.
     const pendingB = bookings.filter(b => b.status === 'Pending').length;
     const approvedB = bookings.filter(b => b.status === 'Approved').length;
     const completedB = bookings.filter(b => b.status === 'Completed').length;
     const rejectedB = bookings.filter(b => b.status === 'Rejected' || b.status === 'Cancelled').length;
 
     const bookingStatusData = [
-      { name: 'Pending Approval', value: pendingB || 1 },
-      { name: 'Approved / Active', value: approvedB || 2 },
-      { name: 'Completed Sessions', value: completedB || 3 },
-      { name: 'Cancelled / Rejected', value: rejectedB || 1 }
+      { name: 'Pending Approval', value: pendingB },
+      { name: 'Approved / Active', value: approvedB },
+      { name: 'Completed Sessions', value: completedB },
+      { name: 'Cancelled / Rejected', value: rejectedB }
     ];
 
     // Unit category distribution counts
@@ -846,10 +946,10 @@ class MockDatabase {
     const emergencyPriority = maintenance.filter(r => r.priority === 'Emergency').length;
 
     const maintenancePriorityData = [
-      { name: 'Low', value: lowPriority || 1 },
-      { name: 'Medium', value: medPriority || 2 },
-      { name: 'High', value: highPriority || 1 },
-      { name: 'Emergency', value: emergencyPriority || 0 }
+      { name: 'Low', value: lowPriority },
+      { name: 'Medium', value: medPriority },
+      { name: 'High', value: highPriority },
+      { name: 'Emergency', value: emergencyPriority }
     ];
 
     return {

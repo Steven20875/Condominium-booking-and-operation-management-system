@@ -50,9 +50,9 @@ const sizeStyles: Record<InputSize, string> = {
 };
 
 const variantStyles: Record<InputVariant, string> = {
-  glass: 'bg-white/5 border border-white/10 text-white placeholder:text-slate-400 focus:bg-white/8 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
-  light: 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
-  solid: 'bg-slate-100 border border-slate-300 text-slate-900 placeholder:text-slate-500 focus:bg-slate-50 focus:border-blue-600 focus:outline-none',
+  glass: 'bg-slate-950/40 border border-white/15 text-slate-50 placeholder:text-slate-400 focus:bg-slate-950/60 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
+  light: 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-500 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
+  solid: 'bg-slate-100 border border-slate-300 text-slate-900 placeholder:text-slate-500 focus:bg-slate-50 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 focus:outline-none',
 };
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -83,7 +83,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className={`flex flex-col gap-1 ${widthClass}`}>
         {label && (
-          <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <label className={`text-xs font-semibold uppercase tracking-wider ${variant === 'glass' ? 'text-slate-200' : 'text-slate-700'}`}>
             {label}
           </label>
         )}
@@ -103,10 +103,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error && (
-          <p className="text-xs text-rose-400 font-semibold">{error}</p>
+          <p className="text-xs text-rose-500 font-semibold">{error}</p>
         )}
         {helperText && !error && (
-          <p className="text-xs text-slate-400">{helperText}</p>
+          <p className={`text-xs ${variant === 'glass' ? 'text-slate-300' : 'text-slate-500'}`}>{helperText}</p>
         )}
       </div>
     );

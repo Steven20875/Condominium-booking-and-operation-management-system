@@ -83,6 +83,12 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [billAmount, setBillAmount] = useState<number>(200);
   const [submittingBill, setSubmittingBill] = useState<boolean>(false);
 
+  // Payment recording state for admin
+  const [selectedPaymentForAdmin, setSelectedPaymentForAdmin] = useState<Payment | null>(null);
+  const [adminPaymentAmount, setAdminPaymentAmount] = useState<number>(0);
+  const [adminPaymentMethod, setAdminPaymentMethod] = useState<string>('Cash');
+  const [submittingAdminPayment, setSubmittingAdminPayment] = useState<boolean>(false);
+
   // Broadcast Announcement State
   const [bcTitle, setBcTitle] = useState<string>('');
   const [bcMessage, setBcMessage] = useState<string>('');
@@ -104,19 +110,33 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
     try {
       const authHeaders = { 'Authorization': `Bearer ${token}` };
 
+      const safeJson = async (response: Response) => {
+        if (!response.ok) return null;
+        try {
+          return await response.json();
+        } catch (err) {
+          console.error('JSON parse failed:', err);
+          return null;
+        }
+      };
+
       // Execute all fetches in parallel and wait for all to complete
       const [statsRes, unitsRes, bookingsRes, paymentsRes, maintenanceRes, logsRes, residentsRes] = await Promise.all([
-        fetch('/api/dashboard/stats', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Stats fetch error:', e); return null; }),
-        fetch('/api/units').then(res => res.json()).catch(e => { console.error('Units fetch error:', e); return null; }),
-        fetch('/api/bookings', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Bookings fetch error:', e); return null; }),
-        fetch('/api/payments', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Payments fetch error:', e); return null; }),
-        fetch('/api/maintenance', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Maintenance fetch error:', e); return null; }),
-        fetch('/api/logs', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Logs fetch error:', e); return null; }),
-        fetch('/api/residents', { headers: authHeaders }).then(res => res.json()).catch(e => { console.error('Residents fetch error:', e); return null; })
+        fetch('/api/dashboard/stats', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Stats fetch error:', e); return null; }),
+        fetch('/api/units').then(safeJson).catch(e => { console.error('Units fetch error:', e); return null; }),
+        fetch('/api/bookings', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Bookings fetch error:', e); return null; }),
+        fetch('/api/payments', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Payments fetch error:', e); return null; }),
+        fetch('/api/maintenance', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Maintenance fetch error:', e); return null; }),
+        fetch('/api/logs', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Logs fetch error:', e); return null; }),
+        fetch('/api/residents', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Residents fetch error:', e); return null; })
       ]);
 
       // Update state atomically once all data is fetched
-      if (statsRes) setStats(statsRes);
+      if (statsRes && statsRes.bookingStatusData && Array.isArray(statsRes.bookingStatusData) && Array.isArray(statsRes.monthlyRevenue)) {
+        setStats(statsRes as DashboardStats);
+      } else {
+        setStats(null);
+      }
       if (Array.isArray(unitsRes)) setUnits(unitsRes);
       if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
       if (Array.isArray(paymentsRes)) setPayments(paymentsRes);
@@ -395,6 +415,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
     });
   };
 
+  const hasValidStats = !!stats && Array.isArray(stats.bookingStatusData) && Array.isArray(stats.monthlyRevenue);
+
   return (
     <div id="admin-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
       
@@ -425,7 +447,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('metrics')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'metrics' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'metrics' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <BarChart3 className="h-4 w-4" /> Operations Overview
@@ -433,7 +455,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('units')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'units' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'units' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <Building className="h-4 w-4" /> Units Manager
@@ -441,7 +463,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('residents')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'residents' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'residents' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <Users className="h-4 w-4" /> Resident Directory
@@ -449,7 +471,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('bookings')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'bookings' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'bookings' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <Calendar className="h-4 w-4" /> Reservation Approvals
@@ -457,7 +479,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('payments')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'payments' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'payments' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <CreditCard className="h-4 w-4" /> Cash Ledger
@@ -465,7 +487,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('maintenance')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'maintenance' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'maintenance' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <Wrench className="h-4 w-4" /> Repairs Claims Desk
@@ -473,7 +495,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('broadcast')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'broadcast' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'broadcast' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <Bell className="h-4 w-4" /> Broadcast Console
@@ -481,7 +503,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <button
               onClick={() => setActiveTab('audit')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                activeTab === 'audit' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeTab === 'audit' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <BookOpen className="h-4 w-4" /> System Audit Trail
@@ -556,7 +578,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
           )}
 
           {/* A. PERFORMANCE METRICS TAB */}
-          {!loading && activeTab === 'metrics' && stats && (
+          {!loading && activeTab === 'metrics' && hasValidStats ? (
             <motion.div
               key="metrics-tab"
               initial={{ opacity: 0, y: 15 }}
@@ -700,7 +722,17 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
               </div>
             </motion.div>
-          )}
+          ) : (!loading && activeTab === 'metrics') ? (
+            <motion.div
+              key="metrics-unavailable"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="bg-white rounded-3xl border border-slate-100 shadow-sm p-12 text-center"
+            >
+              <p className="text-slate-500 text-sm font-medium">Unable to load dashboard metrics. Please click Sync Data or refresh the page.</p>
+            </motion.div>
+          ) : null}
 
           {/* B. UNITS MANAGEMENT TAB */}
           {activeTab === 'units' && (
@@ -1026,10 +1058,13 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                           <td className="py-4 px-3">{p.residentName || 'R. Tenant'}</td>
                           <td className="py-4 px-3 text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                           <td className="py-4 px-3 font-mono text-[10px] text-slate-400">{p.referenceNumber}</td>
-                          <td className="py-4 px-3 font-black text-slate-950">{formatCurrency(p.amount)}</td>
+                          <td className="py-4 px-3 font-black text-slate-950">{formatCurrency(p.totalAmount)}</td>
+                          <td className="py-4 px-3 font-semibold text-slate-900">{formatCurrency(p.paidAmount)}</td>
+                          <td className="py-4 px-3 font-semibold text-slate-900">{formatCurrency(p.remainingBalance)}</td>
                           <td className="py-4 px-3 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono tracking-wider font-bold uppercase ${
                               p.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
+                              p.status === 'Partially Paid' ? 'bg-cyan-100 text-cyan-800' :
                               p.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
                               'bg-rose-100 text-rose-800'
                             }`}>
@@ -1049,7 +1084,18 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                                 Download
                               </Button>
                             ) : (
-                              <span className="text-[10px] text-slate-400 font-semibold">Invoiced pending</span>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedPaymentForAdmin(p);
+                                  setAdminPaymentAmount(p.remainingBalance);
+                                  setAdminPaymentMethod('Cash');
+                                }}
+                                icon={DollarSign}
+                              >
+                                Record Payment
+                              </Button>
                             )}
                           </td>
                         </tr>
@@ -1244,7 +1290,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
               <div className="p-4 sm:p-6 text-xs max-h-[500px] overflow-y-auto font-mono space-y-2.5 leading-relaxed">
                 {logs.map((log) => (
-                  <div key={log.id} className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col sm:flex-row justify-between gap-2">
+                  <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-between gap-2">
                     <div className="space-y-1">
                       <p className="text-slate-900">
                         <strong className="text-slate-900 font-sans">[{log.userRole.toUpperCase()}] {log.userName}: </strong>
@@ -1672,6 +1718,137 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     className="flex-1 py-3 bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md cursor-pointer"
                   >
                     {submittingBill ? 'Processing...' : 'Confirm Ledger Invoice'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedPaymentForAdmin && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full overflow-hidden backdrop-blur-sm"
+            >
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!selectedPaymentForAdmin) return;
+                  if (adminPaymentAmount <= 0) {
+                    toast('Enter a valid payment amount.', 'warning');
+                    return;
+                  }
+                  if (adminPaymentAmount > selectedPaymentForAdmin.remainingBalance) {
+                    toast('Payment exceeds remaining balance.', 'warning');
+                    return;
+                  }
+                  setSubmittingAdminPayment(true);
+                  try {
+                    const res = await fetch(`/api/payments/${selectedPaymentForAdmin.id}/pay`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({
+                        method: adminPaymentMethod,
+                        referenceNumber: `ADMIN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+                        amount: adminPaymentAmount
+                      })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Failed to apply admin payment.');
+                    toast('Payment applied successfully.', 'success');
+                    setSelectedPaymentForAdmin(null);
+                    setAdminPaymentAmount(0);
+                    fetchAllData();
+                  } catch (err: any) {
+                    toast(err.message, 'error');
+                  } finally {
+                    setSubmittingAdminPayment(false);
+                  }
+                }}
+              >
+                <div className="p-6 sm:p-8 space-y-4">
+                  <div className="flex justify-between items-start pb-2 border-b border-slate-100">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Admin Ledger</span>
+                      <h3 className="font-serif font-black text-slate-950 text-lg mt-0.5">Record Payment</h3>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Close payment modal"
+                      onClick={() => setSelectedPaymentForAdmin(null)}
+                      className="p-1 bg-slate-100 rounded-full text-slate-400 cursor-pointer hover:text-slate-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Resident</label>
+                      <div className="text-slate-900 font-semibold">{selectedPaymentForAdmin.residentName}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Invoice Total</label>
+                        <div className="text-slate-900 font-black">{formatCurrency(selectedPaymentForAdmin.totalAmount)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Remaining</label>
+                        <div className="text-slate-900 font-black">{formatCurrency(selectedPaymentForAdmin.remainingBalance)}</div>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="admin-payment-amount" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Payment Amount</label>
+                      <input
+                        id="admin-payment-amount"
+                        type="number"
+                        min={1}
+                        max={selectedPaymentForAdmin.remainingBalance}
+                        className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
+                        value={adminPaymentAmount}
+                        onChange={(e) => setAdminPaymentAmount(Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="admin-payment-method" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Payment Method</label>
+                      <select
+                        id="admin-payment-method"
+                        className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
+                        value={adminPaymentMethod}
+                        onChange={(e) => setAdminPaymentMethod(e.target.value)}
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="GCash Mobile">GCash Mobile</option>
+                        <option value="Credit Card">Credit Card</option>
+                        <option value="Debit Card">Debit Card</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentForAdmin(null)}
+                    className="flex-1 py-3 border border-slate-200 bg-white text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl"
+                    disabled={submittingAdminPayment}
+                  >
+                    {submittingAdminPayment ? 'Applying...' : 'Record Payment'}
                   </button>
                 </div>
               </form>

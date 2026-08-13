@@ -519,8 +519,18 @@ async function startServer() {
     }
 
     const amountValue = parseNumber(amount, -1);
-    if (amountValue < 0) {
+    if (amountValue <= 0) {
       return res.status(400).json({ error: 'Payment amount must be a valid positive number.' });
+    }
+
+    const paymentRecord = paymentService.getPayments().find((p: any) => p.id === req.params.id);
+    if (!paymentRecord) {
+      return res.status(404).json({ error: 'No invoice found with the given ledger ID.' });
+    }
+
+    const remaining = paymentRecord.remainingBalance ?? (paymentRecord.totalAmount - paymentRecord.paidAmount);
+    if (amountValue > remaining) {
+      return res.status(400).json({ error: 'Payment amount exceeds the remaining balance.' });
     }
 
     const payment = paymentService.submitPayment(
@@ -533,7 +543,7 @@ async function startServer() {
     );
 
     if (!payment) {
-      return res.status(404).json({ error: 'No invoice found with the given ledger ID.' });
+      return res.status(500).json({ error: 'Unable to apply payment at this time.' });
     }
 
     res.json(payment);

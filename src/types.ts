@@ -35,7 +35,7 @@ export interface Unit {
   createdAt: string;
 }
 
-export type BookingStatus = 'Pending' | 'Approved' | 'Rejected' | 'Cancelled' | 'Completed';
+export type BookingStatus = 'Pending' | 'Approved' | 'Rejected' | 'Cancelled' | 'Completed' | 'Partially Paid';
 
 export interface Booking {
   id: string;
@@ -53,8 +53,8 @@ export interface Booking {
   createdAt: string;
 }
 
-export type PaymentStatus = 'Pending' | 'Paid' | 'Failed' | 'Refunded';
-export type PaymentMethod = 'Credit Card' | 'Debit Card' | 'Bank Transfer' | 'E-Wallet';
+export type PaymentStatus = 'Pending' | 'Partially Paid' | 'Paid' | 'Failed' | 'Refunded';
+export type PaymentMethod = 'Credit Card' | 'Debit Card' | 'Bank Transfer' | 'E-Wallet' | 'Cash' | 'GCash Mobile';
 
 export interface Payment {
   id: string;
@@ -62,7 +62,11 @@ export interface Payment {
   residentId: string;
   residentName?: string;
   unitName?: string;
-  amount: number;
+  amount: number; // total invoice amount
+  totalAmount: number;
+  paidAmount: number;
+  remainingBalance: number;
+  downpaymentAmount: number;
   status: PaymentStatus;
   method: PaymentMethod;
   referenceNumber: string;

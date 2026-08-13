@@ -3,14 +3,9 @@ services:
     name: one-spatial-iloilo
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: free
     autoDeployTrigger: commit
     healthCheckPath: /api/health
-
-    disk:
-      name: data-disk
-      mountPath: /app/data
-      sizeGB: 1
 
     envVars:
       - key: NODE_ENV

@@ -84,6 +84,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [cardExpiry, setCardExpiry] = useState<string>('09/29');
   const [cardCVC, setCardCVC] = useState<string>('984');
   const [submittingPayment, setSubmittingPayment] = useState<boolean>(false);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
 
   // Cash payment state
   const [paymentOption, setPaymentOption] = useState<'cash'>('cash');
@@ -295,9 +296,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   };
 
   // Currency formatting (display in PHP)
-  const EXCHANGE_RATE = 57; // 1 USD -> 57 PHP (adjustable)
-  const formatPHP = (usdAmount: number | null | undefined) => {
-    const n = Number(usdAmount || 0) * EXCHANGE_RATE;
+  const formatPHP = (amount: number | null | undefined) => {
+    const n = Number(amount || 0);
     return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
@@ -349,6 +349,10 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
     try {
       const selectedMethod = customMethod || 'Cash';
+      const amountToPay = paymentAmount > 0 ? paymentAmount : payingInvoice.remainingBalance;
+      if (amountToPay <= 0 || amountToPay > payingInvoice.remainingBalance) {
+        throw new Error('Enter a valid payment amount within the remaining balance.');
+      }
       const mockRef = (selectedMethod === 'Cash' ? 'CASH-' : selectedMethod.startsWith('QR') ? 'QRPH-' : 'TXN-') + Math.random().toString(36).substr(2, 6).toUpperCase();
       const res = await fetch(`/api/payments/${payingInvoice.id}/pay`, {
         method: 'POST',
@@ -359,15 +363,16 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
         body: JSON.stringify({
           method: selectedMethod,
           referenceNumber: mockRef,
-          amount: payingInvoice.amount
+          amount: amountToPay
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed compiling payment.');
 
-      toast(`Transaction settled! Paid ${formatPHP(payingInvoice.amount)} (${payingInvoice.amount.toLocaleString(undefined,{minimumFractionDigits:2})} USD) successfully via ${selectedMethod}.`, 'success');
+      toast(`Transaction settled! Paid ${formatPHP(amountToPay)} successfully via ${selectedMethod}.`, 'success');
       setPayingInvoice(null);
+      setPaymentAmount(0);
       fetchAllData();
     } catch (err: any) {
       toast(err.message, 'error');
@@ -376,17 +381,17 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     }
   };
 
+  const getReceiptPayment = (bookingId: string) => payments.find((p) => p.bookingId === bookingId);
+
   const handleReceiptSettle = () => {
     if (!selectedBookingReceipt) return;
-    const pendingPayment = payments.find(
-      (p) => p.bookingId === selectedBookingReceipt.id && p.status === 'Pending'
-    );
-
-    if (pendingPayment) {
-      setPayingInvoice(pendingPayment);
+    const relatedPayment = getReceiptPayment(selectedBookingReceipt.id);
+    if (relatedPayment && relatedPayment.status !== 'Paid') {
+      setPayingInvoice(relatedPayment);
+      setPaymentAmount(relatedPayment.remainingBalance);
       setSelectedBookingReceipt(null);
       setActiveTab('payments');
-      toast('Loaded your pending invoice into the payment terminal. Complete settlement here.', 'info');
+      toast('Loaded your invoice into the payment terminal. Complete settlement here.', 'info');
       return;
     }
 
@@ -666,7 +671,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                             setShowLogoutModal(true);
                           }
                         }}
-                        className="w-full text-left px-3 py-3 rounded-2xl text-sm text-slate-200 hover:bg-white/5 transition-colors"
+                        className="w-full text-left px-3 py-3 rounded-2xl text-sm text-white hover:bg-white/10 transition-colors"
                       >
                         {item}
                       </button>
@@ -752,8 +757,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
                   {notifications.length > 0 ? (
                     <div className="space-y-3.5">
-                      {notifications.slice(0, 3).map((notif) => (
-                        <div key={notif.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                      {notifications.slice(0, 3).map((notif, idx) => (
+                        <div key={`${notif.id}-${idx}`} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
                           <div className="flex justify-between items-start">
                             <h4 className="font-bold text-xs text-white">{notif.title}</h4>
                             <span className="text-[9px] text-slate-400 font-mono">{new Date(notif.createdAt).toLocaleDateString()}</span>
@@ -763,7 +768,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                       ))}
                     </div>
                   ) : (
-                    <div className="p-8 text-center text-slate-450 text-xs">
+                    <div className="p-8 text-center text-slate-400 text-xs">
                       No active bulletins found inside your registry.
                     </div>
                   )}
@@ -788,7 +793,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                         setActiveTab('maintenance');
                         setMIssueType('Plumbing');
                       }}
-                      className="w-full bg-white/5 hover:bg-white/15 text-slate-200 border border-white/10 p-4 rounded-xl text-left font-bold text-xs uppercase tracking-wider flex items-center justify-between cursor-pointer"
+                      className="w-full glass-button-secondary text-white p-4 rounded-xl text-left font-bold text-xs uppercase tracking-wider flex items-center justify-between"
                     >
                       Report Leakage Anomalies <Wrench className="h-4 w-4" />
                     </button>
@@ -797,7 +802,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                         setActiveTab('maintenance');
                         setMIssueType('Security / Parking');
                       }}
-                      className="w-full bg-white/5 hover:bg-white/15 text-slate-200 border border-white/10 p-4 rounded-xl text-left font-bold text-xs uppercase tracking-wider flex items-center justify-between cursor-pointer"
+                      className="w-full glass-button-secondary text-white p-4 rounded-xl text-left font-bold text-xs uppercase tracking-wider flex items-center justify-between"
                     >
                       Request Keycard Replacements <Smartphone className="h-4 w-4" />
                     </button>
@@ -867,7 +872,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     setFilterStatus('');
                     toast('Filters purged catalog reset.', 'info');
                   }}
-                  className="w-full bg-white/5 hover:bg-white/15 border border-white/10 text-xs text-white py-2.5 rounded-xl font-bold uppercase tracking-wider cursor-pointer"
+                  className="w-full glass-button-secondary text-xs py-2.5 rounded-xl font-bold uppercase tracking-wider"
                 >
                   Purge Filters
                 </button>
@@ -927,7 +932,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                             setFrequency('daily');
                             setActionMessage('');
                           }}
-                          className="bg-white/5 hover:bg-white/10 text-white/90 px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider border border-white/10"
+                          className="glass-button-secondary text-white px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider"
                         >
                           Inquire / Buy
                         </button>
@@ -1069,8 +1074,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                         <tr className="border-b border-slate-100 text-slate-400 font-semibold">
                           <th className="pb-3 px-3">Description Item</th>
                           <th className="pb-3 px-3">Ref ID</th>
-                          <th className="pb-3 px-3">Amount</th>
-                          <th className="pb-3 px-3">Filing Date</th>
+                          <th className="pb-3 px-3">Total</th>
+                          <th className="pb-3 px-3">Paid</th>
+                          <th className="pb-3 px-3">Remaining</th>
                           <th className="pb-3 px-3">State Status</th>
                           <th className="pb-3 px-3 text-right">Action Gate</th>
                         </tr>
@@ -1080,11 +1086,13 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                           <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-3 font-bold text-slate-900">{p.unitName || 'Operations Bill'}</td>
                             <td className="py-4 px-3 font-mono text-slate-500 text-[10px]">{p.referenceNumber}</td>
-                            <td className="py-4 px-3 font-black text-slate-950">{formatPHP(p.amount)}</td>
-                            <td className="py-4 px-3 text-slate-550">{new Date(p.createdAt).toLocaleDateString()}</td>
+                            <td className="py-4 px-3 font-black text-slate-950">{formatPHP(p.totalAmount)}</td>
+                            <td className="py-4 px-3 font-semibold text-slate-900">{formatPHP(p.paidAmount)}</td>
+                            <td className="py-4 px-3 font-semibold text-slate-900">{formatPHP(p.remainingBalance)}</td>
                             <td className="py-4 px-3">
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                                 p.status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                p.status === 'Partially Paid' ? 'bg-cyan-50 text-cyan-700 border border-cyan-100' :
                                 p.status === 'Pending' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                                 'bg-rose-50 text-rose-700 border border-rose-100'
                               }`}>
@@ -1094,13 +1102,16 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                             <td className="py-4 px-3 text-right">
                               {p.status === 'Pending' ? (
                                 <button
-                                  onClick={() => setPayingInvoice(p)}
-                                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] px-3.5 py-2 rounded-xl uppercase tracking-wider shadow"
+                                  onClick={() => {
+                                    setPayingInvoice(p);
+                                    setPaymentAmount(p.remainingBalance);
+                                  }}
+                                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] px-3.5 py-2 rounded-xl uppercase tracking-wider shadow-sm transition-colors"
                                 >
-                                  Transfer Securely
+                                  Pay Invoice
                                 </button>
                               ) : (
-                                <span className="text-[10px] text-slate-400 font-semibold">Cleared on {p.paidAt ? new Date(p.paidAt).toLocaleDateString() : 'Today'}</span>
+                                <span className="text-[10px] text-slate-500 font-semibold">Cleared on {p.paidAt ? new Date(p.paidAt).toLocaleDateString() : 'Today'}</span>
                               )}
                             </td>
                           </tr>
@@ -1278,9 +1289,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
               <div className="space-y-3.5">
                 {notifications.length > 0 ? (
-                  notifications.map((notif) => (
-                    <div 
-                      key={notif.id} 
+                  notifications.map((notif, idx) => (
+                    <div
+                      key={`${notif.id}-${idx}`}
                       className={`p-5 rounded-2xl border shadow-sm transition-all flex items-start gap-4 ${
                         notif.type === 'success' ? 'border-emerald-100 bg-emerald-50/20' :
                         notif.type === 'alert' ? 'border-rose-100 bg-rose-50/20' :
@@ -1315,7 +1326,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     </div>
                   ))
                 ) : (
-                  <div className="p-16 text-center bg-white rounded-3xl border border-slate-105 shadow space-y-2 text-slate-400">
+                  <div className="p-16 text-center bg-white rounded-3xl border border-slate-200 shadow space-y-2 text-slate-400">
                     <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto" />
                     <p className="text-xs font-bold text-slate-800">Your bulletins inbox is completely cleared!</p>
                     <p className="text-[10px] text-slate-500 max-w-xs mx-auto">No outstanding security alerts are flagged on this profile context.</p>
@@ -1642,23 +1653,50 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     <div className="bg-amber-50 border border-amber-200 p-5 rounded-2xl text-amber-950">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-[10px] uppercase tracking-widest font-bold text-amber-600">Cash Payment</p>
-                          <h4 className="text-sm font-bold">Pay cash at the property office or with the Gales cashier.</h4>
+                          <p className="text-[10px] uppercase tracking-widest font-bold text-amber-700">Cash Payment</p>
+                          <h4 className="text-sm font-bold text-amber-950">Pay cash at the property office or with the Gales cashier.</h4>
                         </div>
-                        <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-700">In-person</span>
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-800">In-person</span>
                       </div>
-                      <p className="text-[11px] text-amber-700 leading-relaxed mt-4">
+                      <p className="text-[11px] text-amber-800 leading-relaxed mt-4">
                         After you settle the amount in cash, click Confirm Settle to register payment in your dashboard.
                       </p>
                     </div>
                   </div>
 
                   {/* Payment summary in local currency */}
-                  <div className="p-4 bg-blue-50/60 rounded-2xl flex flex-col gap-1.5 border border-blue-100 font-sans">
-                    <div className="flex justify-between items-center text-blue-900">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Total Bill</span>
-                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.amount)}</span>
+                  <div className="p-4 bg-slate-50 rounded-2xl grid grid-cols-2 gap-3 border border-slate-200 font-sans">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Total Amount</span>
+                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.totalAmount)}</span>
                     </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Balance</span>
+                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.remainingBalance)}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Paid</span>
+                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.paidAmount)}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Status</span>
+                      <span className="text-sm font-black text-slate-900">{payingInvoice.status}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="payment-amount" className="text-[10px] font-bold uppercase tracking-widest text-slate-700">Payment Amount</label>
+                    <input
+                      id="payment-amount"
+                      type="number"
+                      min={1}
+                      max={payingInvoice.remainingBalance}
+                      step="0.01"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 text-sm font-semibold shadow-sm focus:outline-none focus:border-slate-500"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                    />
+                    <p className="text-[10px] text-slate-600">Enter an amount up to the remaining balance.</p>
                   </div>
                 </div>
 
@@ -1737,6 +1775,27 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     <div className="flex justify-between">
                       <span className="text-slate-400">Guests Configuration:</span>
                       <span className="font-semibold text-slate-900">{selectedBookingReceipt.guestsCount} Persons</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-100 text-sm">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex justify-between text-slate-500">
+                        <span>Total Invoice</span>
+                        <span className="font-semibold text-slate-900">{formatPHP(getReceiptPayment(selectedBookingReceipt.id)?.totalAmount ?? selectedBookingReceipt.totalPrice)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-500">
+                        <span>Paid So Far</span>
+                        <span className="font-semibold text-slate-900">{formatPHP(getReceiptPayment(selectedBookingReceipt.id)?.paidAmount ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-500">
+                        <span>Remaining Balance</span>
+                        <span className="font-semibold text-slate-900">{formatPHP(getReceiptPayment(selectedBookingReceipt.id)?.remainingBalance ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-500">
+                        <span>Status</span>
+                        <span className="font-semibold text-slate-900">{getReceiptPayment(selectedBookingReceipt.id)?.status ?? 'N/A'}</span>
+                      </div>
                     </div>
                   </div>
 

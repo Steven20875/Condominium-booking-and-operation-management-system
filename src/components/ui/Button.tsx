@@ -41,12 +41,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-white/15 shadow-lg shadow-blue-500/20',
-  secondary: 'bg-white/8 hover:bg-white/15 text-white border border-white/10 shadow-sm',
-  tertiary: 'bg-transparent hover:bg-white/5 text-white border border-white/10',
-  danger: 'bg-rose-600/80 hover:bg-rose-600 text-white border border-white/10 shadow-lg shadow-rose-500/20',
-  success: 'bg-emerald-600/80 hover:bg-emerald-600 text-white border border-white/10 shadow-lg shadow-emerald-500/20',
-  outline: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm',
+  primary: 'bg-slate-900 text-white hover:bg-slate-800 border border-slate-900 shadow-lg shadow-slate-900/15 focus-visible:ring-slate-800/40',
+  secondary: 'bg-slate-900 text-white hover:bg-slate-800 border border-slate-700 shadow-sm shadow-slate-900/15 focus-visible:ring-slate-700/40',
+  tertiary: 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-sm focus-visible:ring-slate-300/40',
+  danger: 'bg-rose-600 text-white hover:bg-rose-500 border border-rose-600 shadow-lg shadow-rose-600/15 focus-visible:ring-rose-500/30',
+  success: 'bg-emerald-600 text-white hover:bg-emerald-500 border border-emerald-600 shadow-lg shadow-emerald-600/15 focus-visible:ring-emerald-500/30',
+  outline: 'bg-white text-slate-800 hover:bg-slate-50 border border-slate-300 shadow-sm focus-visible:ring-slate-400/30',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -74,7 +74,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const isDisabled = disabled || isLoading;
 
-    const baseStyles = 'inline-flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider';
+    const baseStyles = 'inline-flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none disabled:bg-slate-200 disabled:text-slate-500 disabled:border-slate-300 disabled:shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/40 uppercase tracking-wider font-semibold';
     const variantClass = variantStyles[variant];
     const sizeClass = sizeStyles[size];
     const widthClass = fullWidth ? 'w-full' : '';

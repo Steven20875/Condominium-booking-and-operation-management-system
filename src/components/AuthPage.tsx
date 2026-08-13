@@ -325,7 +325,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                 >
                   <div>
                     <h3 className="text-2xl font-serif font-bold text-white">Restore Password</h3>
-                    <p className="text-sm text-slate-450 mt-2">
+                    <p className="text-sm text-slate-400 mt-2">
                       Submit your registered email address and our server triggers recovery operations.
                     </p>
                   </div>
