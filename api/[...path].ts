@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { createApp } from '../server';
+import { createApp } from '../dist/server.mjs';
 
 const appPromise = createApp();
 
