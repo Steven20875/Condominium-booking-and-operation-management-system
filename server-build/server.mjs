@@ -1538,8 +1538,8 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
     console.error("Unhandled server error:", err);
     res.status(500).json({ error: "Internal server error. Please try again later." });
   });
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
+  if (false) {
+    const { createServer: createViteServer } = await null;
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -1560,7 +1560,7 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
   }
   return app;
 }
-if (process.env.VERCEL !== "1") {
+if (false) {
   createApp().then((app) => {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Express Condominium App listening at HTTP on Port ${PORT}`);
