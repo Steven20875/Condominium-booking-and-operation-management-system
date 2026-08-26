@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/[...path].ts": {
-      "includeFiles": ["dist/server.mjs"]
+      "includeFiles": ["dist/server.mjs", "data/db.json"]
     }
   },
   "rewrites": [
