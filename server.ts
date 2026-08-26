@@ -63,7 +63,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer as createViteServer } from 'vite';
 import { db, dbEvents } from './server/db.ts';
 import { bookingService } from './server/services/BookingService.ts';
 import { paymentService } from './server/services/PaymentService.ts';
@@ -865,6 +864,7 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
   // --- VITE DEV MIDDLEWARE / STATIC ASSETS ROUTING ---
 
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { 
         middlewareMode: true, 

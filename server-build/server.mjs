@@ -2,7 +2,6 @@
 import express from "express";
 import path2 from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer as createViteServer } from "vite";
 
 // server/db.ts
 import fs from "node:fs";
@@ -1540,6 +1539,7 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
     res.status(500).json({ error: "Internal server error. Please try again later." });
   });
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
