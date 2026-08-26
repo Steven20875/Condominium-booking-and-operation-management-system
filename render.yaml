@@ -1,15 +1,26 @@
 services:
   - type: web
-    name: one-spatial-iloilo
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    name: condominium-booking-and-operation-management-system
+    env: node
     plan: free
-    autoDeployTrigger: commit
+    autoDeploy: true
+
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+
     healthCheckPath: /api/health
+
+    disk:
+      name: data-disk
+      sizeGB: 1
+      mountPath: /app/data
 
     envVars:
       - key: NODE_ENV
         value: production
+
+      - key: PORT
+        value: "3000"
 
       - key: GEMINI_API_KEY
         sync: false
