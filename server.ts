@@ -143,7 +143,7 @@ function validateFields(body: any, requiredFields: string[]) {
   });
 }
 
-async function startServer() {
+export async function createApp() {
   const app = express();
 
   // Increase payload limits for direct base64 image uploads of condo units
@@ -884,12 +884,15 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
     console.log('Production static file server configured to map to dist/ folder.');
   }
 
-  // Bind server listener on standard platform port 3000
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Express Condominium App listening at HTTP on Port ${PORT}`);
-  });
+  return app;
 }
 
-startServer().catch(err => {
-  console.error('CRITICAL: Server startup failure:', err);
-});
+if (process.env.VERCEL !== '1') {
+  createApp().then((app) => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Express Condominium App listening at HTTP on Port ${PORT}`);
+    });
+  }).catch(err => {
+    console.error('CRITICAL: Server startup failure:', err);
+  });
+}
