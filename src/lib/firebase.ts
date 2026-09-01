@@ -241,7 +241,13 @@ export async function signInWithGoogle() {
   }
 
   try {
-    return await signInWithPopup(auth, provider);
+    const popupResult = await Promise.race([
+      signInWithPopup(auth, provider),
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error('Google sign-in popup timed out.')), 10000);
+      }),
+    ]);
+    return popupResult;
   } catch (error: any) {
     if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/popup-closed-by-user' || error?.message?.includes('popup')) {
       await signInWithRedirect(auth, provider);
