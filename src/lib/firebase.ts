@@ -103,10 +103,8 @@ function initializeFirebaseAuth() {
     googleProviderInstance = new GoogleAuthProvider();
     googleProviderInstance.addScope('profile');
     googleProviderInstance.addScope('email');
-    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/__/auth/handler` : undefined;
     googleProviderInstance.setCustomParameters({
       prompt: 'select_account',
-      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     });
     console.log('[firebase] Google provider initialized successfully');
   }
