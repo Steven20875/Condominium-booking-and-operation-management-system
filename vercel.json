@@ -10,9 +10,17 @@
   },
   "routes": [
     {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/[...path].ts",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    {
+      "src": "^/(?!api/|assets/)[^.]*(?:/)?$",
+      "dest": "/index.html"
     }
   ]
 }
