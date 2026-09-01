@@ -34,22 +34,15 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
   useEffect(() => {
     let mounted = true;
-    void initializeFirebase().then((nextStatus) => {
-      if (mounted) {
-        setFirebaseConfigStatus(nextStatus);
-      }
-    });
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const handleRedirectResult = async () => {
+    const initializeAndHandleRedirect = async () => {
+      setIsLoading(true);
       try {
+        const nextStatus = await initializeFirebase();
+        if (mounted) {
+          setFirebaseConfigStatus(nextStatus);
+        }
+
         const result = await getGoogleRedirectResult();
         if (!mounted || !result?.user) {
           return;
@@ -75,14 +68,22 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
         toast(`Welcome, ${data.user.name}!`, 'success');
         onLoginSuccess(data.user, data.token);
       } catch (err: any) {
-        const message = err?.code === 'auth/popup-closed-by-user'
-          ? 'Google sign-in was cancelled.'
-          : err?.message || 'Google sign-in failed.';
-        toast(message, 'warning');
+        const messages: Record<string, string> = {
+          'auth/unauthorized-domain': 'This production domain is not authorized for Google sign-in.',
+          'auth/network-request-failed': 'Google sign-in could not connect. Check your network and try again.',
+          'auth/popup-blocked': 'Google sign-in was blocked by the browser. Please try again.',
+          'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
+          'auth/cancelled-popup-request': 'Another Google sign-in request is already in progress.',
+        };
+        toast(messages[err?.code] || err?.message || 'Google sign-in failed.', 'warning');
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    void handleRedirectResult();
+    void initializeAndHandleRedirect();
 
     return () => {
       mounted = false;
@@ -181,35 +182,16 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
       setFirebaseConfigStatus(nextStatus);
 
-      const credential = await signInWithGoogle();
-      if (!credential?.user) {
-        return;
-      }
-
-      const response = await fetch('/api/auth/firebase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: credential.user.uid,
-          email: credential.user.email,
-          name: credential.user.displayName || credential.user.email?.split('@')[0],
-          avatarUrl: credential.user.photoURL || undefined,
-          provider: 'google'
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Google sign-in failed.');
-      }
-
-      toast(`Welcome, ${data.user.name}!`, 'success');
-      onLoginSuccess(data.user, data.token);
+      await signInWithGoogle();
     } catch (err: any) {
-      const message = err?.code === 'auth/popup-closed-by-user'
-        ? 'Google sign-in was cancelled.'
-        : err?.message || 'Google sign-in failed.';
-      toast(message, 'warning');
+      const messages: Record<string, string> = {
+        'auth/unauthorized-domain': 'This production domain is not authorized for Google sign-in.',
+        'auth/network-request-failed': 'Google sign-in could not connect. Check your network and try again.',
+        'auth/popup-blocked': 'Google sign-in was blocked by the browser. Please try again.',
+        'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
+        'auth/cancelled-popup-request': 'Another Google sign-in request is already in progress.',
+      };
+      toast(messages[err?.code] || err?.message || 'Google sign-in failed.', 'warning');
     } finally {
       setIsLoading(false);
     }

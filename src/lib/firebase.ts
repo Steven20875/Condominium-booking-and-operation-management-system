@@ -5,7 +5,6 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signInWithRedirect,
   signOut as firebaseSignOut,
   type Auth,
@@ -73,6 +72,7 @@ let isConfigComplete = missingConfigKeys.length === 0;
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let googleProviderInstance: GoogleAuthProvider | null = null;
+let redirectResultPromise: Promise<UserCredential | null> | null = null;
 
 function initializeFirebaseAuth() {
   if (typeof window === 'undefined') {
@@ -240,31 +240,19 @@ export async function signInWithGoogle() {
     throw new Error('Firebase authentication is not configured.');
   }
 
-  try {
-    const popupResult = await Promise.race([
-      signInWithPopup(auth, provider),
-      new Promise<never>((_, reject) => {
-        window.setTimeout(() => reject(new Error('Google sign-in popup timed out.')), 10000);
-      }),
-    ]);
-    return popupResult;
-  } catch (error: any) {
-    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/popup-closed-by-user' || error?.message?.includes('popup')) {
-      await signInWithRedirect(auth, provider);
-      return null as unknown as UserCredential;
-    }
-
-    throw error;
-  }
+  await signInWithRedirect(auth, provider);
+  return null;
 }
 
 export async function getGoogleRedirectResult() {
-  const auth = getAuthInstance();
-  if (!auth) {
-    return null;
+  if (!redirectResultPromise) {
+    redirectResultPromise = initializeFirebase().then(() => {
+      const auth = getAuthInstance();
+      return auth ? getRedirectResult(auth) : null;
+    });
   }
 
-  return getRedirectResult(auth);
+  return redirectResultPromise;
 }
 
 export async function signOutFirebaseSession() {
