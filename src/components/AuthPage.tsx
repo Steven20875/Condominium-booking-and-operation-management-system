@@ -470,7 +470,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                             <path fill="#FBBC05" d="M6.41 13.93A5.99 5.99 0 0 1 6.41 10.07V7.49H3.07a10 10 0 0 0 0 12.89l3.34-2.45z" />
                             <path fill="#EA4335" d="M12 6.04c1.47 0 2.8.5 3.84 1.49l2.88-2.88A9.99 9.99 0 0 0 3.07 7.49l3.34 2.44C7.2 7.8 9.4 6.04 12 6.04z" />
                           </svg>
-                          {isLoading ? 'Connecting to Google...' : (!isFirebaseConfigured ? 'Google needs Firebase setup' : 'Continue with Google')}
+                          {isLoading ? 'Signing in with Google...' : (!isFirebaseConfigured ? 'Google needs Firebase setup' : 'Continue with Google')}
                         </span>
                       </Button>
                     </div>

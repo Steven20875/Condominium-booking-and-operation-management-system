@@ -4,11 +4,13 @@ import {
   getAuth,
   getRedirectResult,
   GoogleAuthProvider,
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithRedirect,
   signOut as firebaseSignOut,
   type Auth,
   type UserCredential,
+  type User as FirebaseUser,
 } from 'firebase/auth';
 
 type FirebaseConfig = {
@@ -288,6 +290,26 @@ export async function getGoogleRedirectResult() {
   }
 
   return redirectResultPromise;
+}
+
+export function getCurrentFirebaseUser() {
+  const auth = getAuthInstance();
+  return auth ? auth.currentUser : null;
+}
+
+export function watchFirebaseAuthState(callback: (user: FirebaseUser | null) => void) {
+  const auth = getAuthInstance();
+  if (!auth) {
+    callback(null);
+    return () => undefined;
+  }
+
+  return onAuthStateChanged(auth, (user) => {
+    if (import.meta.env.DEV) {
+      console.debug('[firebase] Auth state changed', { hasUser: Boolean(user), uid: user?.uid ?? null });
+    }
+    callback(user);
+  });
 }
 
 export async function signOutFirebaseSession() {

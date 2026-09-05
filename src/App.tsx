@@ -8,7 +8,7 @@ import AmbientBackground from './components/AmbientBackground.tsx';
 import { User } from './types.ts';
 import Chatbot from './components/Chatbot.tsx';
 import MobilePaySimulator from './components/MobilePaySimulator.tsx';
-import { signOutFirebaseSession } from './lib/firebase.ts';
+import { getGoogleRedirectResult, signOutFirebaseSession, watchFirebaseAuthState } from './lib/firebase.ts';
 
 /**
  * Split Content component to ensure context hooks are safely located under the ToastProvider tree
@@ -80,6 +80,113 @@ function AppContent() {
     return () => {
       window.clearTimeout(timeoutHandle);
       controller.abort();
+    };
+  }, [toast]);
+
+  useEffect(() => {
+    let active = true;
+
+    const syncGoogleAuth = async () => {
+      try {
+        const result = await getGoogleRedirectResult();
+        if (!active || !result?.user) {
+          return;
+        }
+
+        const response = await fetch('/api/auth/firebase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: result.user.uid,
+            email: result.user.email,
+            name: result.user.displayName || result.user.email?.split('@')[0] || 'Google User',
+            avatarUrl: result.user.photoURL || undefined,
+            provider: 'google',
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || 'Google sign-in failed. Please try again.');
+        }
+
+        const loggedInUser = data.user as User;
+        const sessionToken = String(data.token || '');
+        if (!loggedInUser || !sessionToken) {
+          throw new Error('Google sign-in did not return a valid session.');
+        }
+
+        setUser(loggedInUser);
+        setToken(sessionToken);
+        setCurrentView('auth');
+        localStorage.setItem('vista_token', sessionToken);
+        localStorage.setItem('vista_user', JSON.stringify(loggedInUser));
+      } catch (error: any) {
+        const message = error?.message || 'Google sign-in failed. Please try again.';
+        if (import.meta.env.DEV) {
+          console.debug('[app] Google redirect sync failed', {
+            code: error?.code,
+            message,
+          });
+        }
+        toast(message, 'warning');
+      }
+    };
+
+    void syncGoogleAuth();
+
+    const unsubscribe = watchFirebaseAuthState((firebaseUser) => {
+      if (!active || !firebaseUser || !firebaseUser.email) {
+        return;
+      }
+
+      const savedToken = localStorage.getItem('vista_token');
+      if (savedToken) {
+        return;
+      }
+
+      void fetch('/api/auth/firebase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          avatarUrl: firebaseUser.photoURL || undefined,
+          provider: 'google',
+        }),
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || 'Google sign-in failed.');
+          }
+
+          const loggedInUser = data.user as User;
+          const sessionToken = String(data.token || '');
+          if (!loggedInUser || !sessionToken) {
+            return;
+          }
+
+          setUser(loggedInUser);
+          setToken(sessionToken);
+          setCurrentView('auth');
+          localStorage.setItem('vista_token', sessionToken);
+          localStorage.setItem('vista_user', JSON.stringify(loggedInUser));
+        })
+        .catch((error: any) => {
+          if (import.meta.env.DEV) {
+            console.debug('[app] Watcher sync failed', {
+              code: error?.code,
+              message: error?.message,
+            });
+          }
+        });
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
     };
   }, [toast]);
 
