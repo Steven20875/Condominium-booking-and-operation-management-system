@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star, Heart, ArrowUpRight, ArrowRight, CreditCard, Twitter, Instagram, Linkedin 
+  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star, Heart, ArrowUpRight, ArrowRight, CreditCard, Twitter, Instagram, Linkedin, Menu, X
 } from 'lucide-react';
 import { Unit } from '../types.ts';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
@@ -175,6 +175,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactMessage, setContactMessage] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Map simulation
   const [mapLatitude, setMapLatitude] = useState(37.7749);
@@ -223,22 +224,22 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
   };
 
   return (
-    <div id="landing-root" className="min-h-screen bg-transparent text-slate-200 font-sans selection:bg-blue-600 selection:text-white">
+    <div id="landing-root" className="min-h-screen overflow-x-hidden bg-transparent text-slate-200 font-sans selection:bg-blue-600 selection:text-white">
       
       {/* HEADER SECTION */}
-      <nav id="landing-nav" className="sticky top-0 z-50 min-h-[78px] bg-slate-950/25 backdrop-blur-xl border-b border-white/10 transition-all duration-500">
-        <div className="max-w-7xl mx-auto h-full flex items-center justify-between gap-6 px-6">
-          <div className="flex items-center gap-3">
+      <nav id="landing-nav" className="sticky top-0 z-50 min-h-[78px] border-b border-white/10 bg-slate-950/25 backdrop-blur-xl transition-all duration-500">
+        <div className="relative mx-auto grid min-h-[78px] max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-4 sm:px-6 md:grid-cols-[1fr_auto_1fr]">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="bg-gradient-to-tr from-blue-500 to-cyan-400 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20">
               <Building className="h-5 w-5" />
             </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.4em] text-slate-400">One Spatial</p>
-              <p className="font-semibold text-lg text-white font-serif">Iloilo</p>
+            <div className="min-w-0">
+              <p className="truncate text-[10px] uppercase tracking-[0.24em] text-slate-400 sm:text-[11px] sm:tracking-[0.4em]">One Spatial</p>
+              <p className="font-serif text-base font-semibold text-white sm:text-lg">Iloilo</p>
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden items-center justify-center gap-8 md:flex">
             <a href="#hero" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
               Home
               <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
@@ -261,19 +262,58 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
             </a>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-self-end gap-2 sm:gap-3">
             <button 
               onClick={onLoginClick}
-              className="text-sm font-semibold text-slate-200 hover:text-white transition-all bg-white/10 hover:bg-white/20 px-5 py-3 rounded-[16px] border border-white/10"
+              className="rounded-[16px] border border-white/10 bg-white/10 px-3 py-2.5 text-sm font-semibold text-slate-200 transition-all hover:bg-white/20 hover:text-white sm:px-5 sm:py-3"
             >
               Sign In
             </button>
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((open) => !open)}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="landing-mobile-menu"
+              aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-[16px] border border-white/10 bg-white/10 text-slate-200 transition-colors hover:bg-white/20 hover:text-white md:hidden"
+            >
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
+
+          <AnimatePresence>
+            {isMobileMenuOpen && (
+              <motion.div
+                id="landing-mobile-menu"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="absolute inset-x-4 top-[calc(100%-1px)] z-50 rounded-2xl border border-white/10 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-xl md:hidden"
+              >
+                {[
+                  ['Home', '#hero'],
+                  ['About', '#about'],
+                  ['Units', '#showcase'],
+                  ['Features', '#features'],
+                  ['Contact', '#contact']
+                ].map(([label, href]) => (
+                  <a
+                    key={href}
+                    href={href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    {label}
+                  </a>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </nav>
 
       {/* HERO SECTION */}
-      <section id="hero" className="relative py-20 md:py-32 px-6 overflow-hidden text-white select-none">
+      <section id="hero" className="relative overflow-hidden px-4 py-16 text-white select-none sm:px-6 md:py-32">
         <FerrofluidBackground
           colors={["#2563EB", "#0EA5E9", "#06B6D4"]}
           speed={0.25}
