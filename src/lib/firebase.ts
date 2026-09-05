@@ -88,15 +88,21 @@ function initializeFirebaseAuth() {
   }
 
   if (!app) {
-    console.log('[firebase] Initializing Firebase app...');
+    if (import.meta.env.DEV) {
+      console.debug('[firebase] Initializing Firebase app...');
+    }
     app = initializeApp(firebaseConfig);
-    console.log('[firebase] Firebase config loaded', firebaseConfig);
-    console.log('[firebase] Active Firebase projectId:', firebaseConfig.projectId);
+    if (import.meta.env.DEV) {
+      console.debug('[firebase] Active Firebase projectId:', firebaseConfig.projectId);
+      console.debug('[firebase] Active Firebase authDomain:', firebaseConfig.authDomain);
+    }
   }
 
   if (!authInstance) {
     authInstance = getAuth(app);
-    console.log('[firebase] Auth initialized successfully');
+    if (import.meta.env.DEV) {
+      console.debug('[firebase] Auth initialized successfully');
+    }
   }
 
   if (!googleProviderInstance) {
@@ -106,7 +112,9 @@ function initializeFirebaseAuth() {
     googleProviderInstance.setCustomParameters({
       prompt: 'select_account',
     });
-    console.log('[firebase] Google provider initialized successfully');
+    if (import.meta.env.DEV) {
+      console.debug('[firebase] Google provider initialized successfully');
+    }
   }
 }
 
@@ -115,7 +123,9 @@ async function loadFirebaseConfigFromServer() {
     return;
   }
 
-  console.log('[firebase] Loading environment variables');
+  if (import.meta.env.DEV) {
+    console.debug('[firebase] Loading environment variables');
+  }
   const runtimeConfig = window.__FIREBASE_CONFIG__;
   const envConfig = getFirebaseConfig();
   const resolvedConfig = {
@@ -128,7 +138,14 @@ async function loadFirebaseConfigFromServer() {
     measurementId: runtimeConfig?.measurementId || envConfig.measurementId || '',
   };
 
-  console.log('[firebase] Firebase config loaded', resolvedConfig);
+  if (import.meta.env.DEV) {
+    console.debug('[firebase] Firebase config resolved', {
+      projectId: resolvedConfig.projectId,
+      authDomain: resolvedConfig.authDomain,
+      hasApiKey: hasConfigValue(resolvedConfig.apiKey),
+      hasAppId: hasConfigValue(resolvedConfig.appId),
+    });
+  }
 
   if (requiredConfigKeys.every((key) => hasConfigValue(resolvedConfig[key]))) {
     window.__FIREBASE_CONFIG__ = resolvedConfig;
@@ -136,7 +153,9 @@ async function loadFirebaseConfigFromServer() {
     missingConfigKeys = [];
     isConfigComplete = true;
     initializeFirebaseAuth();
-    console.log('[firebase] Firebase initialized successfully');
+    if (import.meta.env.DEV) {
+      console.debug('[firebase] Firebase initialized successfully');
+    }
     return;
   }
 
@@ -162,7 +181,9 @@ async function loadFirebaseConfigFromServer() {
         isConfigComplete = missingConfigKeys.length === 0;
         initializeFirebaseAuth();
         if (isConfigComplete) {
-          console.log('[firebase] Firebase initialized successfully');
+          if (import.meta.env.DEV) {
+            console.debug('[firebase] Firebase initialized successfully');
+          }
         }
       }
     }
@@ -172,7 +193,9 @@ async function loadFirebaseConfigFromServer() {
     isConfigComplete = missingConfigKeys.length === 0;
     initializeFirebaseAuth();
     if (isConfigComplete) {
-      console.log('[firebase] Firebase initialized successfully');
+      if (import.meta.env.DEV) {
+        console.debug('[firebase] Firebase initialized successfully');
+      }
     }
   }
 }
@@ -246,9 +269,21 @@ export async function signInWithGoogle() {
 
 export async function getGoogleRedirectResult() {
   if (!redirectResultPromise) {
+    if (import.meta.env.DEV) {
+      console.debug('[firebase] Redirect result started');
+    }
     redirectResultPromise = initializeFirebase().then(() => {
       const auth = getAuthInstance();
-      return auth ? getRedirectResult(auth) : null;
+      if (!auth) {
+        return null;
+      }
+
+      return getRedirectResult(auth).then((result) => {
+        if (import.meta.env.DEV) {
+          console.debug('[firebase] Redirect result returned', { hasUser: Boolean(result?.user) });
+        }
+        return result;
+      });
     });
   }
 

@@ -48,6 +48,10 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
           return;
         }
 
+        if (import.meta.env.DEV) {
+          console.debug('[auth] Firebase user received', { uid: result.user.uid, hasEmail: Boolean(result.user.email) });
+        }
+
         const response = await fetch('/api/auth/firebase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -60,7 +64,10 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
           })
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
+        if (import.meta.env.DEV) {
+          console.debug('[auth] /api/auth/firebase response', { status: response.status, ok: response.ok });
+        }
         if (!response.ok) {
           throw new Error(data.error || 'Google sign-in failed.');
         }
@@ -68,6 +75,12 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
         toast(`Welcome, ${data.user.name}!`, 'success');
         onLoginSuccess(data.user, data.token);
       } catch (err: any) {
+        if (import.meta.env.DEV) {
+          console.debug('[auth] Redirect processing failed', {
+            code: err?.code,
+            message: err?.message,
+          });
+        }
         const messages: Record<string, string> = {
           'auth/unauthorized-domain': 'This production domain is not authorized for Google sign-in.',
           'auth/network-request-failed': 'Google sign-in could not connect. Check your network and try again.',

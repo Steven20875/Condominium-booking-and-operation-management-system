@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ToastProvider, useToast } from './components/ToastContext.tsx';
 import LandingPage from './components/LandingPage.tsx';
 import AuthPage from './components/AuthPage.tsx';
@@ -103,13 +103,13 @@ function AppContent() {
     setCurrentView('auth');
   };
 
-  const handleLoginSuccess = (loggedInUser: User, sessionToken: string) => {
+  const handleLoginSuccess = useCallback((loggedInUser: User, sessionToken: string) => {
     setUser(loggedInUser);
     setToken(sessionToken);
     setCurrentView('auth');
     localStorage.setItem('vista_token', sessionToken);
     localStorage.setItem('vista_user', JSON.stringify(loggedInUser));
-  };
+  }, []);
 
   const handleLogout = async () => {
     try {
