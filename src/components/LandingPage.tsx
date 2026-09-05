@@ -1,104 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star, Heart, ArrowUpRight, ArrowRight, CreditCard, Twitter, Instagram, Linkedin, Menu, X
+  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronDown, ChevronUp, Star, ArrowUpRight, ArrowRight, CreditCard, Twitter, Instagram, Linkedin, Menu, X
 } from 'lucide-react';
 import { Unit } from '../types.ts';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
-import { ResponsiveContainer, AreaChart as RechartAreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
+import { formatCurrency } from '../utils/currency.ts';
 
 interface LandingPageProps {
   onLoginClick: () => void;
   onBrowseClick: () => void;
 }
-
-const testimonialsData = [
-  {
-    name: 'Nenia  May Buganas',
-    role: 'Tower B Executive Resident',
-    avatar: 'data/assets/nenia',
-    comment: 'The booking interface has simplified managing our corporate suites completely. Settle bills, schedule gym passes, and coordinate with room mechanics under just 3 minutes.',
-    stars: 5,
-    unit: 'The Grand Horizon Penthouse'
-  },
-  {
-    name: 'Steven Christian Felarca',
-    role: 'Property Committee President',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
-    comment: 'From a general administrative perspective, this dashboard delivers high financial clarity. The automated receipts, tenant rosters, and maintenance tracking cut operations friction by 40%.',
-    stars: 5,
-    unit: 'Penthouse East Owner'
-  },
-  {
-    name: 'Donna May Talam',
-    role: 'Resident & Chef Specialist',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80',
-    comment: 'Submitting a support request through the portal takes seconds, and the assigned technician actually gives live status notes directly in our conversation stream.',
-    stars: 5,
-    unit: 'Unit 102 Owner'
-  }
-];
-
-const mockChartData = [
-  { name: 'Jan', occupancy: 65, revenue: 12000 },
-  { name: 'Feb', occupancy: 72, revenue: 15400 },
-  { name: 'Mar', occupancy: 78, revenue: 18100 },
-  { name: 'Apr', occupancy: 84, revenue: 21900 },
-  { name: 'May', occupancy: 91, revenue: 24500 },
-  { name: 'Jun', occupancy: 96, revenue: 28000 }
-];
-
-const fallbackUnits: Unit[] = [
-  {
-    id: 'unit-103',
-    name: 'The Oasis Garden Loft',
-    type: '1-Bedroom Loft',
-    description: 'Charming duplex loft featuring exposed structural brickwork, reclaimed timber accents, and a lush private garden terrace perfect for morning coffee.',
-    price: 180,
-    amenities: ['Garden Terrace', 'Exposed Brick Style', 'Coffee Station', 'Dedicated Workspace', 'Smart Locks', 'Queen Bed', 'In-unit Laundry'],
-    availability: true,
-    capacity: 3,
-    floorNumber: 4,
-    status: 'Available',
-    images: ['https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800&q=80'],
-    createdAt: '2026-05-28T04:07:00.916Z'
-  },
-  {
-    id: 'unit-105',
-    name: 'The Crimson Executive Lounge',
-    type: 'Executive Studio',
-    description: 'Sleek, moody minimalist studio designed for corporate leaders. Soundproofed glazing, high-end acoustic systems, and dynamic ambient lighting presets.',
-    price: 150,
-    amenities: ['Acoustic Soundproofing', 'Curved Monitor Workspace', 'RGB Diffused Lighting', 'Premium Sound System', 'Double Bed'],
-    availability: false,
-    capacity: 2,
-    floorNumber: 8,
-    status: 'Booked',
-    images: ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80'],
-    createdAt: '2026-05-28T04:07:00.916Z'
-  },
-  {
-    id: 'unit-104',
-    name: 'The Solarium Duplex',
-    type: '2-Bedroom Suite',
-    description: 'Bathed in glorious natural light, this southwest-facing duplex offers a spectacular layout ideal for small families or business travelers seeking upscale comfort.',
-    price: 240,
-    amenities: ['Wraparound Glass', 'Kitchen Island', 'Home Office Corner', 'Walk-in Closet', 'Nespresso Machine', 'Two Queen Beds', 'Bath Tub'],
-    availability: false,
-    capacity: 4,
-    floorNumber: 15,
-    status: 'Booked',
-    images: ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80'],
-    createdAt: '2026-05-28T04:07:00.916Z'
-  }
-];
-
-const trustStats = [
-  { value: 500, suffix: '+', label: 'Happy Residents' },
-  { value: 98, suffix: '%', label: 'Occupancy Rate' },
-  { value: 24, suffix: '/7', label: 'Security' },
-  { value: 100, suffix: '%', label: 'Online Booking' }
-];
 
 const whyChooseData = [
   { icon: Calendar, title: 'Online Booking', description: 'Reserve units in seconds with real-time availability and secure confirmation.' },
@@ -126,50 +38,9 @@ const faqItems = [
   { question: 'Can guests be registered in advance?', answer: 'Yes, visitor registration is managed through the platform so guests receive seamless building access approval.' }
 ];
 
-function AnimatedStat({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
-  const [current, setCurrent] = useState(0);
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) return;
-      let frame = 0;
-      const duration = 900;
-      const step = Math.max(1, Math.round(value / (duration / 16)));
-      const counter = () => {
-        frame += step;
-        if (frame >= value) {
-          setCurrent(value);
-          observer.disconnect();
-          return;
-        }
-        setCurrent(frame);
-        requestAnimationFrame(counter);
-      };
-      requestAnimationFrame(counter);
-    }, { threshold: 0.4 });
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [value]);
-
-  return (
-    <div ref={ref} className="space-y-2 text-center">
-      <p className="text-4xl sm:text-5xl font-serif font-black text-white tracking-tight">
-        {current}
-        <span className="text-blue-400">{suffix}</span>
-      </p>
-      <p className="text-xs uppercase tracking-[0.32em] text-slate-400 font-semibold">{label}</p>
-    </div>
-  );
-}
-
 export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPageProps) {
   const [units, setUnits] = useState<Unit[]>([]);
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);
   const [contactSuccess, setContactSuccess] = useState(false);
   const [contactName, setContactName] = useState('');
@@ -191,25 +62,16 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
         return res.json();
       })
       .then(data => {
-        if (Array.isArray(data)) {
-          setUnits(data.slice(0, 3)); // show first 3 for showcase
-        } else {
-          setUnits(fallbackUnits);
-        }
+        setUnits(Array.isArray(data) ? data.slice(0, 3) : []);
       })
       .catch(err => {
         console.error('Failed fetching units on landing:', err);
-        setUnits(fallbackUnits);
+        setUnits([]);
+      })
+      .finally(() => {
+        setIsLoadingUnits(false);
       });
   }, []);
-
-  const handleNextTestimonial = () => {
-    setActiveTestimonial((prev) => (prev + 1) % testimonialsData.length);
-  };
-
-  const handlePrevTestimonial = () => {
-    setActiveTestimonial((prev) => (prev - 1 + testimonialsData.length) % testimonialsData.length);
-  };
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,16 +269,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
         </div>
       </section>
 
-      <section id="trust" className="py-16 px-6 bg-slate-950/70 border-t border-white/10">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          {trustStats.map((stat) => (
-            <div key={stat.label} className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl">
-              <AnimatedStat label={stat.label} value={stat.value} suffix={stat.suffix} />
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* WHY CHOOSE US SECTION */}
       <section id="about" className="py-24 px-6 max-w-7xl mx-auto scroll-mt-10">
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-16 items-center">
@@ -575,11 +427,17 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
             units.map((unit) => (
               <div key={unit.id} className="glass-card rounded-2xl overflow-hidden shadow-xl border border-white/10 group hover:bg-white/10 transition-all duration-300">
                 <div className="relative h-64 overflow-hidden bg-slate-950">
-                  <img 
-                    src={unit.images && unit.images[0] ? unit.images[0] : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'} 
-                    alt={unit.name} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
-                  />
+                  {unit.images && unit.images[0] ? (
+                    <img
+                      src={unit.images[0]}
+                      alt={unit.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      No image available
+                    </div>
+                  )}
                   
                   {/* Status Overlay Badge */}
                   <div className="absolute top-4 left-4 z-10">
@@ -627,7 +485,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                   <div className="flex items-center justify-between pt-4 border-t border-white/5 font-sans">
                     <div>
                       <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest block">RATE / DAY</span>
-                      <span className="font-bold text-emerald-400 text-xl">${unit.price}</span>
+                      <span className="font-bold text-emerald-400 text-xl">{formatCurrency(unit.price)}</span>
                     </div>
                     <button 
                       onClick={onBrowseClick}
@@ -639,8 +497,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                 </div>
               </div>
             ))
-          ) : (
-            // Skeletons while loading
+          ) : isLoadingUnits ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="glass-card rounded-2xl h-[450px] border border-white/10 animate-pulse">
                 <div className="bg-white/5 h-64 rounded-t-2xl" />
@@ -654,6 +511,11 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                 </div>
               </div>
             ))
+          ) : (
+            <div className="md:col-span-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-10 text-center">
+              <p className="font-serif text-lg font-bold text-white">No units available.</p>
+              <p className="mt-2 text-sm text-slate-400">There are currently no units available for lease or reservation.</p>
+            </div>
           )}
         </div>
       </section>
@@ -678,11 +540,11 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
               <div className="bg-slate-950/45 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
                 <p className="text-xs text-slate-400 font-mono uppercase">Avg Occupancy</p>
-                <p className="text-2xl font-serif font-bold text-teal-400 mt-1">91.4%</p>
+                <p className="text-2xl font-serif font-bold text-teal-400 mt-1">No data</p>
               </div>
               <div className="bg-slate-950/45 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
                 <p className="text-xs text-slate-400 font-mono uppercase">Gross Billings</p>
-                <p className="text-2xl font-serif font-bold text-indigo-400 mt-1">$119.3K</p>
+                <p className="text-2xl font-serif font-bold text-indigo-400 mt-1">No data</p>
               </div>
             </div>
           </div>
@@ -698,82 +560,21 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               </span>
             </div>
 
-            <div className="h-64 mt-2 select-none">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartAreaChart data={mockChartData}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px' }}
-                    labelStyle={{ color: '#94a3b8', fontSize: '11px', fontWeight: 'bold' }}
-                    itemStyle={{ color: '#fff', fontSize: '12px' }}
-                  />
-                  <Area type="monotone" dataKey="revenue" name="Revenue ($)" stroke="#14b8a6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" />
-                </RechartAreaChart>
-              </ResponsiveContainer>
+            <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-white/10 text-center">
+              <div>
+                <p className="font-serif text-lg font-bold text-white">Analytics data unavailable.</p>
+                <p className="mt-2 text-xs text-slate-400">Operational metrics will appear when real records are available.</p>
+              </div>
             </div>
           </div>
 
         </div>
       </section>
 
-      {/* REVIEWS TESTIMONIAL CAROUSEL */}
-      <section id="reviews" className="py-24 px-6 max-w-4xl mx-auto text-center scroll-mt-10 select-none">
-        <div className="space-y-8 relative">
-          <Star className="h-8 w-8 text-amber-400 fill-amber-400 mx-auto animate-pulse" />
-          
-          <div className="h-44 sm:h-36 flex items-center justify-center relative overflow-hidden">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTestimonial}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.35 }}
-                className="space-y-4"
-              >
-                <p className="text-lg sm:text-xl font-serif font-semibold text-white/90 leading-relaxed italic">
-                  "{testimonialsData[activeTestimonial].comment}"
-                </p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center justify-center gap-4">
-            <button 
-              type="button"
-              aria-label="Previous testimonial"
-              onClick={handlePrevTestimonial}
-              className="p-2.5 border border-white/10 hover:bg-white/10 rounded-full transition-all active:scale-[0.9] text-white"
-            >
-              <ChevronLeft className="h-4 w-4 text-slate-300" />
-            </button>
-
-            <div className="flex items-center gap-3 text-left bg-white/5 border border-white/5 py-1.5 px-4 rounded-xl backdrop-blur-md">
-              <div className="h-10 w-10 rounded-full overflow-hidden bg-white/10 border border-white/10">
-                <img src={testimonialsData[activeTestimonial].avatar} alt="Avatar" className="w-full h-full object-cover" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-white">{testimonialsData[activeTestimonial].name}</p>
-                <p className="text-[10px] text-slate-400">{testimonialsData[activeTestimonial].role}</p>
-              </div>
-            </div>
-
-            <button 
-              type="button"
-              aria-label="Next testimonial"
-              onClick={handleNextTestimonial}
-              className="p-2.5 border border-white/10 hover:bg-white/10 rounded-full transition-all active:scale-[0.9] text-white"
-            >
-              <ChevronRight className="h-4 w-4 text-slate-300" />
-            </button>
-          </div>
+      <section id="reviews" className="px-6 py-24 text-center scroll-mt-10 select-none">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-dashed border-white/10 bg-white/5 p-10">
+          <p className="font-serif text-xl font-bold text-white">Resident reviews will appear here.</p>
+          <p className="mt-2 text-sm text-slate-400">Verified resident feedback will be shown when it is available.</p>
         </div>
       </section>
 

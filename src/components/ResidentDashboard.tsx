@@ -5,6 +5,7 @@ import {
   Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, ChevronLeft, ChevronRight, Sun, Heart, X, Sparkles, Upload, FileText, DollarSign, HelpCircle, QrCode, Smartphone, ShieldCheck 
 } from 'lucide-react';
 import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, Inquiry, Purchase } from '../types.ts';
+import { formatCurrency, formatCurrencyText } from '../utils/currency.ts';
 import UserManual from './UserManual';
 
 const GCASH_DEEPLINK_BASE = 'gcash://com.mynt.gcash/app/006300000800';
@@ -296,11 +297,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   };
 
   // Currency formatting (display in PHP)
-  const formatPHP = (amount: number | null | undefined) => {
-    const n = Number(amount || 0);
-    return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
   // Submit Booking request
   const handleConfirmBooking = async () => {
     if (!selectedUnitForBooking) return;
@@ -370,7 +366,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed compiling payment.');
 
-      toast(`Transaction settled! Paid ${formatPHP(amountToPay)} successfully via ${selectedMethod}.`, 'success');
+      toast(`Transaction settled! Paid ${formatCurrency(amountToPay)} successfully via ${selectedMethod}.`, 'success');
       setPayingInvoice(null);
       setPaymentAmount(0);
       fetchAllData();
@@ -721,7 +717,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Bills Score</p>
-                    <p className="text-2xl font-serif font-bold text-rose-500">{formatPHP(pendingPaymentsAmount)}</p>
+                    <p className="text-2xl font-serif font-bold text-rose-500">{formatCurrency(pendingPaymentsAmount)}</p>
                   </div>
                   <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
                     <DollarSign className="h-5 w-5" />
@@ -763,7 +759,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                             <h4 className="font-bold text-xs text-white">{notif.title}</h4>
                             <span className="text-[9px] text-slate-400 font-mono">{new Date(notif.createdAt).toLocaleDateString()}</span>
                           </div>
-                          <p className="text-xs text-slate-400 leading-relaxed">{notif.message}</p>
+                          <p className="text-xs text-slate-400 leading-relaxed">{formatCurrencyText(notif.message)}</p>
                         </div>
                       ))}
                     </div>
@@ -912,7 +908,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     <div className="p-5 border-t border-slate-50 flex items-center justify-between">
                       <div>
                         <span className="text-[9px] text-slate-400 uppercase tracking-widest block font-bold">Daily Rate</span>
-                        <span className="text-base font-bold text-slate-950">{formatPHP(item.price)}</span>
+                        <span className="text-base font-bold text-slate-950">{formatCurrency(item.price)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -980,7 +976,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                               <span className="font-medium text-slate-800">{book.startDate}</span> to <span className="font-medium text-slate-800">{book.endDate}</span>
                             </td>
                             <td className="py-4 px-3 text-center font-medium">{book.guestsCount} Persons</td>
-                            <td className="py-4 px-3 font-bold text-slate-900">{formatPHP(book.totalPrice)}</td>
+                            <td className="py-4 px-3 font-bold text-slate-900">{formatCurrency(book.totalPrice)}</td>
                             <td className="py-4 px-3">
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                                 book.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -1086,9 +1082,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                           <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-3 font-bold text-slate-900">{p.unitName || 'Operations Bill'}</td>
                             <td className="py-4 px-3 font-mono text-slate-500 text-[10px]">{p.referenceNumber}</td>
-                            <td className="py-4 px-3 font-black text-slate-950">{formatPHP(p.totalAmount)}</td>
-                            <td className="py-4 px-3 font-semibold text-slate-900">{formatPHP(p.paidAmount)}</td>
-                            <td className="py-4 px-3 font-semibold text-slate-900">{formatPHP(p.remainingBalance)}</td>
+                            <td className="py-4 px-3 font-black text-slate-950">{formatCurrency(p.totalAmount)}</td>
+                            <td className="py-4 px-3 font-semibold text-slate-900">{formatCurrency(p.paidAmount)}</td>
+                            <td className="py-4 px-3 font-semibold text-slate-900">{formatCurrency(p.remainingBalance)}</td>
                             <td className="py-4 px-3">
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                                 p.status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -1312,7 +1308,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                           <span className="text-[10px] text-slate-400 font-mono">{new Date(notif.createdAt).toLocaleDateString()}</span>
                         </div>
                         <p className="text-xs text-slate-500 leading-relaxed font-semibold">
-                          {notif.message}
+                          {formatCurrencyText(notif.message)}
                         </p>
                       </div>
 
@@ -1528,9 +1524,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 <div className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100 font-sans">
                   <div>
                     <span className="text-[9px] text-slate-400 font-bold uppercase block tracking-wider">Estimated Price ({calculateDays()} Days)</span>
-                    <span className="text-xl font-bold text-slate-950">{formatPHP(calculateTotalCost(selectedUnitForBooking.price))}</span>
+                    <span className="text-xl font-bold text-slate-950">{formatCurrency(calculateTotalCost(selectedUnitForBooking.price))}</span>
                   </div>
-                  <span className="text-xs text-slate-400 font-medium">Rate: {formatPHP(selectedUnitForBooking.price)} / Day</span>
+                  <span className="text-xs text-slate-400 font-medium">Rate: {formatCurrency(selectedUnitForBooking.price)} / Day</span>
                 </div>
               </div>
 
@@ -1569,7 +1565,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="text-lg font-serif font-black">{selectedUnitForAction.name}</h3>
-                      <p className="text-xs text-slate-500">{selectedUnitForAction.type} • {formatPHP(selectedUnitForAction.price)} / day</p>
+                      <p className="text-xs text-slate-500">{selectedUnitForAction.type} • {formatCurrency(selectedUnitForAction.price)} / day</p>
                     </div>
                     <button type="button" aria-label="Close action modal" onClick={() => setSelectedUnitForAction(null)} className="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 rounded-full">
                       <X className="h-4 w-4" />
@@ -1668,15 +1664,15 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                   <div className="p-4 bg-slate-50 rounded-2xl grid grid-cols-2 gap-3 border border-slate-200 font-sans">
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Total Amount</span>
-                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.totalAmount)}</span>
+                      <span className="text-sm font-black text-slate-900">{formatCurrency(payingInvoice.totalAmount)}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Balance</span>
-                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.remainingBalance)}</span>
+                      <span className="text-sm font-black text-slate-900">{formatCurrency(payingInvoice.remainingBalance)}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Paid</span>
-                      <span className="text-sm font-black text-slate-900">{formatPHP(payingInvoice.paidAmount)}</span>
+                      <span className="text-sm font-black text-slate-900">{formatCurrency(payingInvoice.paidAmount)}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Status</span>
@@ -1782,15 +1778,15 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex justify-between text-slate-500">
                         <span>Total Invoice</span>
-                        <span className="font-semibold text-slate-900">{formatPHP(getReceiptPayment(selectedBookingReceipt.id)?.totalAmount ?? selectedBookingReceipt.totalPrice)}</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(getReceiptPayment(selectedBookingReceipt.id)?.totalAmount ?? selectedBookingReceipt.totalPrice)}</span>
                       </div>
                       <div className="flex justify-between text-slate-500">
                         <span>Paid So Far</span>
-                        <span className="font-semibold text-slate-900">{formatPHP(getReceiptPayment(selectedBookingReceipt.id)?.paidAmount ?? 0)}</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(getReceiptPayment(selectedBookingReceipt.id)?.paidAmount ?? 0)}</span>
                       </div>
                       <div className="flex justify-between text-slate-500">
                         <span>Remaining Balance</span>
-                        <span className="font-semibold text-slate-900">{formatPHP(getReceiptPayment(selectedBookingReceipt.id)?.remainingBalance ?? 0)}</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(getReceiptPayment(selectedBookingReceipt.id)?.remainingBalance ?? 0)}</span>
                       </div>
                       <div className="flex justify-between text-slate-500">
                         <span>Status</span>
@@ -1801,7 +1797,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
                   <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-sm font-serif">
                     <span className="font-bold text-slate-900">Total Charged Amount</span>
-                    <span className="text-lg font-black text-slate-950">{formatPHP(selectedBookingReceipt.totalPrice)}</span>
+                    <span className="text-lg font-black text-slate-950">{formatCurrency(selectedBookingReceipt.totalPrice)}</span>
                   </div>
 
                   <div className="bg-slate-50 p-3 rounded-xl text-[10px] text-slate-400 text-center uppercase tracking-wide border border-dashed border-slate-200">

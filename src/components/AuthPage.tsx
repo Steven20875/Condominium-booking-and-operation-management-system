@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
-import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, UserCheck, Bell } from 'lucide-react';
+import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, Bell } from 'lucide-react';
 import { User as UserType } from '../types.ts';
 import { Button, Input } from './ui';
 import { signInWithGoogle, getFirebaseConfigStatus, initializeFirebase, getGoogleRedirectResult } from '../lib/firebase.ts';
@@ -110,15 +110,6 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   const handleEmailChange = (value: string) => {
     setEmail(value);
     setEmailValid(value === '' || validateEmail(value));
-  };
-
-  const copyDemoCredentials = async (content: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      toast('Demo credentials copied to clipboard.', 'success');
-    } catch {
-      toast('Clipboard access failed; please copy manually.', 'warning');
-    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -393,55 +384,6 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                     <p className="text-sm text-slate-400 mt-1 font-medium">
                       Access all resident resources or administration capabilities securely.
                     </p>
-                  </div>
-
-                  {/* Preloaded credentials guide helper */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="auth-demo-card">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-[0.28em] text-slate-400 font-semibold">Resident Demo</p>
-                          <p className="mt-2 text-sm font-semibold text-white">Resident Account</p>
-                        </div>
-                        <div className="rounded-2xl bg-blue-500/15 p-3 text-blue-300">
-                          <UserCheck className="h-5 w-5" />
-                        </div>
-                      </div>
-                      <div className="mt-4 space-y-1 text-slate-300 text-[11px]">
-                        <p>Email: <span className="text-white font-semibold">resident@gmail.com</span></p>
-                        <p>Password: <span className="text-white font-semibold">Resident@2026</span></p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => copyDemoCredentials('resident@gmail.com:Resident@2026')}
-                        className="auth-copy-button"
-                      >
-                        Copy Resident Credentials
-                      </button>
-                    </div>
-
-                    <div className="auth-demo-card">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-[0.28em] text-slate-400 font-semibold">Administrator Demo</p>
-                          <p className="mt-2 text-sm font-semibold text-white">Admin Control</p>
-                        </div>
-                        <div className="rounded-2xl bg-violet-500/15 p-3 text-violet-300">
-                          <ShieldCheck className="h-5 w-5" />
-                        </div>
-                      </div>
-                      <div className="mt-4 space-y-1 text-slate-300 text-[11px]">
-                        <p>Email: <span className="text-white font-semibold">admin@condo.com</span></p>
-                        <p>Password: <span className="text-white font-semibold">admin123</span></p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => copyDemoCredentials('admin@condo.com:admin123')}
-                        className="auth-copy-button"
-                      >
-                        Copy Admin Credentials
-                      </button>
-                    </div>
                   </div>
 
                   <form onSubmit={handleLogin} className="space-y-4">

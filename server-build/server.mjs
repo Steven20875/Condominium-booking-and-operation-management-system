@@ -9,238 +9,6 @@ import path from "node:path";
 import { EventEmitter } from "events";
 var DB_DIR = path.join(process.cwd(), "data");
 var DB_FILE = path.join(DB_DIR, "db.json");
-var defaultUnits = [
-  {
-    id: "unit-101",
-    name: "The Zenith Suite",
-    type: "Studio Deluxe",
-    description: "A luxurious open-flow studio on the 10th floor with custom glass partitions, panoramic metropolitan views, and a private step-out balcony.",
-    price: 120,
-    amenities: ["High-speed Wi-Fi", "King Bed", "Smart TV", "Chef Kitchenette", "Rain Shower", "Private Balcony"],
-    availability: true,
-    capacity: 2,
-    floorNumber: 10,
-    status: "Available",
-    images: ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"],
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "unit-102",
-    name: "The Grand Horizon Penthouse",
-    type: "Penthouse",
-    description: "Spanning the top level of the south tower, this ultra-spacious penthouse features double-height ceilings, automated floor-to-ceiling shades, and private plunge pool access.",
-    price: 350,
-    amenities: ["Private Pool", "24/7 Concierge", "En-suite Jacuzzi", "Wine Cellar", "Dual Balconies", "Heated Floors", "Super King Bed"],
-    availability: false,
-    capacity: 6,
-    floorNumber: 24,
-    status: "Booked",
-    images: ["https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80"],
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "unit-103",
-    name: "The Oasis Garden Loft",
-    type: "1-Bedroom Loft",
-    description: "Charming duplex loft featuring exposed structural brickwork, reclaimed timber accents, and a lush private garden terrace perfect for morning coffee.",
-    price: 180,
-    amenities: ["Garden Terrace", "Exposed Brick Style", "Coffee Station", "Dedicated Workspace", "Smart Locks", "Queen Bed", "In-unit Laundry"],
-    availability: true,
-    capacity: 3,
-    floorNumber: 4,
-    status: "Available",
-    images: ["https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800&q=80"],
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "unit-104",
-    name: "The Solarium Duplex",
-    type: "2-Bedroom Suite",
-    description: "Bathed in glorious natural light, this southwest-facing duplex offers a spectacular layout ideal for small families or business travelers seeking upscale comfort.",
-    price: 240,
-    amenities: ["Wraparound Glass", "Kitchen Island", "Home Office Corner", "Walk-in Closet", "Nespresso Machine", "Two Queen Beds", "Bath Tub"],
-    availability: true,
-    capacity: 4,
-    floorNumber: 15,
-    status: "Available",
-    images: ["https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80"],
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "unit-105",
-    name: "The Crimson Executive Lounge",
-    type: "Executive Studio",
-    description: "Sleek, moody minimalist studio designed for corporate leaders. Soundproofed glazing, high-end acoustic systems, and dynamic ambient lighting presets.",
-    price: 150,
-    amenities: ["Acoustic Soundproofing", "Curved Monitor Workspace", "RGB Diffused Lighting", "Premium Sound System", "Double Bed"],
-    availability: true,
-    capacity: 2,
-    floorNumber: 8,
-    status: "Available",
-    images: ["https://images.unsplash.com/photo-1502672014263-04e87abe90b3?auto=format&fit=crop&w=800&q=80"],
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  }
-];
-var defaultUsers = [
-  {
-    id: "user-admin-1",
-    email: "admin@condo.com",
-    password: "admin123",
-    // Clean plain-text mock auth for the sandboxed preview
-    name: "GALES URBAN HAVEN",
-    role: "admin",
-    phone: "+1 (555) 0192-384",
-    avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "user-resident-1",
-    email: "resident@gmail.com",
-    password: "Resident@2026",
-    name: "Steven Felarca",
-    role: "resident",
-    phone: "+1 (555) 0122-874",
-    unitNumber: "Unit 1204",
-    avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "user-resident-2",
-    email: "alice@condo.com",
-    password: "alice123",
-    name: "Alice Cooper",
-    role: "resident",
-    phone: "+1 (555) 0144-555",
-    unitNumber: "Unit 102",
-    avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  }
-];
-var defaultBookings = [
-  {
-    id: "book-1",
-    unitId: "unit-102",
-    unitName: "The Grand Horizon Penthouse",
-    residentId: "user-resident-2",
-    residentName: "Alice Cooper",
-    residentEmail: "alice@condo.com",
-    startDate: "2026-06-01",
-    endDate: "2026-06-10",
-    totalPrice: 3150,
-    status: "Approved",
-    guestsCount: 4,
-    notes: "Please arrange airport pickup if possible.",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "book-2",
-    unitId: "unit-101",
-    unitName: "The Zenith Suite",
-    residentId: "user-resident-1",
-    residentName: "Steven Felarca",
-    residentEmail: "resident@gmail.com",
-    startDate: "2026-06-15",
-    endDate: "2026-06-18",
-    totalPrice: 360,
-    status: "Pending",
-    guestsCount: 2,
-    notes: "Celebrating marriage anniversary.",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  }
-];
-var defaultPayments = [
-  {
-    id: "pay-1",
-    bookingId: "book-1",
-    residentId: "user-resident-2",
-    residentName: "Alice Cooper",
-    unitName: "The Grand Horizon Penthouse",
-    amount: 3150,
-    totalAmount: 3150,
-    paidAmount: 3150,
-    remainingBalance: 0,
-    downpaymentAmount: 3150,
-    status: "Paid",
-    method: "Credit Card",
-    referenceNumber: "TXN-90812312-AB",
-    paidAt: (/* @__PURE__ */ new Date()).toISOString(),
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  },
-  {
-    id: "pay-2",
-    bookingId: "book-2",
-    residentId: "user-resident-1",
-    residentName: "Steven Felarca",
-    unitName: "The Zenith Suite",
-    amount: 360,
-    totalAmount: 360,
-    paidAmount: 0,
-    remainingBalance: 360,
-    downpaymentAmount: 0,
-    status: "Pending",
-    method: "Debit Card",
-    referenceNumber: "TXN-PENDING-F7",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  }
-];
-var defaultMaintenance = [
-  {
-    id: "req-1",
-    residentId: "user-resident-1",
-    residentName: "Steven Felarca",
-    unitNumber: "Unit 1204",
-    issueType: "Plumbing",
-    description: "Slow water drainage in the master bathroom shower cabin. Seems clogged.",
-    priority: "Medium",
-    status: "In Progress",
-    assignedStaff: "Robert Mclean (Plumber Lead)",
-    createdAt: new Date(Date.now() - 48 * 3600 * 1e3).toISOString()
-  },
-  {
-    id: "req-2",
-    residentId: "user-resident-2",
-    residentName: "Alice Cooper",
-    unitNumber: "Unit 102",
-    issueType: "HVAC / Cooling",
-    description: "The Smart Thermostat triggers an error code E-102 every time cooling is set past 22 degrees centigrade.",
-    priority: "High",
-    status: "Pending",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  }
-];
-var defaultNotifications = [
-  {
-    id: "notif-1",
-    title: "Pool Maintenace Complete",
-    message: "The outdoor infinity ozone-pool on the 3rd floor deck has passed safety checks and is now fully reopened for swimming hours.",
-    recipientId: "all",
-    recipientRole: "all",
-    isRead: false,
-    type: "success",
-    createdAt: new Date(Date.now() - 2 * 3600 * 1e3).toISOString()
-  },
-  {
-    id: "notif-2",
-    title: "Upcoming AC Duct Cleaning",
-    message: "We will conduct localized duct clearing and exhaust disinfection between May 30th and June 2nd. Please check notice boards for timings.",
-    recipientId: "all",
-    recipientRole: "resident",
-    isRead: false,
-    type: "info",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  }
-];
-var defaultLogs = [
-  {
-    id: "log-1",
-    userId: "user-admin-1",
-    userName: "Donna Talam",
-    userRole: "admin",
-    action: "System Initialized",
-    details: "The Condominium Booking and Operation Database was deployed.",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  }
-];
 var dbEvents = new EventEmitter();
 var MockDatabase = class {
   constructor() {
@@ -273,26 +41,26 @@ var MockDatabase = class {
         this.normalizeExistingPayments();
       } else {
         this.data = {
-          users: defaultUsers,
-          units: defaultUnits,
-          bookings: defaultBookings,
-          payments: defaultPayments,
-          maintenanceRequests: defaultMaintenance,
-          notifications: defaultNotifications,
-          activityLogs: defaultLogs
+          users: [],
+          units: [],
+          bookings: [],
+          payments: [],
+          maintenanceRequests: [],
+          notifications: [],
+          activityLogs: []
         };
         this.save();
       }
     } catch (err) {
       console.error("Failed to initialize local JSON database file:", err);
       this.data = {
-        users: defaultUsers,
-        units: defaultUnits,
-        bookings: defaultBookings,
-        payments: defaultPayments,
-        maintenanceRequests: defaultMaintenance,
-        notifications: defaultNotifications,
-        activityLogs: defaultLogs
+        users: [],
+        units: [],
+        bookings: [],
+        payments: [],
+        maintenanceRequests: [],
+        notifications: [],
+        activityLogs: []
       };
     }
   }
@@ -650,7 +418,7 @@ var MockDatabase = class {
     }
     this.data.payments.unshift(newPayment);
     this.save();
-    this.addActivityLog(operatorId, operatorName, "admin", "Invoice Generated", `Created manual invoice of $${newPayment.amount} for resident`);
+    this.addActivityLog(operatorId, operatorName, "admin", "Invoice Generated", `Created manual invoice of \u20B1${newPayment.amount.toFixed(2)} for resident`);
     return newPayment;
   }
   // --- MAINTENANCE RELATED ---

@@ -58,26 +58,6 @@ export const PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'Bank Transfer', 'E
 
 export const NOTIFICATION_TYPES = ['info', 'success', 'warning', 'alert'] as const;
 
-export const USD_TO_PHP_RATE = 57;
-
-export const DEMO_ACCOUNTS = {
-  admin: {
-    email: 'admin@condo.com',
-    password: 'admin123',
-    name: 'GALES URBAN HAVEN',
-  },
-  resident1: {
-    email: 'john@condo.com',
-    password: 'john123',
-    name: 'Steven Felarca',
-  },
-  resident2: {
-    email: 'alice@condo.com',
-    password: 'alice123',
-    name: 'Alice Cooper',
-  },
-};
-
 export const TOAST_DURATION = 3000; // milliseconds
 
 export const PAGINATION = {

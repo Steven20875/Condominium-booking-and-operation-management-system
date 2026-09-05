@@ -12,6 +12,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { Button, Input, Select, Badge, StatusBadge, Modal, ModalHeader, ModalBody, ModalFooter, ConfirmationDialog } from './ui';
+import { formatCurrency, formatCurrencyText } from '../utils/currency.ts';
 
 interface AdminDashboardProps {
   user: UserType;
@@ -30,18 +31,6 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
   const [showUserManual, setShowUserManual] = useState<boolean>(false);
 
-  const formatCurrency = (value: number | null | undefined): string => {
-    if (value == null) {
-      return 'PHP 0.00';
-    }
-
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
-
   // Core collections
   const [units, setUnits] = useState<Unit[]>([]);
   const [residents, setResidents] = useState<UserType[]>([]);
@@ -58,12 +47,12 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [showAddUnitModal, setShowAddUnitModal] = useState<boolean>(false);
   const [editUnitItem, setEditUnitItem] = useState<Unit | null>(null);
   const [unitName, setUnitName] = useState<string>('');
-  const [unitType, setUnitType] = useState<string>('Studio Deluxe');
+  const [unitType, setUnitType] = useState<string>('');
   const [unitDescription, setUnitDescription] = useState<string>('');
-  const [unitPrice, setUnitPrice] = useState<number>(150);
-  const [unitCapacity, setUnitCapacity] = useState<number>(2);
-  const [unitFloor, setUnitFloor] = useState<number>(3);
-  const [unitAmenities, setUnitAmenities] = useState<string>('Wi-Fi, Queen Bed, Smart TV');
+  const [unitPrice, setUnitPrice] = useState<number>(0);
+  const [unitCapacity, setUnitCapacity] = useState<number>(0);
+  const [unitFloor, setUnitFloor] = useState<number>(0);
+  const [unitAmenities, setUnitAmenities] = useState<string>('');
   const [unitImages, setUnitImages] = useState<string[]>([]);
   const [submittingUnit, setSubmittingUnit] = useState<boolean>(false);
 
@@ -73,14 +62,14 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [resEmail, setResEmail] = useState<string>('');
   const [resPhone, setResPhone] = useState<string>('');
   const [resUnit, setResUnit] = useState<string>('');
-  const [resPassword, setResPassword] = useState<string>('resident123');
+  const [resPassword, setResPassword] = useState<string>('');
   const [submittingResident, setSubmittingResident] = useState<boolean>(false);
 
   // Invoice creation states
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState<boolean>(false);
   const [targetResidentBillId, setTargetResidentBillId] = useState<string>('');
-  const [billUnitName, setBillUnitName] = useState<string>('Periodic Association Dues');
-  const [billAmount, setBillAmount] = useState<number>(200);
+  const [billUnitName, setBillUnitName] = useState<string>('');
+  const [billAmount, setBillAmount] = useState<number>(0);
   const [submittingBill, setSubmittingBill] = useState<boolean>(false);
 
   // Payment recording state for admin
@@ -98,7 +87,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
   // Maintenance dispatch states
   const [dispatchTicket, setDispatchTicket] = useState<MaintenanceRequest | null>(null);
-  const [dispatchStaff, setDispatchStaff] = useState<string>('Alex Johnson (Team HVAC)');
+  const [dispatchStaff, setDispatchStaff] = useState<string>('');
   const [dispatchStatus, setDispatchStatus] = useState<string>('In Progress');
 
   // Search/Filters logic
@@ -211,7 +200,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       amenities: splitAm,
       capacity: Number(unitCapacity),
       floorNumber: Number(unitFloor),
-      images: unitImages.length > 0 ? unitImages : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80']
+      images: unitImages
     };
 
     try {
@@ -247,7 +236,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       // Flush fields
       setUnitName('');
       setUnitDescription('');
-      setUnitPrice(150);
+      setUnitPrice(0);
       setUnitImages([]);
       
       fetchAllData();
@@ -762,8 +751,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     setEditUnitItem(null);
                     setUnitName('');
                     setUnitDescription('');
-                    setUnitPrice(120);
-                    setUnitAmenities('Wi-Fi, Queen Bed, Kitchenette, TV');
+                    setUnitPrice(0);
+                    setUnitAmenities('');
                     setShowAddUnitModal(true);
                   }}
                   icon={Plus}
@@ -837,6 +826,12 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
                   </div>
                 ))}
+                {units.filter(u => u.name.toLowerCase().includes(searchUnit.toLowerCase())).length === 0 && (
+                  <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                    <p className="font-serif text-lg font-bold text-slate-900">No units available.</p>
+                    <p className="mt-2 text-sm text-slate-500">There are currently no units available in the inventory.</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -907,32 +902,36 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       </tr>
                     </thead>
                     <tbody>
-                      {getFilteredResidents().map((res) => (
-                        <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                          <td className="py-4 px-3 font-semibold text-slate-950 flex items-center gap-2.5">
-                            <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-                              <img src={res.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${res.name}`} alt="av" />
-                            </div>
-                            {res.name}
-                          </td>
-                          <td className="py-4 px-3 font-mono text-slate-600">{res.email}</td>
-                          <td className="py-4 px-3 text-slate-600">{res.phone || 'Non Specified'}</td>
-                          <td className="py-4 px-3 font-bold text-slate-900">{res.unitNumber || 'Suite pending'}</td>
-                          <td className="py-4 px-3 text-slate-400 text-[10px]">{new Date(res.createdAt).toLocaleDateString()}</td>
-                          <td className="py-4 px-3 text-right">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => {
-                                setTargetResidentBillId(res.id);
-                                setShowCreateInvoiceModal(true);
-                              }}
-                            >
-                              Bill
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {getFilteredResidents().length > 0 ? getFilteredResidents().map((res) => (
+                          <tr key={res.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                            <td className="py-4 px-3 font-semibold text-slate-950 flex items-center gap-2.5">
+                              <div className="h-8 w-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
+                                <img src={res.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${res.name}`} alt="av" />
+                              </div>
+                              {res.name}
+                            </td>
+                            <td className="py-4 px-3 font-mono text-slate-600">{res.email}</td>
+                            <td className="py-4 px-3 text-slate-600">{res.phone || 'Non Specified'}</td>
+                            <td className="py-4 px-3 font-bold text-slate-900">{res.unitNumber || 'Not assigned'}</td>
+                            <td className="py-4 px-3 text-slate-400 text-[10px]">{new Date(res.createdAt).toLocaleDateString()}</td>
+                            <td className="py-4 px-3 text-right">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                  setTargetResidentBillId(res.id);
+                                  setShowCreateInvoiceModal(true);
+                                }}
+                              >
+                                Bill
+                              </Button>
+                            </td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan={6} className="p-12 text-center text-slate-400">No residents registered yet.</td>
+                          </tr>
+                        )}
                     </tbody>
                   </table>
                 </div>
@@ -1054,8 +1053,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     <tbody>
                       {payments.map((p) => (
                         <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                          <td className="py-4 px-3 font-bold text-slate-900">{p.unitName || 'Operations Service Fee'}</td>
-                          <td className="py-4 px-3">{p.residentName || 'R. Tenant'}</td>
+                          <td className="py-4 px-3 font-bold text-slate-900">{p.unitName || 'Not specified'}</td>
+                          <td className="py-4 px-3">{p.residentName || 'Not specified'}</td>
                           <td className="py-4 px-3 text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                           <td className="py-4 px-3 font-mono text-[10px] text-slate-400">{p.referenceNumber}</td>
                           <td className="py-4 px-3 font-black text-slate-950">{formatCurrency(p.totalAmount)}</td>
@@ -1141,9 +1140,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     <tbody>
                       {maintenance.map((ticket) => (
                         <tr key={ticket.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                          <td className="py-4 px-3 font-bold text-slate-900">{ticket.unitNumber || 'Common Spaces'}</td>
+                          <td className="py-4 px-3 font-bold text-slate-900">{ticket.unitNumber || 'Not specified'}</td>
                           <td className="py-4 px-3">
-                            <p className="font-bold">{ticket.residentName || 'R. Tenant'}</p>
+                            <p className="font-bold">{ticket.residentName || 'Not specified'}</p>
                             <p className="text-[10px] text-slate-400 font-semibold">{ticket.issueType}</p>
                           </td>
                           <td className="py-4 px-3 text-slate-500">{new Date(ticket.createdAt).toLocaleDateString()}</td>
@@ -1170,7 +1169,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                               onClick={() => {
                                 setDispatchTicket(ticket);
                                 setDispatchStatus(ticket.status);
-                                setDispatchStaff(ticket.assignedStaff || 'Robert Mclean (Plumbing Specialist)');
+                                setDispatchStaff(ticket.assignedStaff || '');
                               }}
                               icon={Wrench}
                             >
@@ -1289,19 +1288,21 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               </div>
 
               <div className="p-4 sm:p-6 text-xs max-h-[500px] overflow-y-auto font-mono space-y-2.5 leading-relaxed">
-                {logs.map((log) => (
-                  <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-between gap-2">
-                    <div className="space-y-1">
-                      <p className="text-slate-900">
-                        <strong className="text-slate-900 font-sans">[{log.userRole.toUpperCase()}] {log.userName}: </strong>
-                        <span className="bg-slate-200 border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold font-mono uppercase">{log.action}</span>
-                      </p>
-                      <p className="text-slate-500 font-sans font-semibold text-[11px]">{log.details}</p>
-                    </div>
+                {logs.length > 0 ? logs.map((log) => (
+                    <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-between gap-2">
+                      <div className="space-y-1">
+                        <p className="text-slate-900">
+                          <strong className="text-slate-900 font-sans">[{log.userRole.toUpperCase()}] {log.userName}: </strong>
+                          <span className="bg-slate-200 border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold font-mono uppercase">{log.action}</span>
+                        </p>
+                        <p className="text-slate-500 font-sans font-semibold text-[11px]">{formatCurrencyText(log.details)}</p>
+                      </div>
 
-                    <span className="text-[10px] text-slate-400 font-mono self-end shrink-0 whitespace-nowrap">{new Date(log.createdAt).toLocaleTimeString()}</span>
-                  </div>
-                ))}
+                      <span className="text-[10px] text-slate-400 font-mono self-end shrink-0 whitespace-nowrap">{new Date(log.createdAt).toLocaleTimeString()}</span>
+                    </div>
+                  )) : (
+                    <div className="p-12 text-center text-slate-400">No audit entries yet.</div>
+                  )}
               </div>
             </motion.div>
           )}
@@ -1445,7 +1446,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     <input
                       type="text"
                       className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
-                      placeholder="Wi-Fi, Queen Bed, Kitchenette, Bath Tub, Coffee Nespresso"
+                        placeholder="Enter amenities separated by commas"
                       value={unitAmenities}
                       onChange={(e) => setUnitAmenities(e.target.value)}
                     />
@@ -1553,7 +1554,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         type="text"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
-                        placeholder="Steven Felarca"
+                        placeholder="Enter resident name"
                         value={resName}
                         onChange={(e) => setResName(e.target.value)}
                       />
@@ -1566,7 +1567,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         type="email"
                         required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none font-mono text-slate-900 font-semibold"
-                        placeholder="john@condo.com"
+                        placeholder="resident@example.com"
                         value={resEmail}
                         onChange={(e) => setResEmail(e.target.value)}
                       />
@@ -1892,17 +1893,14 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-3 pt-2">
                     <div className="space-y-1">
                       <label htmlFor="dispatch-staff" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Assign On-Duty Responder</label>
-                      <select
+                      <input
                         id="dispatch-staff"
+                        type="text"
                         className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2.5 rounded-xl focus:outline-none text-slate-800 font-bold"
                         value={dispatchStaff}
                         onChange={(e) => setDispatchStaff(e.target.value)}
-                      >
-                        <option value="Robert Mclean (Plumber Lead)">🔧 Robert Mclean (Plumber Lead)</option>
-                        <option value="Alex Johnson (Team HVAC)">❄️ Alex Johnson (Team HVAC)</option>
-                        <option value="Terry Vance (Elevator Lead)">🏢 Terry Vance (Elevator Lead)</option>
-                        <option value="Lucas Stark (Concierge Captain)">📦 Lucas Stark (Concierge Captain)</option>
-                      </select>
+                        placeholder="Enter responder name"
+                      />
                     </div>
 
                     <div className="space-y-1">

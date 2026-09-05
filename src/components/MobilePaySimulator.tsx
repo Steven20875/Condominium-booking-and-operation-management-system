@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Smartphone, ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
+import { formatCurrency } from '../utils/currency.ts';
 
 export default function MobilePaySimulator() {
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [initAmount, setInitAmount] = useState<number>(0);
-  const [residentName, setResidentName] = useState<string>('Gales Resident');
+  const [residentName, setResidentName] = useState<string>('');
   
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +14,7 @@ export default function MobilePaySimulator() {
 
   // Flow control
   const [gcashStep, setGcashStep] = useState<'phone' | 'otp' | 'success'>('phone');
-  const [mobileNumber, setMobileNumber] = useState<string>('09171234567');
+  const [mobileNumber, setMobileNumber] = useState<string>('');
   const [otpCode, setOtpCode] = useState<string>('');
   const [referenceNum, setReferenceNum] = useState<string>('');
 
@@ -34,7 +35,7 @@ export default function MobilePaySimulator() {
           setInvoiceDetails(data);
           if (data.status === 'Paid') {
             setGcashStep('success');
-            setReferenceNum(data.referenceNumber || 'RCV-LINK-OK');
+            setReferenceNum(data.referenceNumber || '');
           }
         })
         .catch((err) => {
@@ -94,7 +95,7 @@ export default function MobilePaySimulator() {
   };
 
   const currencyValue = invoiceDetails ? invoiceDetails.amount : initAmount;
-  const phpValue = (currencyValue * 57).toLocaleString(undefined, { minimumFractionDigits: 2 });
+  const phpValue = formatCurrency(currencyValue);
 
   if (loading && gcashStep !== 'success') {
     return (
@@ -172,7 +173,7 @@ export default function MobilePaySimulator() {
             
             <div className="text-right">
               <span className="text-[9px] text-slate-400 block uppercase font-bold">Total Bill</span>
-              <span className="text-[15px] font-black text-blue-400 block">₱ {phpValue} PHP</span>
+              <span className="text-[15px] font-black text-blue-400 block">{phpValue}</span>
             </div>
           </div>
         </div>
@@ -290,7 +291,7 @@ export default function MobilePaySimulator() {
                     type="submit"
                     className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Confirm Settle ₱ {phpValue} PHP
+                    Confirm Settle {phpValue}
                   </button>
                   
                   <button
@@ -330,7 +331,7 @@ export default function MobilePaySimulator() {
                   </div>
                   <div className="flex justify-between text-[10px] font-mono">
                     <span className="text-slate-400 uppercase font-bold text-[9px]">Amount Refunded</span>
-                    <span className="text-white font-bold">₱{phpValue} PHP</span>
+                    <span className="text-white font-bold">{phpValue}</span>
                   </div>
                   <div className="flex justify-between text-[10px] font-mono pt-1.5 border-t border-white/5">
                     <span className="text-slate-400 uppercase font-bold text-[9px]">Receipt Token</span>
