@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronDown, ChevronUp, Star, ArrowUpRight, ArrowRight, CreditCard, Twitter, Instagram, Linkedin, Menu, X
+  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronDown, ChevronUp, ArrowUpRight, CreditCard, Twitter, Instagram, Linkedin, Menu, X
 } from 'lucide-react';
-import { Unit } from '../types.ts';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
-import { formatCurrency } from '../utils/currency.ts';
 
 interface LandingPageProps {
   onLoginClick: () => void;
@@ -39,8 +37,6 @@ const faqItems = [
 ];
 
 export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPageProps) {
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);
   const [contactSuccess, setContactSuccess] = useState(false);
   const [contactName, setContactName] = useState('');
@@ -52,26 +48,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
   const [mapLatitude, setMapLatitude] = useState(37.7749);
   const [mapLongitude, setMapLongitude] = useState(-122.4194);
   const [mapZoom, setMapZoom] = useState(13);
-
-  useEffect(() => {
-    fetch('/api/units')
-      .then(async res => {
-        if (!res.ok) {
-          throw new Error(`Unit API request failed with status ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        setUnits(Array.isArray(data) ? data.slice(0, 3) : []);
-      })
-      .catch(err => {
-        console.error('Failed fetching units on landing:', err);
-        setUnits([]);
-      })
-      .finally(() => {
-        setIsLoadingUnits(false);
-      });
-  }, []);
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,8 +86,8 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               About
               <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
             </a>
-            <a href="#showcase" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
-              Units
+            <a href="#access" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+              Get Started
               <span className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 bg-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
             </a>
             <a href="#features" className="group relative text-sm font-semibold text-slate-300 transition-colors hover:text-white">
@@ -155,7 +131,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                 {[
                   ['Home', '#hero'],
                   ['About', '#about'],
-                  ['Units', '#showcase'],
+                  ['Get Started', '#access'],
                   ['Features', '#features'],
                   ['Contact', '#contact']
                 ].map(([label, href]) => (
@@ -403,120 +379,36 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
         </div>
       </section>
 
-      {/* RESIDENCES SHOWCASE PANEL */}
-      <section id="showcase" className="py-24 px-6 max-w-7xl mx-auto scroll-mt-10">
-        <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-12">
-          <div className="space-y-3">
-            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">Live Listings</span>
-            <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">Curated Living Spaces</h2>
-            <p className="text-slate-400 text-sm max-w-md">
-              View selected units currently available for lease or reservation within One Spatial Iloilo's state-of-the-art building.
-            </p>
-          </div>
-          <button 
-            onClick={onBrowseClick}
-            className="mt-4 md:mt-0 text-xs font-bold uppercase tracking-wider text-white border-b-2 border-blue-400 hover:text-blue-300 hover:border-blue-300 pb-1.5 transition-all flex items-center gap-1 cursor-pointer"
-          >
-            Explore Active Inventory <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Units Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {units.length > 0 ? (
-            units.map((unit) => (
-              <div key={unit.id} className="glass-card rounded-2xl overflow-hidden shadow-xl border border-white/10 group hover:bg-white/10 transition-all duration-300">
-                <div className="relative h-64 overflow-hidden bg-slate-950">
-                  {unit.images && unit.images[0] ? (
-                    <img
-                      src={unit.images[0]}
-                      alt={unit.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      No image available
-                    </div>
-                  )}
-                  
-                  {/* Status Overlay Badge */}
-                  <div className="absolute top-4 left-4 z-10">
-                    <span className={`px-3 py-1 text-[10px] font-mono font-semibold uppercase tracking-widest rounded-full shadow-md ${
-                      unit.status === 'Available' 
-                        ? 'bg-emerald-500/90 text-white backdrop-blur-md' 
-                        : 'bg-slate-950/90 text-slate-300 backdrop-blur-md'
-                    }`}>
-                      {unit.status}
-                    </span>
-                  </div>
-
-                  <div className="absolute top-4 right-4 z-10">
-                    <span className="bg-slate-950/75 p-1.5 rounded-full text-white backdrop-blur-md">
-                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-4">
-                  <div>
-                    <span className="text-[10px] font-semibold text-blue-400 font-mono tracking-widest uppercase">{unit.type}</span>
-                    <h3 className="font-serif font-bold text-white text-lg mt-0.5 leading-snug group-hover:text-blue-200 transition-colors">
-                      {unit.name}
-                    </h3>
-                  </div>
-
-                  <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 h-8">
-                    {unit.description}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {unit.amenities.slice(0, 3).map((amenity, i) => (
-                      <span key={i} className="text-[10px] font-medium text-slate-200 bg-white/5 border border-white/5 px-2 py-0.5 rounded">
-                        {amenity}
-                      </span>
-                    ))}
-                    {unit.amenities.length > 3 && (
-                      <span className="text-[10px] font-medium text-slate-400 border border-white/5 px-2 py-0.5 rounded">
-                        +{unit.amenities.length - 3} more
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-white/5 font-sans">
-                    <div>
-                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest block">RATE / DAY</span>
-                      <span className="font-bold text-emerald-400 text-xl">{formatCurrency(unit.price)}</span>
-                    </div>
-                    <button 
-                      onClick={onBrowseClick}
-                      className="px-4 py-2 bg-white/5 hover:bg-white/15 text-slate-200 hover:text-white transition-all text-xs font-bold rounded-lg uppercase tracking-wide border border-white/10"
-                    >
-                      Book Layout
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : isLoadingUnits ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="glass-card rounded-2xl h-[450px] border border-white/10 animate-pulse">
-                <div className="bg-white/5 h-64 rounded-t-2xl" />
-                <div className="p-6 space-y-4">
-                  <div className="h-4 bg-white/10 rounded w-1/4" />
-                  <div className="h-6 bg-white/10 rounded w-3/4" />
-                  <div className="space-y-2">
-                    <div className="h-3 bg-white/5 rounded" />
-                    <div className="h-3 bg-white/5 rounded w-5/6" />
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="md:col-span-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-10 text-center">
-              <p className="font-serif text-lg font-bold text-white">No units available.</p>
-              <p className="mt-2 text-sm text-slate-400">There are currently no units available for lease or reservation.</p>
+      {/* AUTHENTICATED ACCESS CTA */}
+      <section id="access" className="px-6 py-20 scroll-mt-10">
+        <div className="mx-auto max-w-7xl rounded-[32px] border border-blue-400/20 bg-gradient-to-r from-blue-950/70 via-slate-950/80 to-cyan-950/60 p-8 shadow-2xl shadow-blue-950/20 sm:p-12">
+          <div className="flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
+            <div className="max-w-2xl space-y-4">
+              <span className="inline-block rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1 text-xs font-mono font-bold uppercase tracking-widest text-blue-300">
+                Resident &amp; Admin Portal
+              </span>
+              <h2 className="font-serif text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Manage your condominium experience in one secure system.
+              </h2>
+              <p className="text-sm leading-7 text-slate-300">
+                Sign in or create an account to access live units, reservations, payments, resident services, and professional property operations.
+              </p>
             </div>
-          )}
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              <button
+                onClick={onLoginClick}
+                className="rounded-[16px] bg-gradient-to-r from-blue-500 to-cyan-400 px-7 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition-all hover:-translate-y-0.5"
+              >
+                Get Started
+              </button>
+              <button
+                onClick={onBrowseClick}
+                className="rounded-[16px] border border-white/15 bg-white/10 px-7 py-3.5 text-center text-sm font-semibold text-white transition-all hover:bg-white/15"
+              >
+                Explore Available Units
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -822,7 +714,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
             <p className="text-white text-xs font-bold font-serif tracking-wider">RESOURCES</p>
             <ul className="text-xs space-y-2">
               <li><a href="#about" className="hover:text-white transition-colors">Tower Profile</a></li>
-              <li><a href="#showcase" className="hover:text-white transition-colors">Residential Suites</a></li>
+              <li><a href="#access" className="hover:text-white transition-colors">Resident Portal</a></li>
               <li><a href="#features" className="hover:text-white transition-colors">Facility Listing</a></li>
             </ul>
           </div>
