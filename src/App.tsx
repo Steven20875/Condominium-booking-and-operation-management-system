@@ -27,6 +27,7 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [isRedirectProcessing, setIsRedirectProcessing] = useState<boolean>(true);
   const [pendingBookingRedirect, setPendingBookingRedirect] = useState<boolean>(false);
 
   // Restore authenticated session from localStorage
@@ -130,6 +131,11 @@ function AppContent() {
           });
         }
         toast(message, 'warning');
+      } finally {
+        // Mark redirect processing as complete, whether successful or not
+        if (active) {
+          setIsRedirectProcessing(false);
+        }
       }
     };
 
@@ -238,7 +244,7 @@ function AppContent() {
     localStorage.setItem('vista_user', JSON.stringify(updatedUser));
   };
 
-  if (isInitializing) {
+  if (isInitializing || isRedirectProcessing) {
     return (
       <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white space-y-4 select-none">
         <div className="p-3 bg-white/10 border border-white/10 text-emerald-400 rounded-2xl animate-spin backdrop-blur-md">
