@@ -12,6 +12,7 @@ var DB_FILE = path.join(DB_DIR, "db.json");
 var dbEvents = new EventEmitter();
 var MockDatabase = class {
   constructor() {
+    this.notificationReadState = /* @__PURE__ */ new Map();
     this.data = {
       users: [],
       units: [],
@@ -475,15 +476,19 @@ var MockDatabase = class {
     return updated;
   }
   // --- NOTIFICATION RELATED ---
+  canReceiveNotification(notification, userId, role) {
+    if (notification.recipientId === userId) return true;
+    if (notification.recipientId !== "all") return false;
+    return !notification.recipientRole || notification.recipientRole === "all" || notification.recipientRole === role;
+  }
+  isNotificationReadForUser(notificationId, userId) {
+    return this.notificationReadState.get(notificationId)?.has(userId) ?? false;
+  }
   getNotifications(userId, role) {
-    return this.data.notifications.filter((n) => {
-      if (n.recipientId === userId) return true;
-      if (n.recipientId === "all") {
-        if (!n.recipientRole || n.recipientRole === "all") return true;
-        if (n.recipientRole === role) return true;
-      }
-      return false;
-    });
+    return this.data.notifications.filter((notification) => this.canReceiveNotification(notification, userId, role)).map((notification) => ({
+      ...notification,
+      isRead: this.isNotificationReadForUser(notification.id, userId)
+    }));
   }
   createNotification(n) {
     const newNotif = {
@@ -503,23 +508,23 @@ var MockDatabase = class {
     this.save();
     return newNotif;
   }
-  markNotificationAsRead(notifId, userId) {
-    const idx = this.data.notifications.findIndex((n) => n.id === notifId);
-    if (idx !== -1) {
-      this.data.notifications[idx].isRead = true;
-      this.save();
-      return true;
+  markNotificationAsRead(notifId, userId, role) {
+    const notification = this.data.notifications.find((item) => item.id === notifId);
+    if (!notification || !this.canReceiveNotification(notification, userId, role)) {
+      return false;
     }
-    return false;
+    const readers = this.notificationReadState.get(notifId) || /* @__PURE__ */ new Set();
+    readers.add(userId);
+    this.notificationReadState.set(notifId, readers);
+    return true;
   }
   markAllNotificationsAsRead(userId, role) {
-    this.data.notifications.forEach((n) => {
-      if (n.recipientId === userId) n.isRead = true;
-      if (n.recipientId === "all" && (!n.recipientRole || n.recipientRole === "all" || n.recipientRole === role)) {
-        n.isRead = true;
-      }
+    this.data.notifications.forEach((notification) => {
+      if (!this.canReceiveNotification(notification, userId, role)) return;
+      const readers = this.notificationReadState.get(notification.id) || /* @__PURE__ */ new Set();
+      readers.add(userId);
+      this.notificationReadState.set(notification.id, readers);
     });
-    this.save();
   }
   // --- ANALYTICS STATS ---
   getDashboardStats() {
@@ -661,8 +666,8 @@ var NotificationService = class {
   getNotifications(userId, role) {
     return this.database.getNotifications(userId, role);
   }
-  markAsRead(id, userId) {
-    return this.database.markNotificationAsRead(id, userId);
+  markAsRead(id, userId, role) {
+    return this.database.markNotificationAsRead(id, userId, role);
   }
   markAllAsRead(userId, role) {
     return this.database.markAllNotificationsAsRead(userId, role);
@@ -1039,6 +1044,9 @@ async function createApp() {
     if (!paymentRecord) {
       return res.status(404).json({ error: "No invoice found with the given ledger ID." });
     }
+    if (user.role !== "admin" && paymentRecord.residentId !== user.id) {
+      return res.status(403).json({ error: "Access denied. You can only pay your own invoices." });
+    }
     const remaining = paymentRecord.remainingBalance ?? paymentRecord.totalAmount - paymentRecord.paidAmount;
     if (amountValue > remaining) {
       return res.status(400).json({ error: "Payment amount exceeds the remaining balance." });
@@ -1147,7 +1155,7 @@ async function createApp() {
   });
   app.post("/api/notifications/read/:id", requireAuth, (req, res) => {
     const user = req.user;
-    const success = notificationService.markAsRead(req.params.id, user.id);
+    const success = notificationService.markAsRead(req.params.id, user.id, user.role);
     res.json({ success });
   });
   app.post("/api/notifications/read-all", requireAuth, (req, res) => {

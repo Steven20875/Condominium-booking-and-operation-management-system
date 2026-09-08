@@ -28,6 +28,8 @@ interface DatabaseSchema {
 export const dbEvents = new EventEmitter();
 
 class MockDatabase {
+  private notificationReadState = new Map<string, Set<string>>();
+
   private data: DatabaseSchema = {
     users: [],
     units: [],
@@ -577,17 +579,23 @@ class MockDatabase {
   }
 
   // --- NOTIFICATION RELATED ---
+  private canReceiveNotification(notification: CondoNotification, userId: string, role: string): boolean {
+    if (notification.recipientId === userId) return true;
+    if (notification.recipientId !== 'all') return false;
+    return !notification.recipientRole || notification.recipientRole === 'all' || notification.recipientRole === role;
+  }
+
+  private isNotificationReadForUser(notificationId: string, userId: string): boolean {
+    return this.notificationReadState.get(notificationId)?.has(userId) ?? false;
+  }
+
   public getNotifications(userId: string, role: string): CondoNotification[] {
-    return this.data.notifications.filter(n => {
-      // Return alerts addressed directly to user
-      if (n.recipientId === userId) return true;
-      // Return global alerts
-      if (n.recipientId === 'all') {
-        if (!n.recipientRole || n.recipientRole === 'all') return true;
-        if (n.recipientRole === role) return true;
-      }
-      return false;
-    });
+    return this.data.notifications
+      .filter(notification => this.canReceiveNotification(notification, userId, role))
+      .map(notification => ({
+        ...notification,
+        isRead: this.isNotificationReadForUser(notification.id, userId)
+      }));
   }
 
   public createNotification(n: Partial<CondoNotification>): CondoNotification {
@@ -612,24 +620,26 @@ class MockDatabase {
     return newNotif;
   }
 
-  public markNotificationAsRead(notifId: string, userId: string): boolean {
-    const idx = this.data.notifications.findIndex(n => n.id === notifId);
-    if (idx !== -1) {
-      this.data.notifications[idx].isRead = true;
-      this.save();
-      return true;
+  public markNotificationAsRead(notifId: string, userId: string, role: string): boolean {
+    const notification = this.data.notifications.find(item => item.id === notifId);
+    if (!notification || !this.canReceiveNotification(notification, userId, role)) {
+      return false;
     }
-    return false;
+
+    const readers = this.notificationReadState.get(notifId) || new Set<string>();
+    readers.add(userId);
+    this.notificationReadState.set(notifId, readers);
+    return true;
   }
 
   public markAllNotificationsAsRead(userId: string, role: string): void {
-    this.data.notifications.forEach(n => {
-      if (n.recipientId === userId) n.isRead = true;
-      if (n.recipientId === 'all' && (!n.recipientRole || n.recipientRole === 'all' || n.recipientRole === role)) {
-        n.isRead = true;
-      }
+    this.data.notifications.forEach(notification => {
+      if (!this.canReceiveNotification(notification, userId, role)) return;
+
+      const readers = this.notificationReadState.get(notification.id) || new Set<string>();
+      readers.add(userId);
+      this.notificationReadState.set(notification.id, readers);
     });
-    this.save();
   }
 
   // --- ANALYTICS STATS ---

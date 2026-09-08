@@ -24,8 +24,8 @@ export class NotificationService {
     return this.database.getNotifications(userId, role);
   }
 
-  markAsRead(id: string, userId: string) {
-    return this.database.markNotificationAsRead(id, userId);
+  markAsRead(id: string, userId: string, role: string) {
+    return this.database.markNotificationAsRead(id, userId, role);
   }
 
   markAllAsRead(userId: string, role: string) {

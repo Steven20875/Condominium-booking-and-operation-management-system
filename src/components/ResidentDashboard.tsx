@@ -477,6 +477,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     .filter(p => p.status === 'Pending')
     .reduce((sum, p) => sum + p.amount, 0);
   const activeIssuesCount = maintenance.filter(m => m.status !== 'Completed').length;
+  const unreadNotifications = notifications.filter(notification => !notification.isRead);
 
   return (
     <div id="res-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
@@ -554,7 +555,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 activeTab === 'notifications' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Bell className="h-4 w-4" /> Bulletins & Alerts {notifications.length > 0 && <span className="ml-auto bg-rose-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-full">{notifications.length}</span>}
+              <Bell className="h-4 w-4" /> Bulletins & Alerts {unreadNotifications.length > 0 && <span className="ml-auto bg-rose-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-full">{unreadNotifications.length}</span>}
             </button>
             <button
               onClick={() => setActiveTab('profile')}
@@ -614,7 +615,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                   <Bell className="h-4 w-4 text-blue-300" />
                   <div>
                     <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Notifications</p>
-                    <p className="text-sm font-semibold text-white">{notifications.length} unread</p>
+                    <p className="text-sm font-semibold text-white">{unreadNotifications.length} unread</p>
                   </div>
                 </div>
               </div>

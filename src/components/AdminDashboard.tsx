@@ -406,6 +406,21 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
   const hasValidStats = !!stats && Array.isArray(stats.bookingStatusData) && Array.isArray(stats.monthlyRevenue);
 
+  const reservationStatusSummary = stats?.bookingStatusData ?? [];
+  const totalReservationCount = reservationStatusSummary.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const monthlyRevenueSeries = stats?.monthlyRevenue ?? [];
+  const latestMonthlyRevenue = monthlyRevenueSeries.length > 0 ? monthlyRevenueSeries[monthlyRevenueSeries.length - 1] : null;
+  const previousMonthlyRevenue = monthlyRevenueSeries.length > 1 ? monthlyRevenueSeries[monthlyRevenueSeries.length - 2] : latestMonthlyRevenue;
+  const revenueDelta = latestMonthlyRevenue && previousMonthlyRevenue
+    ? latestMonthlyRevenue.revenue - previousMonthlyRevenue.revenue
+    : 0;
+  const revenueDeltaPct = previousMonthlyRevenue && previousMonthlyRevenue.revenue
+    ? (revenueDelta / previousMonthlyRevenue.revenue) * 100
+    : 0;
+  const revenueTrendLabel = revenueDelta >= 0
+    ? `+${formatCurrency(Math.abs(revenueDelta))} vs previous month`
+    : `-${formatCurrency(Math.abs(revenueDelta))} vs previous month`;
+
   return (
     <div id="admin-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
       
@@ -428,7 +443,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             </div>
             <div className="overflow-hidden">
               <p className="font-bold text-xs truncate max-w-[130px]">{user.name}</p>
-              <p className="text-[10px] text-purple-400 font-bold truncate max-w-[130px]">admin</p>
+              <p className="text-[10px] text-purple-400 font-bold truncate max-w-[130px]">GALES, URBAN HAVEN / Administrator</p>
             </div>
           </div>
 
@@ -582,6 +597,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Residents</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.totalResidents}</p>
+                    <p className="text-[10px] text-slate-400">Current resident roster</p>
                   </div>
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
                     <Users className="h-5 w-5" />
@@ -592,6 +608,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Condo Units Listed</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.totalUnits}</p>
+                    <p className="text-[10px] text-slate-400">Inventory from live unit data</p>
                   </div>
                   <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl">
                     <Building className="h-5 w-5" />
@@ -602,6 +619,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Space Occupancy Rate</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.occupancyRate}%</p>
+                    <p className="text-[10px] text-slate-400">Booked units / total units</p>
                   </div>
                   <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
                     <BarChart3 className="h-5 w-5" />
@@ -612,6 +630,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LEDGER Gross Income</p>
                     <p className="text-2xl font-serif font-bold text-emerald-400">{formatCurrency(stats.totalRevenue)}</p>
+                    <p className="text-[10px] text-emerald-300">{revenueTrendLabel}</p>
                   </div>
                   <div className="p-3 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl">
                     <CreditCard className="h-5 w-5" />
@@ -625,6 +644,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Invoices</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.totalInvoices}</p>
+                    <p className="text-[10px] text-slate-400">Paid and pending payment records</p>
                   </div>
                   <div className="p-3 bg-slate-500/10 border border-slate-500/20 text-slate-400 rounded-xl">
                     <FileText className="h-5 w-5" />
@@ -635,6 +655,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Payments</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.pendingPayments}</p>
+                    <p className="text-[10px] text-amber-300">Open balances awaiting collection</p>
                   </div>
                   <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
                     <DollarSign className="h-5 w-5" />
@@ -645,6 +666,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tickets</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.unresolvedMaintenance}</p>
+                    <p className="text-[10px] text-rose-300">Open maintenance work orders</p>
                   </div>
                   <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
                     <AlertTriangle className="h-5 w-5" />
@@ -655,6 +677,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Bookings</p>
                     <p className="text-2xl font-serif font-bold text-white">{stats.bookingStatusData.find(entry => entry.name === 'Pending Approval')?.value || 0}</p>
+                    <p className="text-[10px] text-blue-300">Awaiting admin approval</p>
                   </div>
                   <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl">
                     <Clock className="h-5 w-5" />
@@ -664,7 +687,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 glass-card p-6 rounded-3xl border border-white/10 shadow-sm hover:shadow-lg hover:border-white/15 transition-all">
-                  <h3 className="font-serif font-bold text-white text-base">Revenue Trend</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-serif font-bold text-white text-base">Revenue Trend</h3>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400">From actual payment dates</span>
+                  </div>
                   <div className="h-80 mt-6">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={stats.monthlyRevenue} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
@@ -684,7 +710,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               </div>
 
                 <div className="lg:col-span-4 glass-card p-6 rounded-3xl border border-white/10 shadow-sm hover:shadow-lg hover:border-white/15 transition-all flex flex-col justify-between">
-                  <h3 className="font-serif font-bold text-white text-base">Reservations Status Ratio</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-serif font-bold text-white text-base">Reservations Status Ratio</h3>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400">{totalReservationCount} total</span>
+                  </div>
                   <div className="h-64 mt-4 select-none flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -706,6 +735,21 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         <Legend wrapperStyle={{ fontSize: '11px', color: '#fff' }} />
                       </PieChart>
                     </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2 mt-2">
+                    {reservationStatusSummary.map((entry, index) => {
+                      const share = totalReservationCount > 0 ? ((Number(entry.value || 0) / totalReservationCount) * 100).toFixed(1) : '0.0';
+                      const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+                      return (
+                        <div key={`${entry.name}-${index}`} className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
+                            <span>{entry.name}</span>
+                          </div>
+                          <span>{entry.value} ({share}%)</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

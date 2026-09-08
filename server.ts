@@ -527,6 +527,10 @@ export async function createApp() {
       return res.status(404).json({ error: 'No invoice found with the given ledger ID.' });
     }
 
+    if (user.role !== 'admin' && paymentRecord.residentId !== user.id) {
+      return res.status(403).json({ error: 'Access denied. You can only pay your own invoices.' });
+    }
+
     const remaining = paymentRecord.remainingBalance ?? (paymentRecord.totalAmount - paymentRecord.paidAmount);
     if (amountValue > remaining) {
       return res.status(400).json({ error: 'Payment amount exceeds the remaining balance.' });
@@ -663,7 +667,7 @@ export async function createApp() {
 
   app.post('/api/notifications/read/:id', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
-    const success = notificationService.markAsRead(req.params.id, user.id);
+    const success = notificationService.markAsRead(req.params.id, user.id, user.role);
     res.json({ success });
   });
 
