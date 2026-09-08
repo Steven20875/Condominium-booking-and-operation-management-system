@@ -1072,30 +1072,7 @@ async function createApp() {
     res.json(payment);
   });
   app.post("/api/public/payments/:id/pay", (req, res) => {
-    const { method, referenceNumber, amount, payorName } = req.body;
-    const missing = validateFields(req.body, ["method", "referenceNumber", "amount"]);
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing public payment fields: ${missing.join(", ")}.` });
-    }
-    if (!isNonEmptyString(method) || !isNonEmptyString(referenceNumber)) {
-      return res.status(400).json({ error: "Payment method and reference number must be valid strings." });
-    }
-    const amountValue = parseNumber(amount, -1);
-    if (amountValue < 0) {
-      return res.status(400).json({ error: "Payment amount must be a valid positive number." });
-    }
-    const payment = paymentService.submitPayment(
-      req.params.id,
-      method.trim(),
-      referenceNumber.trim(),
-      amountValue,
-      "qr-payor",
-      isNonEmptyString(payorName) ? payorName.trim() : "Gales QR Client"
-    );
-    if (!payment) {
-      return res.status(404).json({ error: "No invoice found with the given ledger ID." });
-    }
-    res.json(payment);
+    res.status(403).json({ error: "Public payment mutation is disabled. Use the authenticated payment endpoint." });
   });
   app.post("/api/payments/manual", requireAdmin, (req, res) => {
     const user = req.user;
