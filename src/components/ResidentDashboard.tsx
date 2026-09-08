@@ -477,7 +477,11 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     .filter(p => p.status === 'Pending')
     .reduce((sum, p) => sum + p.amount, 0);
   const activeIssuesCount = maintenance.filter(m => m.status !== 'Completed').length;
-  const unreadNotifications = notifications.filter(notification => !notification.isRead);
+  const visibleNotifications = notifications.filter(notification => {
+    const content = `${notification.title} ${notification.message}`.toLowerCase();
+    return !content.includes('deploy test') && !content.includes('persistence test');
+  });
+  const unreadNotifications = visibleNotifications.filter(notification => !notification.isRead);
 
   return (
     <div id="res-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
@@ -752,9 +756,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     </button>
                   </div>
 
-                  {notifications.length > 0 ? (
+                  {visibleNotifications.length > 0 ? (
                     <div className="space-y-3.5">
-                      {notifications.slice(0, 3).map((notif, idx) => (
+                      {visibleNotifications.slice(0, 3).map((notif, idx) => (
                         <div key={`${notif.id}-${idx}`} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
                           <div className="flex justify-between items-start">
                             <h4 className="font-bold text-xs text-white">{notif.title}</h4>
@@ -1274,7 +1278,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
             >
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                 <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Village Operations Mailbox</p>
-                {notifications.length > 0 && (
+                {visibleNotifications.length > 0 && (
                   <button
                     onClick={handleClearAllNotifications}
                     className="text-xs text-rose-600 font-bold uppercase tracking-wider hover:underline"
@@ -1285,8 +1289,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
               </div>
 
               <div className="space-y-3.5">
-                {notifications.length > 0 ? (
-                  notifications.map((notif, idx) => (
+                {visibleNotifications.length > 0 ? (
+                  visibleNotifications.map((notif, idx) => (
                     <div
                       key={`${notif.id}-${idx}`}
                       className={`p-5 rounded-2xl border shadow-sm transition-all flex items-start gap-4 ${

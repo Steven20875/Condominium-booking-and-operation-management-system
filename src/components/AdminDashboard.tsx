@@ -441,9 +441,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             <div className="h-9 w-9 bg-white/10 rounded-full border border-white/15 overflow-hidden shrink-0 flex items-center justify-center">
               <span className="font-bold text-xs text-white">GUH</span>
             </div>
-            <div className="overflow-hidden">
-              <p className="font-bold text-xs truncate max-w-[130px]">{user.name}</p>
-              <p className="text-[10px] text-purple-400 font-bold truncate max-w-[130px]">GALES, URBAN HAVEN / Administrator</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-xs text-white leading-tight break-words">{user.name}</p>
+              <p className="text-[10px] text-purple-400 font-bold leading-tight mt-1">Administrator</p>
             </div>
           </div>
 
