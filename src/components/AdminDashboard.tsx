@@ -157,7 +157,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       const handleStats = (e: MessageEvent) => {
         try {
           const payload = JSON.parse((e as any).data);
-          setStats(payload);
+          const statsPayload = payload?.stats ?? payload;
+          if (statsPayload && Array.isArray(statsPayload.bookingStatusData) && Array.isArray(statsPayload.monthlyRevenue)) {
+            setStats(statsPayload as DashboardStats);
+          }
         } catch (err) {
           console.error('Failed parsing SSE stats payload', err);
         }
