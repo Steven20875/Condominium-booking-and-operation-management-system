@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'events';
 import { 
   User, 
@@ -11,9 +12,20 @@ import {
   ActivityLog,
   DashboardStats
 } from './types';
+const isVercel = Boolean(process.env.VERCEL);
+const currentFile = fileURLToPath(import.meta.url);
+const currentDir = path.dirname(currentFile);
 
-const DB_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DB_DIR, 'db.json');
+const DB_CANDIDATES = [
+  path.join(process.cwd(), 'data', 'db.json'),
+  path.join(currentDir, '..', 'data', 'db.json'),
+  path.join(currentDir, 'data', 'db.json'),
+  path.join(currentDir, '..', '..', 'data', 'db.json')
+];
+
+const existingDbFile = DB_CANDIDATES.find((file) => fs.existsSync(file));
+const DB_FILE = existingDbFile || path.join(process.cwd(), 'data', 'db.json');
+const DB_DIR = path.dirname(DB_FILE);
 
 interface DatabaseSchema {
   users: User[];
@@ -44,49 +56,60 @@ class MockDatabase {
   }
 
   private init() {
-    try {
-      if (!fs.existsSync(DB_DIR)) {
-        fs.mkdirSync(DB_DIR, { recursive: true });
-      }
+    const emptyData: DatabaseSchema = {
+      users: [],
+      units: [],
+      bookings: [],
+      payments: [],
+      maintenanceRequests: [],
+      notifications: [],
+      activityLogs: []
+    };
 
+    console.log('[DB] Environment:', {
+      isVercel,
+      cwd: process.cwd(),
+      currentDir,
+      dbFile: DB_FILE,
+      exists: fs.existsSync(DB_FILE)
+    });
+
+    try {
       if (fs.existsSync(DB_FILE)) {
         const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-        this.data = JSON.parse(fileContent);
-        // Ensure any new arrays are initialized
-        if (!this.data.users) this.data.users = [];
-        if (!this.data.units) this.data.units = [];
-        if (!this.data.bookings) this.data.bookings = [];
-        if (!this.data.payments) this.data.payments = [];
-        if (!this.data.maintenanceRequests) this.data.maintenanceRequests = [];
-        if (!this.data.notifications) this.data.notifications = [];
-        if (!this.data.activityLogs) this.data.activityLogs = [];
+        const parsed = JSON.parse(fileContent) as Partial<DatabaseSchema>;
+
+        this.data = {
+          users: Array.isArray(parsed.users) ? parsed.users : [],
+          units: Array.isArray(parsed.units) ? parsed.units : [],
+          bookings: Array.isArray(parsed.bookings) ? parsed.bookings : [],
+          payments: Array.isArray(parsed.payments) ? parsed.payments : [],
+          maintenanceRequests: Array.isArray(parsed.maintenanceRequests) ? parsed.maintenanceRequests : [],
+          notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+          activityLogs: Array.isArray(parsed.activityLogs) ? parsed.activityLogs : []
+        };
+
+        console.log('[DB] Counts:', {
+          users: this.data.users.length,
+          units: this.data.units.length,
+          bookings: this.data.bookings.length
+        });
 
         this.normalizeExistingPayments();
+      } else if (isVercel) {
+        console.warn('[DB] Vercel runtime detected without a bundled database file. Loading in-memory data only; no filesystem write is attempted.');
+        this.data = { ...emptyData };
       } else {
-        // Start with empty collections until real records are created.
-        this.data = {
-          users: [],
-          units: [],
-          bookings: [],
-          payments: [],
-          maintenanceRequests: [],
-          notifications: [],
-          activityLogs: []
-        };
+        if (!fs.existsSync(DB_DIR)) {
+          fs.mkdirSync(DB_DIR, { recursive: true });
+        }
+
+        this.data = { ...emptyData };
         this.save();
       }
     } catch (err) {
-      console.error('Failed to initialize local JSON database file:', err);
-      // Keep the in-memory fallback empty when storage cannot be read.
-      this.data = {
-        users: [],
-        units: [],
-        bookings: [],
-        payments: [],
-        maintenanceRequests: [],
-        notifications: [],
-        activityLogs: []
-      };
+      console.error('Failed to initialize JSON database:', err);
+      this.data = { ...emptyData };
     }
   }
 
@@ -126,6 +149,11 @@ class MockDatabase {
 
   private save() {
     try {
+      if (isVercel) {
+        dbEvents.emit('change', { stats: this.getDashboardStats(), timestamp: Date.now() });
+        return;
+      }
+
       if (!fs.existsSync(DB_DIR)) {
         fs.mkdirSync(DB_DIR, { recursive: true });
       }
@@ -139,6 +167,11 @@ class MockDatabase {
       }
     } catch (err) {
       console.error('Error writing database to disk:', err);
+      try {
+        dbEvents.emit('change', { stats: this.getDashboardStats(), timestamp: Date.now() });
+      } catch (emitErr) {
+        console.error('dbEvents emit error:', emitErr);
+      }
     }
   }
 
