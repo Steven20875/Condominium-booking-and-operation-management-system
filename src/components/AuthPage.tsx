@@ -5,7 +5,7 @@ import FerrofluidBackground from './FerrofluidBackground.tsx';
 import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, Bell } from 'lucide-react';
 import { User as UserType } from '../types.ts';
 import { Button, Input } from './ui';
-import { signInWithGoogle, getFirebaseConfigStatus, initializeFirebase, getGoogleRedirectResult } from '../lib/firebase.ts';
+import { signInWithGooglePopup, getFirebaseConfigStatus, initializeFirebase } from '../lib/firebase.ts';
 
 interface AuthPageProps {
   onLoginSuccess: (user: UserType, token: string) => void;
@@ -35,73 +35,27 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   useEffect(() => {
     let mounted = true;
 
-    const initializeAndHandleRedirect = async () => {
-      setIsLoading(true);
+    const initializeAuthConfig = async () => {
       try {
         const nextStatus = await initializeFirebase();
         if (mounted) {
           setFirebaseConfigStatus(nextStatus);
         }
-
-        const result = await getGoogleRedirectResult();
-        if (!mounted || !result?.user) {
-          return;
-        }
-
-        if (import.meta.env.DEV) {
-          console.debug('[auth] Firebase user received', { uid: result.user.uid, hasEmail: Boolean(result.user.email) });
-        }
-
-        const response = await fetch('/api/auth/firebase', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: result.user.uid,
-            email: result.user.email,
-            name: result.user.displayName || result.user.email?.split('@')[0],
-            avatarUrl: result.user.photoURL || undefined,
-            provider: 'google'
-          })
-        });
-
-        const data = await response.json().catch(() => ({}));
-        if (import.meta.env.DEV) {
-          console.debug('[auth] /api/auth/firebase response', { status: response.status, ok: response.ok });
-        }
-        if (!response.ok) {
-          throw new Error(data.error || 'Google sign-in failed.');
-        }
-
-        toast(`Welcome, ${data.user.name}!`, 'success');
-        onLoginSuccess(data.user, data.token);
       } catch (err: any) {
         if (import.meta.env.DEV) {
-          console.debug('[auth] Redirect processing failed', {
-            code: err?.code,
+          console.debug('[auth] Firebase initialization failed', {
             message: err?.message,
           });
-        }
-        const messages: Record<string, string> = {
-          'auth/unauthorized-domain': 'This production domain is not authorized for Google sign-in.',
-          'auth/network-request-failed': 'Google sign-in could not connect. Check your network and try again.',
-          'auth/popup-blocked': 'Google sign-in was blocked by the browser. Please try again.',
-          'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
-          'auth/cancelled-popup-request': 'Another Google sign-in request is already in progress.',
-        };
-        toast(messages[err?.code] || err?.message || 'Google sign-in failed.', 'warning');
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
         }
       }
     };
 
-    void initializeAndHandleRedirect();
+    void initializeAuthConfig();
 
     return () => {
       mounted = false;
     };
-  }, [onLoginSuccess, toast]);
+  }, [toast]);
 
   const isFirebaseConfigured = firebaseConfigStatus.isConfigured;
   const isLocalAuthFallback = !isFirebaseConfigured;
@@ -186,7 +140,41 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
       setFirebaseConfigStatus(nextStatus);
 
-      await signInWithGoogle();
+      const result = await signInWithGooglePopup();
+      if (!result?.user) {
+        throw new Error('Google sign-in did not return a valid user.');
+      }
+
+      if (import.meta.env.DEV) {
+        console.debug('[auth] Firebase popup user received', { uid: result.user.uid, hasEmail: Boolean(result.user.email) });
+      }
+
+      const idToken = await result.user.getIdToken();
+
+      const response = await fetch('/api/auth/firebase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName || result.user.email?.split('@')[0],
+          avatarUrl: result.user.photoURL || undefined,
+          provider: 'google',
+          idToken,
+          token: idToken,
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (import.meta.env.DEV) {
+        console.debug('[auth] /api/auth/firebase response', { status: response.status, ok: response.ok });
+      }
+      if (!response.ok) {
+        throw new Error(data.error || 'Google sign-in failed.');
+      }
+
+      toast(`Welcome, ${data.user.name}!`, 'success');
+      onLoginSuccess(data.user, data.token);
     } catch (err: any) {
       const messages: Record<string, string> = {
         'auth/unauthorized-domain': 'This production domain is not authorized for Google sign-in.',
@@ -449,47 +437,47 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       fullWidth
                       disabled={isLoading}
                       isLoading={isLoading}
-                      icon={ArrowRight}
-                      iconPosition="right"
                     >
-                      {isLoading ? 'Signing In Securely...' : 'Sign In Securely'}
+                      {isLoading ? 'Settling In...' : 'Settle In & Access'}
                     </Button>
-
-                    <div className="pt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        fullWidth
-                        onClick={handleGoogleSignIn}
-                        disabled={!isFirebaseConfigured || isLoading}
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 shrink-0">
-                            <path fill="#4285F4" d="M21.6 12.23c0-.82-.07-1.6-.2-2.35H12v4.48h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.66z" />
-                            <path fill="#34A853" d="M12 22c2.7 0 4.96-.89 6.62-2.41l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22z" />
-                            <path fill="#FBBC05" d="M6.41 13.93A5.99 5.99 0 0 1 6.41 10.07V7.49H3.07a10 10 0 0 0 0 12.89l3.34-2.45z" />
-                            <path fill="#EA4335" d="M12 6.04c1.47 0 2.8.5 3.84 1.49l2.88-2.88A9.99 9.99 0 0 0 3.07 7.49l3.34 2.44C7.2 7.8 9.4 6.04 12 6.04z" />
-                          </svg>
-                          {isLoading ? 'Signing in with Google...' : (!isFirebaseConfigured ? 'Google needs Firebase setup' : 'Continue with Google')}
-                        </span>
-                      </Button>
-                    </div>
-                    {isLocalAuthFallback ? (
-                      <p className="text-xs text-amber-300 mt-3">Firebase is not configured. Local email/password sign-in is enabled. Google sign-in is disabled until Firebase configuration is added.</p>
-                    ) : null}
                   </form>
 
-                  <div className="text-center pt-2 border-t border-white/5">
-                    <p className="text-xs text-slate-400 font-medium font-sans">
-                      New addition to One Spatial Iloilo?{' '}
-                      <button
-                        onClick={() => setIsLogin(false)}
-                        className="text-blue-400 hover:underline hover:text-blue-300 font-bold cursor-pointer"
-                      >
-                        Register your portfolio here
-                      </button>
-                    </p>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/10"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-slate-950 text-slate-400">Or continue with</span>
+                    </div>
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    fullWidth
+                    onClick={handleGoogleSignIn}
+                    disabled={isLoading || !isFirebaseConfigured}
+                    isLoading={isLoading}
+                  >
+                    <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    {isLoading ? 'Authenticating...' : 'Continue with Google'}
+                  </Button>
+
+                  <p className="text-center text-xs text-slate-400 pt-2">
+                    No account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setIsLogin(false)}
+                      className="text-blue-400 hover:text-blue-300 font-bold transition-colors cursor-pointer"
+                    >
+                      Register a Resident Account
+                    </button>
+                  </p>
                 </motion.div>
               ) : (
                 /* Registration Form */
@@ -498,72 +486,81 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4 md:space-y-6"
+                  className="space-y-6"
                 >
                   <div>
-                    <h3 className="text-2xl font-serif font-bold text-white">Resident Enrolment</h3>
-                    <p className="text-sm text-slate-400 mt-1">
-                      Register your portfolio to access scheduling and maintenance utilities instantly.
+                    <h3 className="text-2xl sm:text-3xl font-serif font-bold text-white">Claim Your Unit</h3>
+                    <p className="text-sm text-slate-400 mt-1 font-medium">
+                      Register as a resident and gain access to full portal features.
                     </p>
                   </div>
 
-                  <form onSubmit={handleRegister} className="space-y-3.5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Input
-                        type="text"
-                        label="Full Legal Name"
-                        variant="glass"
-                        placeholder="Johnathan Doe"
-                        value={name}
-                        onChange={(e: any) => setName(e.target.value)}
-                        icon={User}
-                        required
-                      />
-
-                      <Input
-                        type="tel"
-                        label="Mobile Phone"
-                        variant="glass"
-                        placeholder="+1 (555) 122-874"
-                        value={phone}
-                        onChange={(e: any) => setPhone(e.target.value)}
-                        icon={Phone}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Input
-                        type="email"
-                        label="Email Address"
-                        variant="glass"
-                        placeholder="john@condo.com"
-                        value={email}
-                        onChange={(e: any) => setEmail(e.target.value)}
-                        icon={Mail}
-                        required
-                      />
-
-                      <Input
-                        type="text"
-                        label="Unit ID / Suite (Optional)"
-                        variant="glass"
-                        placeholder="Unit 1204"
-                        value={unitNumber}
-                        onChange={(e: any) => setUnitNumber(e.target.value)}
-                        icon={Home}
-                      />
-                    </div>
-
+                  <form onSubmit={handleRegister} className="space-y-4">
                     <Input
-                      type="password"
-                      label="Setup Secure Password"
+                      type="text"
+                      label="Full Name"
                       variant="glass"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e: any) => setPassword(e.target.value)}
-                      icon={Lock}
+                      placeholder="John Doe"
+                      value={name}
+                      onChange={(e: any) => setName(e.target.value)}
+                      icon={User}
                       required
                     />
+
+                    <Input
+                      type="email"
+                      label="Email Address"
+                      variant="glass"
+                      placeholder="john@condo.com"
+                      value={email}
+                      onChange={(e: any) => handleEmailChange(e.target.value)}
+                      error={!emailValid ? 'Enter a valid email address to continue.' : undefined}
+                      icon={Mail}
+                      required
+                    />
+
+                    <Input
+                      type="tel"
+                      label="Phone Number"
+                      variant="glass"
+                      placeholder="(555) 123-4567"
+                      value={phone}
+                      onChange={(e: any) => setPhone(e.target.value)}
+                      icon={Phone}
+                    />
+
+                    <Input
+                      type="text"
+                      label="Unit Number"
+                      variant="glass"
+                      placeholder="A-1205"
+                      value={unitNumber}
+                      onChange={(e: any) => setUnitNumber(e.target.value)}
+                      icon={Building}
+                    />
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Create Password</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10" />
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          placeholder="••••••••"
+                          className="w-full glass-input rounded-xl pl-10 pr-11 py-3 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
 
                     <Button
                       type="submit"
@@ -572,33 +569,26 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       disabled={isLoading}
                       isLoading={isLoading}
                     >
-                      {isLoading ? 'Verifying Portfolio...' : 'Begin Secure Enrolment'}
+                      {isLoading ? 'Registering...' : 'Claim Your Unit'}
                     </Button>
                   </form>
 
-                  <div className="text-center pt-2 border-t border-white/5">
-                    <p className="text-xs text-slate-400 font-medium font-sans">
-                      Already registered your residence profile?{' '}
-                      <button
-                        onClick={() => setIsLogin(true)}
-                        className="text-blue-400 hover:underline hover:text-blue-400 font-bold cursor-pointer"
-                      >
-                        Sign in instantly
-                      </button>
-                    </p>
-                  </div>
+                  <p className="text-center text-xs text-slate-400 pt-2">
+                    Already registered?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setIsLogin(true)}
+                      className="text-blue-400 hover:text-blue-300 font-bold transition-colors cursor-pointer"
+                    >
+                      Sign In Here
+                    </button>
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
-
           </div>
         </div>
       </main>
-
-      {/* Footer copyright links */}
-      <footer className="w-full text-center py-6 text-xs text-slate-500 select-none">
-        © 2026 Gales Urban Haven — One Spatial Iloilo Property Management System. All rights reserved.
-      </footer>
     </div>
   );
 }

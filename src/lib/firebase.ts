@@ -2,11 +2,10 @@ import { initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
   getAuth,
-  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signInWithRedirect,
+  signInWithPopup,
   signOut as firebaseSignOut,
   type Auth,
   type UserCredential,
@@ -74,7 +73,6 @@ let isConfigComplete = missingConfigKeys.length === 0;
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let googleProviderInstance: GoogleAuthProvider | null = null;
-let redirectResultPromise: Promise<UserCredential | null> | null = null;
 
 function initializeFirebaseAuth() {
   if (typeof window === 'undefined') {
@@ -257,7 +255,7 @@ export async function createAccountWithEmailPassword(email: string, password: st
   return createUserWithEmailAndPassword(auth, email, password);
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGooglePopup(): Promise<UserCredential> {
   await initializeFirebase();
   const auth = getAuthInstance();
   const provider = getGoogleProvider();
@@ -265,31 +263,22 @@ export async function signInWithGoogle() {
     throw new Error('Firebase authentication is not configured.');
   }
 
-  await signInWithRedirect(auth, provider);
-  return null;
-}
-
-export async function getGoogleRedirectResult() {
-  if (!redirectResultPromise) {
-    if (import.meta.env.DEV) {
-      console.debug('[firebase] Redirect result started');
-    }
-    redirectResultPromise = initializeFirebase().then(() => {
-      const auth = getAuthInstance();
-      if (!auth) {
-        return null;
-      }
-
-      return getRedirectResult(auth).then((result) => {
-        if (import.meta.env.DEV) {
-          console.debug('[firebase] Redirect result returned', { hasUser: Boolean(result?.user) });
-        }
-        return result;
-      });
-    });
+  if (import.meta.env.DEV) {
+    console.debug('[firebase] Opening Google sign-in popup...');
   }
 
-  return redirectResultPromise;
+  const result = await signInWithPopup(auth, provider);
+
+  if (import.meta.env.DEV) {
+    console.debug('[firebase] Google popup result', { hasUser: Boolean(result?.user), uid: result?.user?.uid });
+  }
+
+  return result;
+}
+
+export async function getGoogleIdTokenFromPopup(): Promise<string> {
+  const result = await signInWithGooglePopup();
+  return result.user.getIdToken();
 }
 
 export function getCurrentFirebaseUser() {
