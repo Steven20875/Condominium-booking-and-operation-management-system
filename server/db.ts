@@ -16,13 +16,7 @@ const isVercel = Boolean(process.env.VERCEL);
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
 
-const DB_CANDIDATES = [
-  path.join(process.cwd(), 'data', 'db.json'),
-  path.join(currentDir, '..', 'data', 'db.json'),
-  path.join(currentDir, 'data', 'db.json'),
-  path.join(currentDir, '..', '..', 'data', 'db.json')
-];
-
+const PRIMARY_DB_FILE = path.join(process.cwd(), 'data', 'db.json');
 const BACKUP_DB_CANDIDATES = [
   path.join(process.cwd(), 'data', 'db.before-full-dummy-data-cleanup-2026-09-08.json'),
   path.join(process.cwd(), 'data', 'db.pre-admin-name-change-2026-09-05.json'),
@@ -35,16 +29,20 @@ const BACKUP_DB_CANDIDATES = [
   path.join(currentDir, 'data', 'db.backup-2026-08-12.json')
 ];
 
-const existingDbFile = DB_CANDIDATES.find((file) => fs.existsSync(file));
-const fallbackDbFile = BACKUP_DB_CANDIDATES.find((file) => fs.existsSync(file) && (() => {
+function isValidJsonFile(filePath: string): boolean {
+  if (!fs.existsSync(filePath)) return false;
   try {
-    JSON.parse(fs.readFileSync(file, 'utf-8'));
+    JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     return true;
   } catch {
     return false;
   }
-})());
-const DB_FILE = existingDbFile || path.join(process.cwd(), 'data', 'db.json');
+}
+
+const DB_FILE = isValidJsonFile(PRIMARY_DB_FILE)
+  ? PRIMARY_DB_FILE
+  : (BACKUP_DB_CANDIDATES.find(isValidJsonFile) ?? PRIMARY_DB_FILE);
+const DB_SOURCE = DB_FILE === PRIMARY_DB_FILE ? 'primary' : 'backup';
 const DB_DIR = path.dirname(DB_FILE);
 
 function readDatabaseFile(filePath: string): DatabaseSchema | null {
@@ -111,53 +109,23 @@ class MockDatabase {
       cwd: process.cwd(),
       currentDir,
       dbFile: DB_FILE,
+      dbSource: DB_SOURCE,
       exists: fs.existsSync(DB_FILE)
     });
 
     try {
-      if (fs.existsSync(DB_FILE)) {
-        const parsedDb = readDatabaseFile(DB_FILE);
-        if (parsedDb) {
-          this.data = parsedDb;
-          console.log('[DB] Counts:', {
-            users: this.data.users.length,
-            units: this.data.units.length,
-            bookings: this.data.bookings.length
-          });
+      const parsedDb = readDatabaseFile(DB_FILE);
+      if (parsedDb) {
+        this.data = parsedDb;
+        console.log('[DB] Counts:', {
+          users: this.data.users.length,
+          units: this.data.units.length,
+          bookings: this.data.bookings.length
+        });
 
-          this.normalizeExistingPayments();
-        } else if (fallbackDbFile) {
-          console.warn('[DB] Primary database file is unreadable or malformed. Falling back to the last valid backup snapshot without modifying the live file.');
-          const backupData = readDatabaseFile(fallbackDbFile);
-          if (backupData) {
-            this.data = backupData;
-            console.log('[DB] Counts from fallback snapshot:', {
-              users: this.data.users.length,
-              units: this.data.units.length,
-              bookings: this.data.bookings.length
-            });
-            this.normalizeExistingPayments();
-          } else {
-            throw new Error('No valid database snapshot available.');
-          }
-        } else {
-          throw new Error('Primary database file is unreadable and no valid fallback exists.');
-        }
-      } else if (fallbackDbFile) {
-        const backupData = readDatabaseFile(fallbackDbFile);
-        if (backupData) {
-          this.data = backupData;
-          console.log('[DB] Loaded fallback database snapshot:', {
-            users: this.data.users.length,
-            units: this.data.units.length,
-            bookings: this.data.bookings.length
-          });
-          this.normalizeExistingPayments();
-        } else {
-          throw new Error('Fallback backup database is unavailable.');
-        }
+        this.normalizeExistingPayments();
       } else if (isVercel) {
-        console.warn('[DB] Vercel runtime detected without a bundled database file. Loading in-memory data only; no filesystem write is attempted.');
+        console.warn('[DB] Vercel runtime detected without a readable database file. Loading in-memory data only; no filesystem write is attempted.');
         this.data = { ...emptyData };
       } else {
         if (!fs.existsSync(DB_DIR)) {
