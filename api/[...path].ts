@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { createApp } from '../server.ts';
+import { createApp } from '../server-build/server.mjs';
 
 process.env.NODE_ENV = 'production';
 process.env.VERCEL = '1';

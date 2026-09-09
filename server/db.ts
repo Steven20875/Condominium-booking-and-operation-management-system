@@ -23,9 +23,49 @@ const DB_CANDIDATES = [
   path.join(currentDir, '..', '..', 'data', 'db.json')
 ];
 
+const BACKUP_DB_CANDIDATES = [
+  path.join(process.cwd(), 'data', 'db.before-full-dummy-data-cleanup-2026-09-08.json'),
+  path.join(process.cwd(), 'data', 'db.pre-admin-name-change-2026-09-05.json'),
+  path.join(process.cwd(), 'data', 'db.backup-2026-08-12.json'),
+  path.join(currentDir, '..', 'data', 'db.before-full-dummy-data-cleanup-2026-09-08.json'),
+  path.join(currentDir, '..', 'data', 'db.pre-admin-name-change-2026-09-05.json'),
+  path.join(currentDir, '..', 'data', 'db.backup-2026-08-12.json'),
+  path.join(currentDir, 'data', 'db.before-full-dummy-data-cleanup-2026-09-08.json'),
+  path.join(currentDir, 'data', 'db.pre-admin-name-change-2026-09-05.json'),
+  path.join(currentDir, 'data', 'db.backup-2026-08-12.json')
+];
+
 const existingDbFile = DB_CANDIDATES.find((file) => fs.existsSync(file));
+const fallbackDbFile = BACKUP_DB_CANDIDATES.find((file) => fs.existsSync(file) && (() => {
+  try {
+    JSON.parse(fs.readFileSync(file, 'utf-8'));
+    return true;
+  } catch {
+    return false;
+  }
+})());
 const DB_FILE = existingDbFile || path.join(process.cwd(), 'data', 'db.json');
 const DB_DIR = path.dirname(DB_FILE);
+
+function readDatabaseFile(filePath: string): DatabaseSchema | null {
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const parsed = JSON.parse(fileContent) as Partial<DatabaseSchema>;
+
+    return {
+      users: Array.isArray(parsed.users) ? parsed.users : [],
+      units: Array.isArray(parsed.units) ? parsed.units : [],
+      bookings: Array.isArray(parsed.bookings) ? parsed.bookings : [],
+      payments: Array.isArray(parsed.payments) ? parsed.payments : [],
+      maintenanceRequests: Array.isArray(parsed.maintenanceRequests) ? parsed.maintenanceRequests : [],
+      notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+      activityLogs: Array.isArray(parsed.activityLogs) ? parsed.activityLogs : []
+    };
+  } catch (error) {
+    console.warn('[DB] Unable to read database file:', filePath, error);
+    return null;
+  }
+}
 
 interface DatabaseSchema {
   users: User[];
@@ -76,26 +116,46 @@ class MockDatabase {
 
     try {
       if (fs.existsSync(DB_FILE)) {
-        const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-        const parsed = JSON.parse(fileContent) as Partial<DatabaseSchema>;
+        const parsedDb = readDatabaseFile(DB_FILE);
+        if (parsedDb) {
+          this.data = parsedDb;
+          console.log('[DB] Counts:', {
+            users: this.data.users.length,
+            units: this.data.units.length,
+            bookings: this.data.bookings.length
+          });
 
-        this.data = {
-          users: Array.isArray(parsed.users) ? parsed.users : [],
-          units: Array.isArray(parsed.units) ? parsed.units : [],
-          bookings: Array.isArray(parsed.bookings) ? parsed.bookings : [],
-          payments: Array.isArray(parsed.payments) ? parsed.payments : [],
-          maintenanceRequests: Array.isArray(parsed.maintenanceRequests) ? parsed.maintenanceRequests : [],
-          notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
-          activityLogs: Array.isArray(parsed.activityLogs) ? parsed.activityLogs : []
-        };
-
-        console.log('[DB] Counts:', {
-          users: this.data.users.length,
-          units: this.data.units.length,
-          bookings: this.data.bookings.length
-        });
-
-        this.normalizeExistingPayments();
+          this.normalizeExistingPayments();
+        } else if (fallbackDbFile) {
+          console.warn('[DB] Primary database file is unreadable or malformed. Falling back to the last valid backup snapshot without modifying the live file.');
+          const backupData = readDatabaseFile(fallbackDbFile);
+          if (backupData) {
+            this.data = backupData;
+            console.log('[DB] Counts from fallback snapshot:', {
+              users: this.data.users.length,
+              units: this.data.units.length,
+              bookings: this.data.bookings.length
+            });
+            this.normalizeExistingPayments();
+          } else {
+            throw new Error('No valid database snapshot available.');
+          }
+        } else {
+          throw new Error('Primary database file is unreadable and no valid fallback exists.');
+        }
+      } else if (fallbackDbFile) {
+        const backupData = readDatabaseFile(fallbackDbFile);
+        if (backupData) {
+          this.data = backupData;
+          console.log('[DB] Loaded fallback database snapshot:', {
+            users: this.data.users.length,
+            units: this.data.units.length,
+            bookings: this.data.bookings.length
+          });
+          this.normalizeExistingPayments();
+        } else {
+          throw new Error('Fallback backup database is unavailable.');
+        }
       } else if (isVercel) {
         console.warn('[DB] Vercel runtime detected without a bundled database file. Loading in-memory data only; no filesystem write is attempted.');
         this.data = { ...emptyData };

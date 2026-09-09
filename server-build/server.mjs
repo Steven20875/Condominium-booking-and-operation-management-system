@@ -1,14 +1,62 @@
 // server.ts
 import express from "express";
 import path2 from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // server/db.ts
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { EventEmitter } from "events";
-var DB_DIR = path.join(process.cwd(), "data");
-var DB_FILE = path.join(DB_DIR, "db.json");
+var isVercel = Boolean("1");
+var currentFile = fileURLToPath(import.meta.url);
+var currentDir = path.dirname(currentFile);
+var DB_CANDIDATES = [
+  path.join(process.cwd(), "data", "db.json"),
+  path.join(currentDir, "..", "data", "db.json"),
+  path.join(currentDir, "data", "db.json"),
+  path.join(currentDir, "..", "..", "data", "db.json")
+];
+var BACKUP_DB_CANDIDATES = [
+  path.join(process.cwd(), "data", "db.before-full-dummy-data-cleanup-2026-09-08.json"),
+  path.join(process.cwd(), "data", "db.pre-admin-name-change-2026-09-05.json"),
+  path.join(process.cwd(), "data", "db.backup-2026-08-12.json"),
+  path.join(currentDir, "..", "data", "db.before-full-dummy-data-cleanup-2026-09-08.json"),
+  path.join(currentDir, "..", "data", "db.pre-admin-name-change-2026-09-05.json"),
+  path.join(currentDir, "..", "data", "db.backup-2026-08-12.json"),
+  path.join(currentDir, "data", "db.before-full-dummy-data-cleanup-2026-09-08.json"),
+  path.join(currentDir, "data", "db.pre-admin-name-change-2026-09-05.json"),
+  path.join(currentDir, "data", "db.backup-2026-08-12.json")
+];
+var existingDbFile = DB_CANDIDATES.find((file) => fs.existsSync(file));
+var fallbackDbFile = BACKUP_DB_CANDIDATES.find((file) => fs.existsSync(file) && (() => {
+  try {
+    JSON.parse(fs.readFileSync(file, "utf-8"));
+    return true;
+  } catch {
+    return false;
+  }
+})());
+var DB_FILE = existingDbFile || path.join(process.cwd(), "data", "db.json");
+var DB_DIR = path.dirname(DB_FILE);
+function readDatabaseFile(filePath) {
+  try {
+    const fileContent = fs.readFileSync(filePath, "utf-8");
+    const parsed = JSON.parse(fileContent);
+    return {
+      users: Array.isArray(parsed.users) ? parsed.users : [],
+      units: Array.isArray(parsed.units) ? parsed.units : [],
+      bookings: Array.isArray(parsed.bookings) ? parsed.bookings : [],
+      payments: Array.isArray(parsed.payments) ? parsed.payments : [],
+      maintenanceRequests: Array.isArray(parsed.maintenanceRequests) ? parsed.maintenanceRequests : [],
+      notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+      activityLogs: Array.isArray(parsed.activityLogs) ? parsed.activityLogs : []
+    };
+  } catch (error) {
+    console.warn("[DB] Unable to read database file:", filePath, error);
+    return null;
+  }
+}
 var dbEvents = new EventEmitter();
 var MockDatabase = class {
   constructor() {
@@ -25,44 +73,76 @@ var MockDatabase = class {
     this.init();
   }
   init() {
+    const emptyData = {
+      users: [],
+      units: [],
+      bookings: [],
+      payments: [],
+      maintenanceRequests: [],
+      notifications: [],
+      activityLogs: []
+    };
+    console.log("[DB] Environment:", {
+      isVercel,
+      cwd: process.cwd(),
+      currentDir,
+      dbFile: DB_FILE,
+      exists: fs.existsSync(DB_FILE)
+    });
     try {
-      if (!fs.existsSync(DB_DIR)) {
-        fs.mkdirSync(DB_DIR, { recursive: true });
-      }
       if (fs.existsSync(DB_FILE)) {
-        const fileContent = fs.readFileSync(DB_FILE, "utf-8");
-        this.data = JSON.parse(fileContent);
-        if (!this.data.users) this.data.users = [];
-        if (!this.data.units) this.data.units = [];
-        if (!this.data.bookings) this.data.bookings = [];
-        if (!this.data.payments) this.data.payments = [];
-        if (!this.data.maintenanceRequests) this.data.maintenanceRequests = [];
-        if (!this.data.notifications) this.data.notifications = [];
-        if (!this.data.activityLogs) this.data.activityLogs = [];
-        this.normalizeExistingPayments();
+        const parsedDb = readDatabaseFile(DB_FILE);
+        if (parsedDb) {
+          this.data = parsedDb;
+          console.log("[DB] Counts:", {
+            users: this.data.users.length,
+            units: this.data.units.length,
+            bookings: this.data.bookings.length
+          });
+          this.normalizeExistingPayments();
+        } else if (fallbackDbFile) {
+          console.warn("[DB] Primary database file is unreadable or malformed. Falling back to the last valid backup snapshot without modifying the live file.");
+          const backupData = readDatabaseFile(fallbackDbFile);
+          if (backupData) {
+            this.data = backupData;
+            console.log("[DB] Counts from fallback snapshot:", {
+              users: this.data.users.length,
+              units: this.data.units.length,
+              bookings: this.data.bookings.length
+            });
+            this.normalizeExistingPayments();
+          } else {
+            throw new Error("No valid database snapshot available.");
+          }
+        } else {
+          throw new Error("Primary database file is unreadable and no valid fallback exists.");
+        }
+      } else if (fallbackDbFile) {
+        const backupData = readDatabaseFile(fallbackDbFile);
+        if (backupData) {
+          this.data = backupData;
+          console.log("[DB] Loaded fallback database snapshot:", {
+            users: this.data.users.length,
+            units: this.data.units.length,
+            bookings: this.data.bookings.length
+          });
+          this.normalizeExistingPayments();
+        } else {
+          throw new Error("Fallback backup database is unavailable.");
+        }
+      } else if (isVercel) {
+        console.warn("[DB] Vercel runtime detected without a bundled database file. Loading in-memory data only; no filesystem write is attempted.");
+        this.data = { ...emptyData };
       } else {
-        this.data = {
-          users: [],
-          units: [],
-          bookings: [],
-          payments: [],
-          maintenanceRequests: [],
-          notifications: [],
-          activityLogs: []
-        };
+        if (!fs.existsSync(DB_DIR)) {
+          fs.mkdirSync(DB_DIR, { recursive: true });
+        }
+        this.data = { ...emptyData };
         this.save();
       }
     } catch (err) {
-      console.error("Failed to initialize local JSON database file:", err);
-      this.data = {
-        users: [],
-        units: [],
-        bookings: [],
-        payments: [],
-        maintenanceRequests: [],
-        notifications: [],
-        activityLogs: []
-      };
+      console.error("Failed to initialize JSON database:", err);
+      this.data = { ...emptyData };
     }
   }
   normalizeExistingPayments() {
@@ -93,6 +173,10 @@ var MockDatabase = class {
   }
   save() {
     try {
+      if (isVercel) {
+        dbEvents.emit("change", { stats: this.getDashboardStats(), timestamp: Date.now() });
+        return;
+      }
       if (!fs.existsSync(DB_DIR)) {
         fs.mkdirSync(DB_DIR, { recursive: true });
       }
@@ -104,6 +188,11 @@ var MockDatabase = class {
       }
     } catch (err) {
       console.error("Error writing database to disk:", err);
+      try {
+        dbEvents.emit("change", { stats: this.getDashboardStats(), timestamp: Date.now() });
+      } catch (emitErr) {
+        console.error("dbEvents emit error:", emitErr);
+      }
     }
   }
   // --- LOG RELATED ---
@@ -678,7 +767,7 @@ var notificationService = new NotificationService();
 // server.ts
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-var __filename = fileURLToPath(import.meta.url);
+var __filename = fileURLToPath2(import.meta.url);
 var __dirname = path2.dirname(__filename);
 var projectRoot = __dirname;
 dotenv.config({ path: path2.resolve(projectRoot, ".env") });
