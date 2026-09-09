@@ -47,7 +47,8 @@ const DB_DIR = path.dirname(DB_FILE);
 function readDatabaseFile(filePath: string): DatabaseSchema | null {
   try {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
-    const parsed = JSON.parse(fileContent) as Partial<DatabaseSchema>;
+    const normalizedContent = fileContent.replace(/^\uFEFF/, '');
+    const parsed = JSON.parse(normalizedContent) as Partial<DatabaseSchema>;
 
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
