@@ -39,9 +39,8 @@ function isValidJsonFile(filePath: string): boolean {
   }
 }
 
-const DB_FILE = isValidJsonFile(PRIMARY_DB_FILE)
-  ? PRIMARY_DB_FILE
-  : (BACKUP_DB_CANDIDATES.find(isValidJsonFile) ?? PRIMARY_DB_FILE);
+const FALLBACK_DB_FILE = BACKUP_DB_CANDIDATES.find(isValidJsonFile) ?? PRIMARY_DB_FILE;
+const DB_FILE = fs.existsSync(PRIMARY_DB_FILE) ? PRIMARY_DB_FILE : FALLBACK_DB_FILE;
 const DB_SOURCE = DB_FILE === PRIMARY_DB_FILE ? 'primary' : 'backup';
 const DB_DIR = path.dirname(DB_FILE);
 
@@ -124,6 +123,9 @@ class MockDatabase {
         });
 
         this.normalizeExistingPayments();
+      } else if (fs.existsSync(PRIMARY_DB_FILE)) {
+        console.warn('[DB] Primary data/db.json exists but was unreadable. Refusing backup override so Vercel does not silently switch to stale credentials.');
+        this.data = { ...emptyData };
       } else if (isVercel) {
         console.warn('[DB] Vercel runtime detected without a readable database file. Loading in-memory data only; no filesystem write is attempted.');
         this.data = { ...emptyData };
