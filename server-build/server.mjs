@@ -1751,7 +1751,7 @@ async function createApp() {
         let reply = "Hello! I am your Gales Urban Haven Virtual Assistant at One Spatial Iloilo. I can help answer questions about renting/leasing, suite features, amenities, location, maintenance response, and payment dues. How can I assist you today?";
         const q = userPrompt.toLowerCase();
         if (q.includes("suite") || q.includes("zenith") || q.includes("loft") || q.includes("rental") || q.includes("lease")) {
-          reply = "The Zenith Suite is a signature 1-Bedroom Loft offered by Gales Urban Haven at $120/night. It's fully furnished with a Queen Bed, kitchenette, Wi-Fi, and a widescreen TV, perfect for young professionals or students who want convenience near Mandurriao, Iloilo City.";
+          reply = "The Zenith Suite is a signature 1-Bedroom Loft offered by Gales Urban Haven at \u20B1120.00/night. It's fully furnished with a Queen Bed, kitchenette, Wi-Fi, and a widescreen TV, perfect for young professionals or students who want convenience near Mandurriao, Iloilo City.";
         } else if (q.includes("amenit") || q.includes("pool") || q.includes("wifi") || q.includes("gym")) {
           reply = "At One Spatial Iloilo, we offer excellent community amenities: a swimming pool, High-Speed Wi-Fi, 24/7 security, automatic mailboxes, on-duty 20-minute emergency mechanics, and high-quality suites tailored for student and professional urban lifestyles.";
         } else if (q.includes("maintenance") || q.includes("fix") || q.includes("pipe") || q.includes("leak") || q.includes("claim")) {
@@ -1782,7 +1782,7 @@ The business is Gales Urban Haven, specializing in affordable, accessible, and c
 Target customers are young professionals, busy students looking for convenient university housing, and small families.
 
 Key selling points & operating models:
-1. Online reservations (e.g., "The Zenith Suite", a premium 1-Bedroom Loft on Floor 4, rate of $120/night, sleeps up to 3, furnished with modern Wi-Fi, Queen Bed, Kitchenette, and TV).
+1. Online reservations (e.g., "The Zenith Suite", a premium 1-Bedroom Loft on Floor 4, rate of \u20B1120.00/night, sleeps up to 3, furnished with modern Wi-Fi, Queen Bed, Kitchenette, and TV).
 2. Bullet-proof maintenance: Certified mechanics are stationed on-duty 24/7. They resolve emergency resident claims within 20 minutes of submitting through the dashboard!
 3. Seamless billing: "One Spatial Pay" handles digital ledgers, automatic invoice generation, and credit card processing, ending paper receipt clutter.
 4. Active administrative dashboard: Approved enrollments, instant security broadcast notices, and transparent audit details.

@@ -10,6 +10,21 @@ import UserManual from './UserManual';
 
 const GCASH_DEEPLINK_BASE = 'gcash://com.mynt.gcash/app/006300000800';
 
+const formatDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getDefaultBookingDates = () => {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 3);
+  return { start: formatDateInput(start), end: formatDateInput(end) };
+};
+
 interface ResidentDashboardProps {
   user: UserType;
   token: string;
@@ -65,9 +80,10 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [submittingGovernmentId, setSubmittingGovernmentId] = useState<boolean>(false);
 
   // Complex Booking Form State
+  const defaultBookingDates = getDefaultBookingDates();
   const [selectedUnitForBooking, setSelectedUnitForBooking] = useState<Unit | null>(null);
-  const [checkInDate, setCheckInDate] = useState<string>('2026-06-15');
-  const [checkOutDate, setCheckOutDate] = useState<string>('2026-06-18');
+  const [checkInDate, setCheckInDate] = useState<string>(defaultBookingDates.start);
+  const [checkOutDate, setCheckOutDate] = useState<string>(defaultBookingDates.end);
   const [guestsCount, setGuestsCount] = useState<number>(2);
   const [bookingNotes, setBookingNotes] = useState<string>('');
   const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
@@ -349,9 +365,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     try {
       const start = new Date(checkInDate);
       const end = new Date(checkOutDate);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffTime = end.getTime() - start.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return isNaN(diffDays) ? 1 : diffDays || 1;
+      return Number.isNaN(diffDays) ? 1 : Math.max(1, diffDays);
     } catch {
       return 1;
     }
@@ -359,7 +375,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
   const calculateTotalCost = (price: number) => {
     const days = calculateDays();
-    const isHolidayWindow = [11, 12].includes(new Date(checkInDate).getMonth()) || [11, 12].includes(new Date(checkOutDate).getMonth());
+    const isHolidayWindow = [11, 0].includes(new Date(checkInDate).getMonth()) || [11, 0].includes(new Date(checkOutDate).getMonth());
     const holidayMultiplier = isHolidayWindow ? 0.9 : 1;
     const seasonalSurcharge = (new Date(checkInDate).getMonth() === 11 || new Date(checkInDate).getMonth() === 0 || new Date(checkOutDate).getMonth() === 11 || new Date(checkOutDate).getMonth() === 0) ? 250 : 0;
     const base = days * price;
@@ -373,6 +389,16 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     if (!hasValidId) {
       toast('A valid ID must be verified in Profile Settings before a booking can be submitted.', 'error');
       setActiveTab('profile');
+      return;
+    }
+    const start = new Date(checkInDate);
+    const end = new Date(checkOutDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      toast('Please choose a valid checkout date after check-in.', 'warning');
+      return;
+    }
+    if (guestsCount < 1 || guestsCount > selectedUnitForBooking.capacity) {
+      toast(`Guest count must be between 1 and ${selectedUnitForBooking.capacity}.`, 'warning');
       return;
     }
     setSubmittingBooking(true);
@@ -553,8 +579,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const pendingApprovalsCount = bookings.filter(b => b.status === 'Pending').length;
   const activeBookingsCount = bookings.filter(b => b.status === 'Approved').length;
   const pendingPaymentsAmount = payments
-    .filter(p => p.status === 'Pending')
-    .reduce((sum, p) => sum + p.amount, 0);
+    .filter(p => p.status !== 'Paid' && p.remainingBalance > 0)
+    .reduce((sum, p) => sum + p.remainingBalance, 0);
   const activeIssuesCount = maintenance.filter(m => m.status !== 'Completed').length;
   const visibleNotifications = notifications.filter(notification => {
     const content = `${notification.title} ${notification.message}`.toLowerCase();
@@ -606,7 +632,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 activeTab === 'browse' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Search className="h-4 w-4" /> Browse Available Units
+              <Search className="h-4 w-4" /> Browse Units
             </button>
             <button
               onClick={() => setActiveTab('bookings')}
@@ -622,7 +648,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 activeTab === 'payments' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <CreditCard className="h-4 w-4" /> Ledger & Payments
+              <CreditCard className="h-4 w-4" /> Payments
             </button>
             <button
               onClick={() => setActiveTab('maintenance')}
@@ -630,7 +656,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 activeTab === 'maintenance' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Wrench className="h-4 w-4" /> Maintenance Desk {activeIssuesCount > 0 && <span className="ml-auto bg-emerald-500 text-slate-900 font-bold text-[9px] px-1.5 py-0.5 rounded-full">{activeIssuesCount}</span>}
+              <Wrench className="h-4 w-4" /> Maintenance {activeIssuesCount > 0 && <span className="ml-auto bg-emerald-500 text-slate-900 font-bold text-[9px] px-1.5 py-0.5 rounded-full">{activeIssuesCount}</span>}
             </button>
             <button
               onClick={() => setActiveTab('notifications')}
@@ -638,7 +664,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 activeTab === 'notifications' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Bell className="h-4 w-4" /> Bulletins & Alerts {unreadNotifications.length > 0 && <span className="ml-auto bg-rose-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-full">{unreadNotifications.length}</span>}
+              <Bell className="h-4 w-4" /> Announcements {unreadNotifications.length > 0 && <span className="ml-auto bg-rose-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-full">{unreadNotifications.length}</span>}
             </button>
             <button
               onClick={() => setActiveTab('profile')}

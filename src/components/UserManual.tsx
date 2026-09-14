@@ -80,11 +80,11 @@ const sectionDetails: Array<{
       },
       {
         title: 'Monitor payments and reports',
-        body: 'The Cash Ledger and audit sections help admins review invoices, payment status, and reporting details.'
+        body: 'The Payments and Audit Trail sections help admins review invoices, payment status, and reporting details.'
       },
       {
         title: 'Handle maintenance requests',
-        body: 'The Repairs Claims Desk provides a central place for reviewing maintenance issues and updating progress.'
+        body: 'The Maintenance section provides a central place for reviewing repair requests and updating progress.'
       },
       {
         title: 'Send broadcast messages',

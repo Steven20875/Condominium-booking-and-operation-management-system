@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
 import { 
-  Building, Users, Calendar, CreditCard, Wrench, Bell, LogOut, Search, Filter, Plus, Trash2, Edit2, CheckCircle, Clock, AlertTriangle, ShieldCheck, ArrowRight, UserCheck, DollarSign, Settings, FileText, Check, X, ShieldAlert, BookOpen, BarChart3, ListCollapse, Upload
+  Building, Users, Calendar, CreditCard, Wrench, Bell, LogOut, Search, Filter, Plus, Trash2, Edit2, CheckCircle, Clock, AlertTriangle, ShieldCheck, ArrowRight, UserCheck, DollarSign, Settings, FileText, Check, X, ShieldAlert, BookOpen, BarChart3, ListCollapse, Upload, Menu
 } from 'lucide-react';
 import { 
   User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, ActivityLog, DashboardStats 
@@ -28,6 +28,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
   const [showUserManual, setShowUserManual] = useState<boolean>(false);
 
@@ -173,6 +174,31 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       fetchAllData();
     } catch (err: any) {
       toast(err.message || 'Unable to update government ID verification.', 'error');
+    }
+  };
+
+  const handleViewGovernmentId = async (userId: string) => {
+    const previewWindow = window.open('', '_blank', 'noopener,noreferrer');
+    try {
+      const response = await fetch(`/api/admin/government-id-verifications/${userId}/file`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        previewWindow?.close();
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Unable to open the submitted government ID.');
+      }
+
+      const fileUrl = URL.createObjectURL(await response.blob());
+      if (previewWindow) {
+        previewWindow.location.href = fileUrl;
+        window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60000);
+      } else {
+        URL.revokeObjectURL(fileUrl);
+        throw new Error('Please allow pop-ups to view the submitted government ID.');
+      }
+    } catch (err: any) {
+      toast(err.message || 'Unable to open the submitted government ID.', 'error');
     }
   };
 
@@ -482,14 +508,24 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
             </div>
           </div>
 
-          <nav className="space-y-1">
+          <button
+            type="button"
+            onClick={() => setIsMobileNavOpen((open) => !open)}
+            className="md:hidden w-full flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-200"
+            aria-expanded={isMobileNavOpen}
+          >
+            <span>Admin navigation</span>
+            <Menu className="h-4 w-4" />
+          </button>
+
+          <nav className={`${isMobileNavOpen ? 'block' : 'hidden'} md:block space-y-1`}>
             <button
               onClick={() => setActiveTab('metrics')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                 activeTab === 'metrics' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <BarChart3 className="h-4 w-4" /> Operations Overview
+              <BarChart3 className="h-4 w-4" /> Dashboard
             </button>
             <button
               onClick={() => setActiveTab('units')}
@@ -497,7 +533,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 activeTab === 'units' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Building className="h-4 w-4" /> Units Manager
+              <Building className="h-4 w-4" /> Units
             </button>
             <button
               onClick={() => setActiveTab('residents')}
@@ -505,7 +541,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 activeTab === 'residents' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Users className="h-4 w-4" /> Resident Directory
+              <Users className="h-4 w-4" /> Residents
             </button>
             <button
               onClick={() => setActiveTab('bookings')}
@@ -513,7 +549,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 activeTab === 'bookings' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Calendar className="h-4 w-4" /> Reservation Approvals
+              <Calendar className="h-4 w-4" /> Bookings
             </button>
             <button
               onClick={() => setActiveTab('payments')}
@@ -521,7 +557,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 activeTab === 'payments' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <CreditCard className="h-4 w-4" /> Cash Ledger
+              <CreditCard className="h-4 w-4" /> Payments
             </button>
             <button
               onClick={() => setActiveTab('maintenance')}
@@ -529,7 +565,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 activeTab === 'maintenance' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Wrench className="h-4 w-4" /> Repairs Claims Desk
+              <Wrench className="h-4 w-4" /> Maintenance
             </button>
             <button
               onClick={() => setActiveTab('broadcast')}
@@ -537,7 +573,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 activeTab === 'broadcast' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Bell className="h-4 w-4" /> Broadcast Console
+              <Bell className="h-4 w-4" /> Announcements
             </button>
             <button
               onClick={() => setActiveTab('audit')}
@@ -545,7 +581,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                 activeTab === 'audit' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
-              <BookOpen className="h-4 w-4" /> System Audit Trail
+              <BookOpen className="h-4 w-4" /> Audit Trail
             </button>
           </nav>
         </div>
@@ -737,7 +773,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       </defs>
                       <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                      <Tooltip contentStyle={{ backgroundColor: 'rgb(15, 23, 42)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
+                      <Tooltip
+                        formatter={(value) => [formatCurrency(Number(value || 0)), 'Revenue']}
+                        contentStyle={{ backgroundColor: 'rgb(15, 23, 42)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }}
+                      />
                       <Area type="monotone" dataKey="revenue" name="Inflow (₱)" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2.5} />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -992,9 +1031,11 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
 
                         <div className="flex flex-wrap items-center gap-2">
                           <a
-                            href={`/api/admin/government-id-verifications/${resident.id}/file`}
-                            target="_blank"
-                            rel="noreferrer"
+                            href="#government-id-preview"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              void handleViewGovernmentId(resident.id);
+                            }}
                             className="rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-700"
                           >
                             View ID
@@ -1174,7 +1215,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         <th className="pb-3 px-3">Resident Tenant</th>
                         <th className="pb-3 px-3">Filing Date</th>
                         <th className="pb-3 px-3 font-mono">Reference Code</th>
-                        <th className="pb-3 px-3">Net Balance</th>
+                        <th className="pb-3 px-3">Total</th>
+                        <th className="pb-3 px-3">Paid</th>
+                        <th className="pb-3 px-3">Remaining</th>
                         <th className="pb-3 px-3 text-center">Status</th>
                         <th className="pb-3 px-3 text-right">Receipt</th>
                       </tr>

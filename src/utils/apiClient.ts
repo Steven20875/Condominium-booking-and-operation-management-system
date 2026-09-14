@@ -49,7 +49,15 @@ export const apiClient = {
         body: body ? JSON.stringify(body) : undefined,
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: any = {};
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          data = { error: responseText };
+        }
+      }
 
       if (!response.ok) {
         return {

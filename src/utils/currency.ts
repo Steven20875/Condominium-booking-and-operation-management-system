@@ -9,7 +9,7 @@ export function formatCurrency(value: number | null | undefined): string {
   return phpFormatter.format(Number.isFinite(Number(value)) ? Number(value) : 0);
 }
 export function formatCurrencyText(value: string): string {
-  return value.replace(/\$([\d,]+(?:\.\d{1,2})?)/g, (_match, amount: string) => {
+  return value.replace(/(?:\b(?:USD|US\$)\s*|\$)([\d,]+(?:\.\d{1,2})?)/gi, (_match, amount: string) => {
     const numericAmount = Number(amount.replace(/,/g, ''));
     return Number.isFinite(numericAmount) ? formatCurrency(numericAmount) : _match;
   });
