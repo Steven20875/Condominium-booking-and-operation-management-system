@@ -3,6 +3,7 @@
  */
 
 export type UserRole = 'admin' | 'resident';
+export type GovernmentIdStatus = 'not_submitted' | 'pending' | 'verified' | 'rejected';
 
 export interface User {
   id: string;
@@ -15,6 +16,11 @@ export interface User {
   authProvider?: 'email' | 'google' | 'firebase';
   authUid?: string;
   hasValidId?: boolean;
+  governmentIdStatus?: GovernmentIdStatus;
+  governmentIdUrl?: string;
+  governmentIdUploadedAt?: string;
+  governmentIdVerifiedAt?: string;
+  governmentIdRejectionReason?: string;
   validIdVerifiedAt?: string;
   createdAt: string;
   password?: string; // Kept in backend, stripped on API responses

@@ -1,5 +1,6 @@
 // server.ts
 import express from "express";
+import fs2 from "node:fs";
 import path2 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -65,6 +66,13 @@ function readDatabaseFile(filePath) {
     return null;
   }
 }
+function normalizeGovernmentIdStatus(status) {
+  const normalized = typeof status === "string" ? status.trim().toLowerCase() : "";
+  if (normalized === "pending" || normalized === "verified" || normalized === "rejected") {
+    return normalized;
+  }
+  return "not_submitted";
+}
 var dbEvents = new EventEmitter();
 var MockDatabase = class {
   constructor() {
@@ -79,6 +87,30 @@ var MockDatabase = class {
       activityLogs: []
     };
     this.init();
+  }
+  normalizeUserRecord(user) {
+    const status = normalizeGovernmentIdStatus(user.governmentIdStatus ?? (user.hasValidId ? "verified" : "not_submitted"));
+    const hasValidId = user.hasValidId ?? status === "verified";
+    return {
+      id: user.id || "user-unknown",
+      email: user.email || "",
+      name: user.name || "Unknown User",
+      role: user.role || "resident",
+      phone: user.phone || "",
+      unitNumber: user.unitNumber || "",
+      avatarUrl: user.avatarUrl || "",
+      authProvider: user.authProvider || "email",
+      authUid: user.authUid || "",
+      hasValidId,
+      governmentIdStatus: status,
+      governmentIdUrl: user.governmentIdUrl || "",
+      governmentIdUploadedAt: user.governmentIdUploadedAt || void 0,
+      governmentIdVerifiedAt: user.governmentIdVerifiedAt || void 0,
+      governmentIdRejectionReason: user.governmentIdRejectionReason || void 0,
+      validIdVerifiedAt: user.validIdVerifiedAt || (status === "verified" ? (/* @__PURE__ */ new Date()).toISOString() : void 0),
+      createdAt: user.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+      password: user.password || void 0
+    };
   }
   init() {
     const emptyData = {
@@ -102,6 +134,7 @@ var MockDatabase = class {
       const parsedDb = readDatabaseFile(DB_FILE);
       if (parsedDb) {
         this.data = parsedDb;
+        this.data.users = this.data.users.map((user) => this.normalizeUserRecord(user));
         console.log("[DB] Counts:", {
           users: this.data.users.length,
           units: this.data.units.length,
@@ -222,23 +255,26 @@ var MockDatabase = class {
   }
   // --- USER RELATED ---
   getUsers() {
-    return this.data.users;
+    return this.data.users.map((user) => this.normalizeUserRecord(user));
   }
   findUserById(id) {
-    return this.data.users.find((u) => u.id === id);
+    const user = this.data.users.find((u) => u.id === id);
+    return user ? this.normalizeUserRecord(user) : void 0;
   }
   findUserByEmail(email) {
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
     if (!normalizedEmail) {
       return void 0;
     }
-    return this.data.users.find((user) => {
-      const currentEmail = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+    const user = this.data.users.find((item) => {
+      const currentEmail = typeof item?.email === "string" ? item.email.trim().toLowerCase() : "";
       return currentEmail === normalizedEmail;
     });
+    return user ? this.normalizeUserRecord(user) : void 0;
   }
   createUser(user) {
-    const newUser = {
+    const newUser = this.normalizeUserRecord({
+      ...user,
       id: "user-" + Math.random().toString(36).substr(2, 9),
       email: user.email,
       password: user.password || "password",
@@ -252,7 +288,7 @@ var MockDatabase = class {
       hasValidId: user.hasValidId ?? false,
       validIdVerifiedAt: user.validIdVerifiedAt || (user.hasValidId ? (/* @__PURE__ */ new Date()).toISOString() : void 0),
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
+    });
     this.data.users.push(newUser);
     this.save();
     this.addActivityLog(newUser.id, newUser.name, newUser.role, "User Registered", `Account created with email ${newUser.email}`);
@@ -262,13 +298,82 @@ var MockDatabase = class {
     const idx = this.data.users.findIndex((u) => u.id === id);
     if (idx === -1) return void 0;
     const original = this.data.users[idx];
-    const updated = { ...original, ...updates };
+    const updated = this.normalizeUserRecord({ ...original, ...updates });
     if (original.password) {
       updated.password = original.password;
     }
     this.data.users[idx] = updated;
     this.save();
     this.addActivityLog(id, updated.name, updated.role, "Profile Updated", "User modified profile settings.");
+    return updated;
+  }
+  getPendingGovernmentIdVerifications() {
+    return this.data.users.filter((user) => user.role === "resident" && normalizeGovernmentIdStatus(user.governmentIdStatus) === "pending").map((user) => this.normalizeUserRecord(user));
+  }
+  getGovernmentIdStatusForUser(userId) {
+    const user = this.findUserById(userId);
+    return user ? normalizeGovernmentIdStatus(user.governmentIdStatus ?? (user.hasValidId ? "verified" : "not_submitted")) : "not_submitted";
+  }
+  submitGovernmentIdForVerification(userId, filePath, originalFileName, mimeType) {
+    const idx = this.data.users.findIndex((user) => user.id === userId);
+    if (idx === -1) return void 0;
+    const original = this.data.users[idx];
+    const updated = this.normalizeUserRecord({
+      ...original,
+      governmentIdStatus: "pending",
+      governmentIdUrl: filePath,
+      governmentIdUploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      governmentIdVerifiedAt: void 0,
+      governmentIdRejectionReason: void 0,
+      hasValidId: false,
+      validIdVerifiedAt: void 0,
+      phone: original.phone || "",
+      unitNumber: original.unitNumber || ""
+    });
+    const sanitizedName = String(originalFileName || "government-id").replace(/\s+/g, " ").trim();
+    updated.governmentIdUrl = filePath;
+    updated.governmentIdUploadedAt = (/* @__PURE__ */ new Date()).toISOString();
+    updated.governmentIdRejectionReason = void 0;
+    updated.governmentIdVerifiedAt = void 0;
+    updated.hasValidId = false;
+    updated.validIdVerifiedAt = void 0;
+    this.data.users[idx] = updated;
+    this.save();
+    this.addActivityLog(userId, updated.name, updated.role, "Government ID Submitted", `Submitted a valid government ID for verification (${sanitizedName})`);
+    return updated;
+  }
+  approveGovernmentId(userId) {
+    const idx = this.data.users.findIndex((user) => user.id === userId);
+    if (idx === -1) return void 0;
+    const original = this.data.users[idx];
+    const updated = this.normalizeUserRecord({
+      ...original,
+      governmentIdStatus: "verified",
+      governmentIdVerifiedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      governmentIdRejectionReason: void 0,
+      hasValidId: true,
+      validIdVerifiedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    this.data.users[idx] = updated;
+    this.save();
+    this.addActivityLog(userId, updated.name, updated.role, "Government ID Approved", "Government ID verified and approved by an administrator.");
+    return updated;
+  }
+  rejectGovernmentId(userId, reason) {
+    const idx = this.data.users.findIndex((user) => user.id === userId);
+    if (idx === -1) return void 0;
+    const original = this.data.users[idx];
+    const updated = this.normalizeUserRecord({
+      ...original,
+      governmentIdStatus: "rejected",
+      governmentIdRejectionReason: reason || "Please upload a clearer and valid government-issued ID.",
+      governmentIdVerifiedAt: void 0,
+      hasValidId: false,
+      validIdVerifiedAt: void 0
+    });
+    this.data.users[idx] = updated;
+    this.save();
+    this.addActivityLog(userId, updated.name, updated.role, "Government ID Rejected", reason || "Government ID was rejected.");
     return updated;
   }
   deleteUser(id, operatorId, operatorName) {
@@ -877,6 +982,9 @@ var projectRoot = __dirname;
 dotenv.config({ path: path2.resolve(projectRoot, ".env") });
 var PORT = Number(process.env.PORT) || 3e3;
 var VITE_HMR_PORT = Number(process.env.VITE_HMR_PORT) || 24678;
+var isVercel2 = Boolean("1");
+var GOVERNMENT_ID_STORAGE_DIR = path2.join(projectRoot, "data", "private", "government-ids");
+var MAX_GOVERNMENT_ID_SIZE_BYTES = 5 * 1024 * 1024;
 var firebaseConfigFromEnv = {
   apiKey: process.env.VITE_FIREBASE_API_KEY || "",
   authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "",
@@ -917,6 +1025,44 @@ function isNonEmptyString(value) {
 function parseNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+function normalizeGovernmentIdStatus2(status) {
+  const normalized = typeof status === "string" ? status.trim().toLowerCase() : "";
+  if (normalized === "pending" || normalized === "verified" || normalized === "rejected") {
+    return normalized;
+  }
+  return "not_submitted";
+}
+function getGovernmentIdStatusForUser(user) {
+  return normalizeGovernmentIdStatus2(user?.governmentIdStatus ?? (user?.hasValidId ? "verified" : "not_submitted"));
+}
+function sanitizeUserForApi(user) {
+  const { password: _password, governmentIdUrl: _governmentIdUrl, ...safeUser } = user;
+  return safeUser;
+}
+function ensureGovernmentIdStorageDir() {
+  const targetDir = GOVERNMENT_ID_STORAGE_DIR;
+  if (!fs2.existsSync(targetDir)) {
+    fs2.mkdirSync(targetDir, { recursive: true });
+  }
+  if (isVercel2) {
+    console.warn("[FILES] Vercel/serverless environment detected. Private government IDs are stored only in the local filesystem for the current runtime and will not persist across deployments.");
+  }
+  return targetDir;
+}
+function getSafeGovernmentIdFilename(name, residentId) {
+  const sanitizedBase = String(name || "government-id").replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "government-id";
+  return `${residentId}-${Date.now()}-${sanitizedBase}`;
+}
+function determineGovernmentIdMimeType(mimeType) {
+  const normalized = typeof mimeType === "string" ? mimeType.toLowerCase() : "";
+  if (["image/jpeg", "image/jpg", "image/png", "application/pdf"].includes(normalized)) {
+    return normalized;
+  }
+  if (normalized === "image/pjpeg") {
+    return "image/jpeg";
+  }
+  return "";
 }
 function calculateBookingTotal(unitPrice, startDate, endDate) {
   const start = new Date(startDate);
@@ -967,7 +1113,7 @@ async function createApp() {
       unitNumber: isNonEmptyString(unitNumber) ? unitNumber.trim() : void 0,
       role: "resident"
     });
-    const { password: _, ...userSafe } = newUser;
+    const userSafe = sanitizeUserForApi(newUser);
     res.status(201).json({ user: userSafe, token: newUser.id });
   });
   app.post("/api/auth/login", (req, res) => {
@@ -987,7 +1133,7 @@ async function createApp() {
       if (!user || typeof user.password !== "string" || user.password !== password) {
         return res.status(401).json({ error: "Invalid email or password combination." });
       }
-      const { password: _, ...userSafe } = user;
+      const userSafe = sanitizeUserForApi(user);
       return res.status(200).json({ user: userSafe, token: user.id });
     } catch (error) {
       console.error("[AUTH] Login exception:", {
@@ -1028,7 +1174,7 @@ async function createApp() {
       if (!updatedUser) {
         return res.status(500).json({ error: "Unable to synchronize the existing account." });
       }
-      const { password: _2, ...userSafe2 } = updatedUser;
+      const userSafe2 = sanitizeUserForApi(updatedUser);
       return res.status(200).json({ user: userSafe2, token: updatedUser.id });
     }
     const newUser = db.createUser({
@@ -1040,12 +1186,12 @@ async function createApp() {
       authProvider: provider === "google" ? "google" : "firebase",
       authUid: uid
     });
-    const { password: _, ...userSafe } = newUser;
+    const userSafe = sanitizeUserForApi(newUser);
     return res.status(201).json({ user: userSafe, token: newUser.id });
   });
   app.get("/api/auth/me", requireAuth, (req, res) => {
     const user = req.user;
-    const { password: _, ...userSafe } = user;
+    const userSafe = sanitizeUserForApi(user);
     res.json({ user: userSafe });
   });
   app.put("/api/auth/profile", requireAuth, (req, res) => {
@@ -1062,12 +1208,187 @@ async function createApp() {
     if (!updated) {
       return res.status(500).json({ error: "Failed to update user profile." });
     }
-    const { password: _, ...userSafe } = updated;
+    const userSafe = sanitizeUserForApi(updated);
     res.json({ user: userSafe });
+  });
+  app.get("/api/profile/verification", requireAuth, (req, res) => {
+    const user = db.findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const status = getGovernmentIdStatusForUser(user);
+    const canBook = status === "verified";
+    const response = {
+      governmentIdStatus: status,
+      hasValidId: Boolean(user.hasValidId),
+      governmentIdUploadedAt: user.governmentIdUploadedAt || null,
+      governmentIdVerifiedAt: user.governmentIdVerifiedAt || null,
+      governmentIdRejectionReason: user.governmentIdRejectionReason || null,
+      canBook,
+      message: status === "not_submitted" ? "Government ID verification is required before you can make a booking." : status === "pending" ? "Your ID has been submitted and is waiting for admin verification." : status === "verified" ? "Your identity has been verified. You may now submit bookings." : "Your submitted ID could not be verified. Please upload a valid government-issued ID and submit it again."
+    };
+    res.json(response);
+  });
+  app.post("/api/profile/government-id", requireAuth, (req, res) => {
+    const user = db.findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const { fileName, fileData, mimeType, agreesToVerification } = req.body || {};
+    const agrees = Boolean(agreesToVerification);
+    if (!agrees) {
+      db.updateUser(user.id, {
+        governmentIdStatus: "not_submitted",
+        governmentIdUploadedAt: void 0,
+        governmentIdVerifiedAt: void 0,
+        governmentIdRejectionReason: void 0,
+        hasValidId: false,
+        validIdVerifiedAt: void 0
+      });
+      return res.status(200).json({
+        governmentIdStatus: "not_submitted",
+        message: "Government ID verification is required before you can make a booking.",
+        canBook: false
+      });
+    }
+    if (!isNonEmptyString(fileName) || !isNonEmptyString(fileData) || !isNonEmptyString(mimeType)) {
+      return res.status(400).json({ error: "Please select a valid government-issued ID." });
+    }
+    const normalizedMime = determineGovernmentIdMimeType(mimeType);
+    if (!normalizedMime) {
+      return res.status(400).json({ error: "File type not supported. Please upload JPG, JPEG, PNG, or PDF." });
+    }
+    const match = String(fileData).match(/^data:(.*?);base64,(.*)$/);
+    if (!match) {
+      return res.status(400).json({ error: "Please select a valid government-issued ID." });
+    }
+    const rawBuffer = Buffer.from(match[2], "base64");
+    if (rawBuffer.length === 0) {
+      return res.status(400).json({ error: "Please select a valid government-issued ID." });
+    }
+    if (rawBuffer.length > MAX_GOVERNMENT_ID_SIZE_BYTES) {
+      return res.status(400).json({ error: "File size must not exceed 5 MB." });
+    }
+    try {
+      const storageDir = ensureGovernmentIdStorageDir();
+      const safeFilename = getSafeGovernmentIdFilename(fileName, user.id);
+      const extension = normalizedMime === "application/pdf" ? ".pdf" : normalizedMime === "image/png" ? ".png" : ".jpg";
+      const finalPath = path2.join(storageDir, `${safeFilename}${extension}`);
+      fs2.writeFileSync(finalPath, rawBuffer);
+      const updatedUser = db.submitGovernmentIdForVerification(user.id, finalPath, fileName, normalizedMime);
+      if (!updatedUser) {
+        return res.status(500).json({ error: "Unable to save your government ID for review." });
+      }
+      return res.status(201).json({
+        governmentIdStatus: "pending",
+        governmentIdUploadedAt: updatedUser.governmentIdUploadedAt,
+        hasValidId: false,
+        message: "Your ID has been submitted and is waiting for admin verification.",
+        canBook: false
+      });
+    } catch (error) {
+      console.error("[GOVERNMENT_ID] Failed to save resident government ID:", error);
+      return res.status(500).json({ error: "Unable to save the uploaded ID. Please try again." });
+    }
+  });
+  app.get("/api/profile/government-id", requireAuth, (req, res) => {
+    const user = db.findUserById(req.user.id);
+    if (!user || !user.governmentIdUrl) {
+      return res.status(404).json({ error: "No government ID record found for this user." });
+    }
+    const filePath = String(user.governmentIdUrl);
+    if (!fs2.existsSync(filePath)) {
+      return res.status(404).json({ error: "Stored government ID file not found." });
+    }
+    const extension = path2.extname(filePath).toLowerCase();
+    const mimeType = extension === ".pdf" ? "application/pdf" : extension === ".png" ? "image/png" : "image/jpeg";
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${path2.basename(filePath)}"`);
+    return res.sendFile(filePath);
+  });
+  app.get("/api/admin/government-id-verifications", requireAdmin, (req, res) => {
+    const pending = db.getPendingGovernmentIdVerifications().map((resident) => ({
+      id: resident.id,
+      name: resident.name,
+      email: resident.email,
+      unitNumber: resident.unitNumber || "",
+      governmentIdStatus: resident.governmentIdStatus || "not_submitted",
+      governmentIdUploadedAt: resident.governmentIdUploadedAt || null,
+      governmentIdRejectionReason: resident.governmentIdRejectionReason || null,
+      hasValidId: Boolean(resident.hasValidId)
+    }));
+    res.json(pending);
+  });
+  app.get("/api/admin/government-id-verifications/:userId", requireAdmin, (req, res) => {
+    const targetUser = db.findUserById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: "Resident not found." });
+    }
+    const residentData = {
+      id: targetUser.id,
+      name: targetUser.name,
+      email: targetUser.email,
+      unitNumber: targetUser.unitNumber || "",
+      governmentIdStatus: getGovernmentIdStatusForUser(targetUser),
+      governmentIdUrl: targetUser.governmentIdUrl || null,
+      governmentIdUploadedAt: targetUser.governmentIdUploadedAt || null,
+      governmentIdVerifiedAt: targetUser.governmentIdVerifiedAt || null,
+      governmentIdRejectionReason: targetUser.governmentIdRejectionReason || null,
+      hasValidId: Boolean(targetUser.hasValidId)
+    };
+    res.json(residentData);
+  });
+  app.get("/api/admin/government-id-verifications/:userId/file", requireAdmin, (req, res) => {
+    const targetUser = db.findUserById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: "Resident not found." });
+    }
+    if (!targetUser.governmentIdUrl || !fs2.existsSync(String(targetUser.governmentIdUrl))) {
+      return res.status(404).json({ error: "No submitted government ID was found for this resident." });
+    }
+    const filePath = String(targetUser.governmentIdUrl);
+    const extension = path2.extname(filePath).toLowerCase();
+    const mimeType = extension === ".pdf" ? "application/pdf" : extension === ".png" ? "image/png" : "image/jpeg";
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${path2.basename(filePath)}"`);
+    return res.sendFile(filePath);
+  });
+  app.post("/api/admin/government-id-verifications/:userId/approve", requireAdmin, (req, res) => {
+    const targetUser = db.findUserById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: "Resident not found." });
+    }
+    const updatedUser = db.approveGovernmentId(targetUser.id);
+    if (!updatedUser) {
+      return res.status(500).json({ error: "Unable to approve the resident government ID." });
+    }
+    res.json({
+      governmentIdStatus: "verified",
+      governmentIdVerifiedAt: updatedUser.governmentIdVerifiedAt,
+      hasValidId: true,
+      message: "Government ID has been verified."
+    });
+  });
+  app.post("/api/admin/government-id-verifications/:userId/reject", requireAdmin, (req, res) => {
+    const { reason } = req.body || {};
+    const targetUser = db.findUserById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: "Resident not found." });
+    }
+    const updatedUser = db.rejectGovernmentId(targetUser.id, isNonEmptyString(reason) ? String(reason).trim() : "Please upload a clearer and valid government-issued ID.");
+    if (!updatedUser) {
+      return res.status(500).json({ error: "Unable to reject the resident government ID." });
+    }
+    res.json({
+      governmentIdStatus: "rejected",
+      governmentIdRejectionReason: updatedUser.governmentIdRejectionReason || null,
+      hasValidId: false,
+      message: "Government ID rejected. Please ask the resident to upload another valid ID."
+    });
   });
   app.get("/api/residents", requireAdmin, (req, res) => {
     const residents = db.getUsers().filter((u) => u.role === "resident");
-    const safeResidents = residents.map(({ password, ...rest }) => rest);
+    const safeResidents = residents.map((resident) => sanitizeUserForApi(resident));
     res.json(safeResidents);
   });
   app.get("/api/units", (req, res) => {
@@ -1142,7 +1463,10 @@ async function createApp() {
     }
   });
   app.post("/api/bookings", requireAuth, (req, res) => {
-    const user = req.user;
+    const user = db.findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
     const { unitId, startDate, endDate, totalPrice, guestsCount, notes } = req.body;
     const missing = validateFields(req.body, ["unitId", "startDate", "endDate", "totalPrice"]);
     if (missing.length > 0) {
@@ -1151,8 +1475,9 @@ async function createApp() {
     if (!isNonEmptyString(unitId) || !isNonEmptyString(startDate) || !isNonEmptyString(endDate)) {
       return res.status(400).json({ error: "unitId, startDate, and endDate must be valid strings." });
     }
-    if (!user.hasValidId) {
-      return res.status(403).json({ error: "A valid government ID is required before any booking can be created." });
+    const governmentIdStatus = getGovernmentIdStatusForUser(user);
+    if (governmentIdStatus !== "verified") {
+      return res.status(403).json({ error: "Government ID verification is required before you can make a booking." });
     }
     const unit = db.findUnitById(unitId);
     if (!unit) {
@@ -1490,6 +1815,9 @@ Your tone should be helpful, humble, warm, concise, and focused on property solu
   app.use((err, req, res, next) => {
     console.error("Unhandled server error:", err);
     res.status(500).json({ error: "Internal server error. Please try again later." });
+  });
+  app.use("/data/private", (_req, res) => {
+    res.status(404).json({ error: "Private files are not publicly accessible." });
   });
   if (false) {
     const { createServer: createViteServer } = await null;

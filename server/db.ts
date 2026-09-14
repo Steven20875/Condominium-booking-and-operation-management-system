@@ -92,10 +92,45 @@ interface DatabaseSchema {
   activityLogs: ActivityLog[];
 }
 
+function normalizeGovernmentIdStatus(status?: string | null): User['governmentIdStatus'] {
+  const normalized = typeof status === 'string' ? status.trim().toLowerCase() : '';
+  if (normalized === 'pending' || normalized === 'verified' || normalized === 'rejected') {
+    return normalized;
+  }
+
+  return 'not_submitted';
+}
+
 export const dbEvents = new EventEmitter();
 
 class MockDatabase {
   private notificationReadState = new Map<string, Set<string>>();
+
+  private normalizeUserRecord(user: Partial<User>): User {
+    const status = normalizeGovernmentIdStatus(user.governmentIdStatus ?? (user.hasValidId ? 'verified' : 'not_submitted'));
+    const hasValidId = user.hasValidId ?? status === 'verified';
+
+    return {
+      id: user.id || 'user-unknown',
+      email: user.email || '',
+      name: user.name || 'Unknown User',
+      role: user.role || 'resident',
+      phone: user.phone || '',
+      unitNumber: user.unitNumber || '',
+      avatarUrl: user.avatarUrl || '',
+      authProvider: user.authProvider || 'email',
+      authUid: user.authUid || '',
+      hasValidId,
+      governmentIdStatus: status,
+      governmentIdUrl: user.governmentIdUrl || '',
+      governmentIdUploadedAt: user.governmentIdUploadedAt || undefined,
+      governmentIdVerifiedAt: user.governmentIdVerifiedAt || undefined,
+      governmentIdRejectionReason: user.governmentIdRejectionReason || undefined,
+      validIdVerifiedAt: user.validIdVerifiedAt || (status === 'verified' ? new Date().toISOString() : undefined),
+      createdAt: user.createdAt || new Date().toISOString(),
+      password: user.password || undefined,
+    };
+  }
 
   private data: DatabaseSchema = {
     users: [],
@@ -134,6 +169,7 @@ class MockDatabase {
       const parsedDb = readDatabaseFile(DB_FILE);
       if (parsedDb) {
         this.data = parsedDb;
+        this.data.users = this.data.users.map((user) => this.normalizeUserRecord(user));
         console.log('[DB] Counts:', {
           users: this.data.users.length,
           units: this.data.units.length,
@@ -277,11 +313,12 @@ class MockDatabase {
 
   // --- USER RELATED ---
   public getUsers(): User[] {
-    return this.data.users;
+    return this.data.users.map((user) => this.normalizeUserRecord(user));
   }
 
   public findUserById(id: string): User | undefined {
-    return this.data.users.find(u => u.id === id);
+    const user = this.data.users.find(u => u.id === id);
+    return user ? this.normalizeUserRecord(user) : undefined;
   }
 
   public findUserByEmail(email: string): User | undefined {
@@ -290,14 +327,17 @@ class MockDatabase {
       return undefined;
     }
 
-    return this.data.users.find((user) => {
-      const currentEmail = typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+    const user = this.data.users.find((item) => {
+      const currentEmail = typeof item?.email === 'string' ? item.email.trim().toLowerCase() : '';
       return currentEmail === normalizedEmail;
     });
+
+    return user ? this.normalizeUserRecord(user) : undefined;
   }
 
   public createUser(user: Partial<User> & { password?: string }): User {
-    const newUser: User = {
+    const newUser = this.normalizeUserRecord({
+      ...user,
       id: 'user-' + Math.random().toString(36).substr(2, 9),
       email: user.email!,
       password: user.password || 'password',
@@ -311,7 +351,7 @@ class MockDatabase {
       hasValidId: user.hasValidId ?? false,
       validIdVerifiedAt: user.validIdVerifiedAt || (user.hasValidId ? new Date().toISOString() : undefined),
       createdAt: new Date().toISOString()
-    };
+    });
     this.data.users.push(newUser);
     this.save();
     this.addActivityLog(newUser.id, newUser.name, newUser.role, 'User Registered', `Account created with email ${newUser.email}`);
@@ -323,7 +363,7 @@ class MockDatabase {
     if (idx === -1) return undefined;
     
     const original = this.data.users[idx];
-    const updated = { ...original, ...updates };
+    const updated = this.normalizeUserRecord({ ...original, ...updates });
     // Keep password
     if (original.password) {
       updated.password = original.password;
@@ -332,6 +372,89 @@ class MockDatabase {
     this.data.users[idx] = updated;
     this.save();
     this.addActivityLog(id, updated.name, updated.role, 'Profile Updated', 'User modified profile settings.');
+    return updated;
+  }
+
+  public getPendingGovernmentIdVerifications(): User[] {
+    return this.data.users
+      .filter((user) => user.role === 'resident' && normalizeGovernmentIdStatus(user.governmentIdStatus) === 'pending')
+      .map((user) => this.normalizeUserRecord(user));
+  }
+
+  public getGovernmentIdStatusForUser(userId: string): User['governmentIdStatus'] {
+    const user = this.findUserById(userId);
+    return user ? normalizeGovernmentIdStatus(user.governmentIdStatus ?? (user.hasValidId ? 'verified' : 'not_submitted')) : 'not_submitted';
+  }
+
+  public submitGovernmentIdForVerification(userId: string, filePath: string, originalFileName: string, mimeType: string): User | undefined {
+    const idx = this.data.users.findIndex((user) => user.id === userId);
+    if (idx === -1) return undefined;
+
+    const original = this.data.users[idx];
+    const updated = this.normalizeUserRecord({
+      ...original,
+      governmentIdStatus: 'pending',
+      governmentIdUrl: filePath,
+      governmentIdUploadedAt: new Date().toISOString(),
+      governmentIdVerifiedAt: undefined,
+      governmentIdRejectionReason: undefined,
+      hasValidId: false,
+      validIdVerifiedAt: undefined,
+      phone: original.phone || '',
+      unitNumber: original.unitNumber || ''
+    });
+
+    const sanitizedName = String(originalFileName || 'government-id').replace(/\s+/g, ' ').trim();
+    updated.governmentIdUrl = filePath;
+    updated.governmentIdUploadedAt = new Date().toISOString();
+    updated.governmentIdRejectionReason = undefined;
+    updated.governmentIdVerifiedAt = undefined;
+    updated.hasValidId = false;
+    updated.validIdVerifiedAt = undefined;
+
+    this.data.users[idx] = updated;
+    this.save();
+    this.addActivityLog(userId, updated.name, updated.role, 'Government ID Submitted', `Submitted a valid government ID for verification (${sanitizedName})`);
+    return updated;
+  }
+
+  public approveGovernmentId(userId: string): User | undefined {
+    const idx = this.data.users.findIndex((user) => user.id === userId);
+    if (idx === -1) return undefined;
+
+    const original = this.data.users[idx];
+    const updated = this.normalizeUserRecord({
+      ...original,
+      governmentIdStatus: 'verified',
+      governmentIdVerifiedAt: new Date().toISOString(),
+      governmentIdRejectionReason: undefined,
+      hasValidId: true,
+      validIdVerifiedAt: new Date().toISOString()
+    });
+
+    this.data.users[idx] = updated;
+    this.save();
+    this.addActivityLog(userId, updated.name, updated.role, 'Government ID Approved', 'Government ID verified and approved by an administrator.');
+    return updated;
+  }
+
+  public rejectGovernmentId(userId: string, reason?: string): User | undefined {
+    const idx = this.data.users.findIndex((user) => user.id === userId);
+    if (idx === -1) return undefined;
+
+    const original = this.data.users[idx];
+    const updated = this.normalizeUserRecord({
+      ...original,
+      governmentIdStatus: 'rejected',
+      governmentIdRejectionReason: reason || 'Please upload a clearer and valid government-issued ID.',
+      governmentIdVerifiedAt: undefined,
+      hasValidId: false,
+      validIdVerifiedAt: undefined
+    });
+
+    this.data.users[idx] = updated;
+    this.save();
+    this.addActivityLog(userId, updated.name, updated.role, 'Government ID Rejected', reason || 'Government ID was rejected.');
     return updated;
   }
 

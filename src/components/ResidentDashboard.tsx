@@ -54,6 +54,15 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [profileUnit, setProfileUnit] = useState<string>(user.unitNumber || '');
   const [profileAvatar, setProfileAvatar] = useState<string>(user.avatarUrl || '');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState<boolean>(false);
+  const [governmentIdStatus, setGovernmentIdStatus] = useState<UserType['governmentIdStatus']>(user.governmentIdStatus ?? (user.hasValidId ? 'verified' : 'not_submitted'));
+  const [governmentIdMessage, setGovernmentIdMessage] = useState<string>('');
+  const [governmentIdUploadedAt, setGovernmentIdUploadedAt] = useState<string | null>(user.governmentIdUploadedAt || null);
+  const [governmentIdRejectionReason, setGovernmentIdRejectionReason] = useState<string | null>(user.governmentIdRejectionReason || null);
+  const [governmentIdFileName, setGovernmentIdFileName] = useState<string>('');
+  const [governmentIdFileData, setGovernmentIdFileData] = useState<string>('');
+  const [governmentIdMimeType, setGovernmentIdMimeType] = useState<string>('');
+  const [governmentIdAgrees, setGovernmentIdAgrees] = useState<boolean>(false);
+  const [submittingGovernmentId, setSubmittingGovernmentId] = useState<boolean>(false);
 
   // Complex Booking Form State
   const [selectedUnitForBooking, setSelectedUnitForBooking] = useState<Unit | null>(null);
@@ -63,7 +72,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [bookingNotes, setBookingNotes] = useState<string>('');
   const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
 
-  const [hasValidId, setHasValidId] = useState<boolean>(Boolean(user.hasValidId));
+  const [hasValidId, setHasValidId] = useState<boolean>(governmentIdStatus === 'verified');
 
   // Unit Filtering Sizing
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -187,7 +196,102 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
   useEffect(() => {
     fetchAllData();
+    fetch('/api/profile/verification', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data || !data.governmentIdStatus) return;
+        const nextStatus = data.governmentIdStatus || 'not_submitted';
+        setGovernmentIdStatus(nextStatus);
+        setHasValidId(nextStatus === 'verified');
+        setGovernmentIdMessage(data.message || '');
+        setGovernmentIdUploadedAt(data.governmentIdUploadedAt || null);
+        setGovernmentIdRejectionReason(data.governmentIdRejectionReason || null);
+      })
+      .catch(() => undefined);
   }, [token]);
+
+  const getGovernmentIdBadge = (status: UserType['governmentIdStatus']) => {
+    switch (status) {
+      case 'verified':
+        return { label: 'Verified', className: 'bg-emerald-100 text-emerald-800' };
+      case 'pending':
+        return { label: 'Pending', className: 'bg-amber-100 text-amber-800' };
+      case 'rejected':
+        return { label: 'Rejected', className: 'bg-rose-100 text-rose-800' };
+      default:
+        return { label: 'Not Submitted', className: 'bg-slate-100 text-slate-700' };
+    }
+  };
+
+  const handleGovernmentIdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setGovernmentIdFileName('');
+      setGovernmentIdFileData('');
+      setGovernmentIdMimeType('');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setGovernmentIdFileName(file.name);
+        setGovernmentIdFileData(reader.result);
+        setGovernmentIdMimeType(file.type || 'application/octet-stream');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleGovernmentIdSubmit = async () => {
+    if (!governmentIdAgrees) {
+      toast('Please confirm that you agree to the ID verification process.', 'warning');
+      return;
+    }
+
+    if (!governmentIdFileData || !governmentIdFileName) {
+      toast('Please upload a valid government-issued ID before submitting.', 'warning');
+      return;
+    }
+
+    setSubmittingGovernmentId(true);
+    try {
+      const response = await fetch('/api/profile/government-id', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fileName: governmentIdFileName,
+          fileData: governmentIdFileData,
+          mimeType: governmentIdMimeType,
+          agreesToVerification: governmentIdAgrees
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to submit your government ID.');
+
+      const nextStatus = data.governmentIdStatus || 'pending';
+      setGovernmentIdStatus(nextStatus);
+      setHasValidId(nextStatus === 'verified');
+      setGovernmentIdMessage(data.message || '');
+      setGovernmentIdUploadedAt(data.governmentIdUploadedAt || null);
+      setGovernmentIdRejectionReason(null);
+      setGovernmentIdFileData('');
+      setGovernmentIdFileName('');
+      setGovernmentIdMimeType('');
+      setGovernmentIdAgrees(false);
+      toast(data.message || 'Government ID submitted for verification.', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Unable to submit government ID.', 'error');
+    } finally {
+      setSubmittingGovernmentId(false);
+    }
+  };
 
   // Profile update Handler
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -222,8 +326,10 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   };
 
   useEffect(() => {
-    setHasValidId(Boolean(user.hasValidId));
-  }, [user.hasValidId]);
+    const nextStatus = user.governmentIdStatus ?? (user.hasValidId ? 'verified' : 'not_submitted');
+    setGovernmentIdStatus(nextStatus);
+    setHasValidId(nextStatus === 'verified');
+  }, [user.governmentIdStatus, user.hasValidId]);
 
   // Avatar Upload simulation
   const handleAvatarSelect = (url: string) => {
@@ -1362,26 +1468,48 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                       <p className="text-xs text-slate-500">Required before any booking can be submitted.</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-[9px] font-bold uppercase ${hasValidId ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                        {hasValidId ? 'Verified' : 'Not Verified'}
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-[9px] font-bold uppercase ${getGovernmentIdBadge(governmentIdStatus).className}`}>
+                        {getGovernmentIdBadge(governmentIdStatus).label}
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setHasValidId(true)}
-                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold ${hasValidId ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
-                    >
-                      Yes, I have a valid ID
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHasValidId(false)}
-                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold ${!hasValidId ? 'border-rose-500 bg-rose-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
-                    >
-                      No, I do not have one
-                    </button>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-3">
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                      <Upload className="h-3.5 w-3.5" />
+                      Upload Government ID
+                    </div>
+
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[11px] text-slate-600 transition hover:border-slate-400 hover:bg-slate-100">
+                      <input type="file" accept="image/jpeg,image/png,application/pdf" className="hidden" onChange={handleGovernmentIdFileChange} />
+                      <span className="font-bold text-slate-800">{governmentIdFileName || 'Choose a JPG, PNG, or PDF file'}</span>
+                      <span className="mt-1 text-[10px] text-slate-500">Max size: 5MB</span>
+                    </label>
+
+                    <label className="flex items-start gap-2 text-[10px] text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={governmentIdAgrees}
+                        onChange={(e) => setGovernmentIdAgrees(e.target.checked)}
+                        className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-slate-900"
+                      />
+                      I agree to submit my government-issued ID for verification and confirm it is a valid, current document.
+                    </label>
+
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div className="min-w-0">
+                        {governmentIdMessage && <p className="text-[10px] font-semibold text-slate-700">{governmentIdMessage}</p>}
+                        {governmentIdUploadedAt && <p className="text-[9px] text-slate-500">Uploaded {new Date(governmentIdUploadedAt).toLocaleDateString()}</p>}
+                        {governmentIdRejectionReason && <p className="text-[9px] text-rose-700">Reason: {governmentIdRejectionReason}</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGovernmentIdSubmit}
+                        disabled={submittingGovernmentId || !governmentIdAgrees || !governmentIdFileData}
+                        className="rounded-xl bg-slate-900 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {submittingGovernmentId ? 'Submitting...' : 'Submit for Review'}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

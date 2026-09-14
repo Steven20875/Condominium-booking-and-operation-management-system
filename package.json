@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs && node scripts/build-server.mjs && node -e \"const fs=require('fs');const path=require('path');const src='data';const dst='dist/data';if(!fs.existsSync(dst))fs.mkdirSync(dst,{recursive:true});fs.readdirSync(src).forEach(f=>{fs.copyFileSync(path.join(src,f),path.join(dst,f));});\"",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs && node scripts/build-server.mjs && node -e \"const fs=require('fs');const path=require('path');const src='data';const dst='dist/data';if(!fs.existsSync(dst))fs.mkdirSync(dst,{recursive:true});fs.readdirSync(src).filter(f=>f!=='private').forEach(f=>{const source=path.join(src,f);if(fs.statSync(source).isFile())fs.copyFileSync(source,path.join(dst,f));});\"",
     "preview": "vite preview",
     "start": "node dist/server.mjs",
     "clean": "rm -rf dist server.js",

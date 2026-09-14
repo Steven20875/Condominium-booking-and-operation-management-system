@@ -92,6 +92,16 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   // Search/Filters logic
   const [searchUnit, setSearchUnit] = useState<string>('');
   const [searchRes, setSearchRes] = useState<string>('');
+  const [verificationQueue, setVerificationQueue] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    unitNumber: string;
+    governmentIdStatus: string;
+    governmentIdUploadedAt: string | null;
+    governmentIdRejectionReason: string | null;
+    hasValidId: boolean;
+  }>>([]);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -109,14 +119,15 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       };
 
       // Execute all fetches in parallel and wait for all to complete
-      const [statsRes, unitsRes, bookingsRes, paymentsRes, maintenanceRes, logsRes, residentsRes] = await Promise.all([
+      const [statsRes, unitsRes, bookingsRes, paymentsRes, maintenanceRes, logsRes, residentsRes, verificationRes] = await Promise.all([
         fetch('/api/dashboard/stats', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Stats fetch error:', e); return null; }),
         fetch('/api/units').then(safeJson).catch(e => { console.error('Units fetch error:', e); return null; }),
         fetch('/api/bookings', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Bookings fetch error:', e); return null; }),
         fetch('/api/payments', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Payments fetch error:', e); return null; }),
         fetch('/api/maintenance', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Maintenance fetch error:', e); return null; }),
         fetch('/api/logs', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Logs fetch error:', e); return null; }),
-        fetch('/api/residents', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Residents fetch error:', e); return null; })
+        fetch('/api/residents', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Residents fetch error:', e); return null; }),
+        fetch('/api/admin/government-id-verifications', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Government ID verification fetch error:', e); return null; })
       ]);
 
       // Update state atomically once all data is fetched
@@ -131,6 +142,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       if (Array.isArray(maintenanceRes)) setMaintenance(maintenanceRes);
       if (Array.isArray(logsRes)) setLogs(logsRes);
       if (Array.isArray(residentsRes)) setResidents(residentsRes as UserType[]);
+      if (Array.isArray(verificationRes)) setVerificationQueue(verificationRes as typeof verificationQueue);
     } catch (e) {
       console.error('Fatal data synchronization error:', e);
       toast('Error refreshing dashboard data. Please try again.', 'error');
@@ -142,6 +154,27 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   useEffect(() => {
     fetchAllData();
   }, [token]);
+
+  const handleGovernmentIdDecision = async (userId: string, action: 'approve' | 'reject', reason?: string) => {
+    try {
+      const response = await fetch(`/api/admin/government-id-verifications/${userId}/${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: action === 'reject' ? JSON.stringify({ reason: reason || 'Please upload a clearer and valid government-issued ID.' }) : undefined
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `Unable to ${action} government ID.`);
+
+      toast(data.message || `Government ID ${action}d.`, 'success');
+      fetchAllData();
+    } catch (err: any) {
+      toast(err.message || 'Unable to update government ID verification.', 'error');
+    }
+  };
 
   // Realtime updates via Server-Sent Events (SSE)
   useEffect(() => {
@@ -925,6 +958,59 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </Button>
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Pending ID Reviews</p>
+                  <p className="mt-2 text-2xl font-serif font-black text-amber-900">{verificationQueue.length}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Resident Accounts</p>
+                  <p className="mt-2 text-2xl font-serif font-black text-slate-900">{residents.length}</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Verified IDs</p>
+                  <p className="mt-2 text-2xl font-serif font-black text-emerald-900">{residents.filter((resident) => resident.governmentIdStatus === 'verified' || resident.hasValidId).length}</p>
+                </div>
+              </div>
+
+              {verificationQueue.length > 0 && (
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Government ID Verification Queue</h3>
+                    <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-bold uppercase text-amber-700">{verificationQueue.length} awaiting review</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {verificationQueue.map((resident) => (
+                      <div key={resident.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="font-bold text-slate-900">{resident.name}</p>
+                          <p className="text-[10px] text-slate-500">{resident.email} • {resident.unitNumber || 'No unit assigned'}</p>
+                          <p className="text-[9px] text-slate-400">Submitted {resident.governmentIdUploadedAt ? new Date(resident.governmentIdUploadedAt).toLocaleDateString() : 'Unknown date'}</p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/api/admin/government-id-verifications/${resident.id}/file`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-700"
+                          >
+                            View ID
+                          </a>
+                          <Button variant="success" size="sm" onClick={() => handleGovernmentIdDecision(resident.id, 'approve')}>
+                            Approve
+                          </Button>
+                          <Button variant="danger" size="sm" onClick={() => handleGovernmentIdDecision(resident.id, 'reject')}>
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Roster database Table representation */}
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
