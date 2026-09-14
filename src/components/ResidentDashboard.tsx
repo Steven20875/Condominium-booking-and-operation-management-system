@@ -426,13 +426,19 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     }
   };
 
+  const isUnitBookable = (unit: Unit) => {
+    const normalizedStatus = (unit.status || 'Available').toLowerCase();
+    return normalizedStatus === 'available' && unit.availability !== false;
+  };
+
   // Filters calculation
   const getFilteredUnits = () => {
     return units.filter((u: Unit) => {
       const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             u.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = filterType ? u.type.toLowerCase() === filterType.toLowerCase() : true;
-      const matchesStatus = filterStatus ? u.status.toLowerCase() === filterStatus.toLowerCase() : true;
+      const normalizedStatus = (u.status || 'Available').toLowerCase();
+      const matchesStatus = filterStatus ? normalizedStatus === filterStatus.toLowerCase() : true;
       return matchesSearch && matchesType && matchesStatus;
     });
   };
@@ -828,7 +834,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                   >
                     <option value="" className="bg-slate-900 text-white">All Statuses</option>
                     <option value="Available" className="bg-slate-900 text-white">Available</option>
-                    <option value="Booked" className="bg-slate-900 text-white">Leased / Booked</option>
+                    <option value="Occupied" className="bg-slate-900 text-white">Occupied / Not Available</option>
                     <option value="Maintenance" className="bg-slate-900 text-white">Maintenance Window</option>
                   </select>
                 </div>
@@ -875,17 +881,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                         <span className="text-[9px] text-slate-400 uppercase tracking-widest block font-bold">Daily Rate</span>
                         <span className="text-base font-bold text-slate-950">{formatCurrency(item.price)}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          disabled={item.status !== 'Available'}
-                          onClick={() => {
-                            setSelectedUnitForBooking(item);
-                          }}
-                          className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400 text-white px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider shadow"
-                        >
-                          {item.status === 'Available' ? 'Book Suite' : 'Occupied'}
-                        </button>
 
+                      {isUnitBookable(item) ? (
                         <button
                           onClick={() => {
                             if (!hasValidId) {
@@ -895,11 +892,15 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                             }
                             setSelectedUnitForBooking(item);
                           }}
-                          className="glass-button-secondary text-white px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider"
+                          className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider shadow"
                         >
                           Book Unit
                         </button>
-                      </div>
+                      ) : (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                          {item.status || 'Unavailable'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

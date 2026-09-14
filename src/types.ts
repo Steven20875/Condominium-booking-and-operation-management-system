@@ -20,7 +20,7 @@ export interface User {
   password?: string; // Kept in backend, stripped on API responses
 }
 
-export type UnitStatus = 'Available' | 'Booked' | 'Maintenance';
+export type UnitStatus = 'Available' | 'Occupied' | 'Maintenance';
 
 export interface Unit {
   id: string;

@@ -52,7 +52,7 @@ export const BOOKING_STATUSES = ['Pending', 'Approved', 'Rejected', 'Cancelled',
 export const PAYMENT_STATUSES = ['Pending', 'Paid', 'Failed', 'Refunded'] as const;
 export const MAINTENANCE_STATUSES = ['Pending', 'Assigned', 'In Progress', 'Completed', 'Deferred'] as const;
 export const MAINTENANCE_PRIORITIES = ['Low', 'Medium', 'High', 'Emergency'] as const;
-export const UNIT_STATUSES = ['Available', 'Booked', 'Maintenance'] as const;
+export const UNIT_STATUSES = ['Available', 'Occupied', 'Maintenance'] as const;
 
 export const PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'Bank Transfer', 'E-Wallet', 'QR PH'] as const;
 

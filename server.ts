@@ -207,23 +207,37 @@ export async function createApp() {
   });
 
   app.post('/api/auth/login', (req: Request, res: Response) => {
-    const { email, password } = req.body;
-    const missing = validateFields(req.body, ['email', 'password']);
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
-    }
+    const rawEmail = req.body?.email;
+    const rawPassword = req.body?.password;
 
-    if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
-      return res.status(400).json({ error: 'Email and password must be valid non-empty strings.' });
-    }
+    try {
+      const missing = validateFields(req.body, ['email', 'password']);
+      if (missing.length > 0) {
+        return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
+      }
 
-    const user = db.findUserByEmail(email.trim().toLowerCase());
-    if (!user || user.password !== password) {
-      return res.status(401).json({ error: 'Invalid email or password combination.' });
-    }
+      if (!isNonEmptyString(rawEmail) || !isNonEmptyString(rawPassword)) {
+        return res.status(400).json({ error: 'Email and password must be valid non-empty strings.' });
+      }
 
-    const { password: _, ...userSafe } = user as any;
-    res.status(200).json({ user: userSafe, token: user.id });
+      const email = String(rawEmail).trim().toLowerCase();
+      const password = String(rawPassword);
+      const user = db.findUserByEmail(email);
+
+      if (!user || typeof user.password !== 'string' || user.password !== password) {
+        return res.status(401).json({ error: 'Invalid email or password combination.' });
+      }
+
+      const { password: _, ...userSafe } = user as any;
+      return res.status(200).json({ user: userSafe, token: user.id });
+    } catch (error) {
+      console.error('[AUTH] Login exception:', {
+        email: typeof rawEmail === 'string' ? rawEmail : String(rawEmail ?? ''),
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      return res.status(500).json({ error: 'Internal server error. Please try again later.' });
+    }
   });
 
   app.get('/api/config/firebase', (_req: Request, res: Response) => {

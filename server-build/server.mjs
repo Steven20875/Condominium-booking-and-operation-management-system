@@ -36,6 +36,12 @@ var FALLBACK_DB_FILE = BACKUP_DB_CANDIDATES.find(isValidJsonFile) ?? PRIMARY_DB_
 var DB_FILE = fs.existsSync(PRIMARY_DB_FILE) ? PRIMARY_DB_FILE : FALLBACK_DB_FILE;
 var DB_SOURCE = DB_FILE === PRIMARY_DB_FILE ? "primary" : "backup";
 var DB_DIR = path.dirname(DB_FILE);
+function normalizeUnitStatus(status) {
+  const value = typeof status === "string" ? status.trim() : "";
+  if (value === "Maintenance") return "Maintenance";
+  if (value === "Occupied" || value === "Booked") return "Occupied";
+  return "Available";
+}
 function readDatabaseFile(filePath) {
   try {
     const fileContent = fs.readFileSync(filePath, "utf-8");
@@ -97,6 +103,7 @@ var MockDatabase = class {
           units: this.data.units.length,
           bookings: this.data.bookings.length
         });
+        this.normalizeUnitStatuses();
         this.normalizeExistingPayments();
         this.backfillMissingBookingPayments();
       } else if (fs.existsSync(PRIMARY_DB_FILE)) {
@@ -115,6 +122,25 @@ var MockDatabase = class {
     } catch (err) {
       console.error("Failed to initialize JSON database:", err);
       this.data = { ...emptyData };
+    }
+  }
+  normalizeUnitStatuses() {
+    let changed = false;
+    this.data.units = this.data.units.map((unit) => {
+      const normalizedStatus = normalizeUnitStatus(unit.status);
+      const needsUpdate = normalizedStatus !== unit.status || Boolean(unit.availability) !== (normalizedStatus === "Available");
+      if (needsUpdate) {
+        changed = true;
+        return {
+          ...unit,
+          status: normalizedStatus,
+          availability: normalizedStatus === "Available" ? true : false
+        };
+      }
+      return unit;
+    });
+    if (changed) {
+      this.save();
     }
   }
   normalizeExistingPayments() {
@@ -198,7 +224,14 @@ var MockDatabase = class {
     return this.data.users.find((u) => u.id === id);
   }
   findUserByEmail(email) {
-    return this.data.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!normalizedEmail) {
+      return void 0;
+    }
+    return this.data.users.find((user) => {
+      const currentEmail = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+      return currentEmail === normalizedEmail;
+    });
   }
   createUser(user) {
     const newUser = {
@@ -251,15 +284,16 @@ var MockDatabase = class {
     return this.data.units.find((u) => u.id === id);
   }
   createUnit(unit, operatorId, operatorName) {
+    const explicitStatus = normalizeUnitStatus(unit.status);
     const newUnit = {
       id: "unit-" + Math.random().toString(36).substr(2, 9),
       name: unit.name || "Gales Urban Haven Unit 1",
       type: unit.type || "Studio",
       description: unit.description || "",
       price: Number(unit.price) || 120,
-      availability: unit.availability !== void 0 ? unit.availability : true,
+      availability: explicitStatus === "Available",
       capacity: Number(unit.capacity) || 2,
-      status: unit.status || "Available",
+      status: explicitStatus,
       images: unit.images && unit.images.length > 0 ? unit.images : ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"],
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
@@ -272,9 +306,14 @@ var MockDatabase = class {
     const idx = this.data.units.findIndex((u) => u.id === id);
     if (idx === -1) return void 0;
     const original = this.data.units[idx];
+    const requestedStatus = normalizeUnitStatus(updates.status ?? original.status);
+    const nextStatus = requestedStatus;
+    const nextAvailability = nextStatus === "Available";
     const updated = {
       ...original,
       ...updates,
+      status: nextStatus,
+      availability: nextAvailability,
       price: updates.price !== void 0 ? Number(updates.price) : original.price,
       capacity: updates.capacity !== void 0 ? Number(updates.capacity) : original.capacity
     };
@@ -342,7 +381,7 @@ var MockDatabase = class {
     if (status === "Approved") {
       const unit = this.findUnitById(booking.unitId);
       if (unit) {
-        unit.status = "Booked";
+        unit.status = "Occupied";
         unit.availability = false;
       }
       this.createNotification({
@@ -354,7 +393,7 @@ var MockDatabase = class {
       });
     } else if (status === "Rejected" || status === "Cancelled") {
       const unit = this.findUnitById(booking.unitId);
-      if (unit && unit.status === "Booked") {
+      if (unit && unit.status === "Occupied") {
         unit.status = "Available";
         unit.availability = true;
       }
@@ -492,7 +531,7 @@ var MockDatabase = class {
         }
         const unit = this.findUnitById(booking.unitId);
         if (unit) {
-          unit.status = "Booked";
+          unit.status = "Occupied";
           unit.availability = false;
         }
       } else if (payment.status === "Partially Paid") {
@@ -655,8 +694,8 @@ var MockDatabase = class {
     const unresolvedMaintenance = maintenance.filter((r) => r.status !== "Completed").length;
     const totalInvoices = payments.length;
     const pendingPayments = payments.filter((p) => p.status === "Pending").length;
-    const bookedCount = units.filter((u) => u.status === "Booked" || !u.availability).length;
-    const occupancyRate = units.length > 0 ? Math.round(bookedCount / units.length * 100) : 0;
+    const occupiedCount = units.filter((u) => u.status === "Occupied" || !u.availability).length;
+    const occupancyRate = units.length > 0 ? Math.round(occupiedCount / units.length * 100) : 0;
     const paidPayments = payments.filter((p) => p.status === "Paid");
     const paidPaymentRevenueByMonth = /* @__PURE__ */ new Map();
     paidPayments.forEach((p) => {
@@ -904,20 +943,32 @@ async function createApp() {
     res.status(201).json({ user: userSafe, token: newUser.id });
   });
   app.post("/api/auth/login", (req, res) => {
-    const { email, password } = req.body;
-    const missing = validateFields(req.body, ["email", "password"]);
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing required fields: ${missing.join(", ")}.` });
+    const rawEmail = req.body?.email;
+    const rawPassword = req.body?.password;
+    try {
+      const missing = validateFields(req.body, ["email", "password"]);
+      if (missing.length > 0) {
+        return res.status(400).json({ error: `Missing required fields: ${missing.join(", ")}.` });
+      }
+      if (!isNonEmptyString(rawEmail) || !isNonEmptyString(rawPassword)) {
+        return res.status(400).json({ error: "Email and password must be valid non-empty strings." });
+      }
+      const email = String(rawEmail).trim().toLowerCase();
+      const password = String(rawPassword);
+      const user = db.findUserByEmail(email);
+      if (!user || typeof user.password !== "string" || user.password !== password) {
+        return res.status(401).json({ error: "Invalid email or password combination." });
+      }
+      const { password: _, ...userSafe } = user;
+      return res.status(200).json({ user: userSafe, token: user.id });
+    } catch (error) {
+      console.error("[AUTH] Login exception:", {
+        email: typeof rawEmail === "string" ? rawEmail : String(rawEmail ?? ""),
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : void 0
+      });
+      return res.status(500).json({ error: "Internal server error. Please try again later." });
     }
-    if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
-      return res.status(400).json({ error: "Email and password must be valid non-empty strings." });
-    }
-    const user = db.findUserByEmail(email.trim().toLowerCase());
-    if (!user || user.password !== password) {
-      return res.status(401).json({ error: "Invalid email or password combination." });
-    }
-    const { password: _, ...userSafe } = user;
-    res.status(200).json({ user: userSafe, token: user.id });
   });
   app.get("/api/config/firebase", (_req, res) => {
     res.json({ firebase: firebaseConfigFromEnv });

@@ -75,7 +75,7 @@ export const StatusBadge = ({ status, size = 'md' }: { status: string; size?: Ba
     'Paid': { variant: 'success', label: 'Paid' },
     'Failed': { variant: 'error', label: 'Failed' },
     'Available': { variant: 'success', label: 'Available' },
-    'Booked': { variant: 'warning', label: 'Booked' },
+    'Occupied': { variant: 'warning', label: 'Occupied' },
     'Maintenance': { variant: 'info', label: 'Maintenance' },
     'Cancelled': { variant: 'error', label: 'Cancelled' },
     'Closed': { variant: 'info', label: 'Closed' },

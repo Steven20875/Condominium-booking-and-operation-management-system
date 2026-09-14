@@ -51,6 +51,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [unitDescription, setUnitDescription] = useState<string>('');
   const [unitPrice, setUnitPrice] = useState<number>(0);
   const [unitCapacity, setUnitCapacity] = useState<number>(0);
+  const [unitStatus, setUnitStatus] = useState<'Available' | 'Occupied' | 'Maintenance'>('Available');
   const [unitImages, setUnitImages] = useState<string[]>([]);
   const [submittingUnit, setSubmittingUnit] = useState<boolean>(false);
 
@@ -199,6 +200,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       description: unitDescription,
       price: Number(unitPrice),
       capacity: Number(unitCapacity),
+      status: unitStatus,
+      availability: unitStatus === 'Available',
       images: unitImages
     };
 
@@ -795,6 +798,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     setUnitName('');
                     setUnitDescription('');
                     setUnitPrice(0);
+                    setUnitCapacity(2);
+                    setUnitStatus('Available');
                     setShowAddUnitModal(true);
                   }}
                   icon={Plus}
@@ -1372,7 +1377,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
                   <button
                     type="button"
-                    onClick={() => setShowAddUnitModal(false)}
+                    onClick={() => {
+                      setShowAddUnitModal(false);
+                      setUnitStatus('Available');
+                    }}
                     aria-label="Close unit modal"
                     className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
                   >
@@ -1467,6 +1475,20 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
 
                   <div className="space-y-1">
+                    <label htmlFor="unit-status" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Availability Status</label>
+                    <select
+                      id="unit-status"
+                      value={unitStatus}
+                      onChange={(e) => setUnitStatus(e.target.value as 'Available' | 'Occupied' | 'Maintenance')}
+                      className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
+                    >
+                      <option value="Available">Available</option>
+                      <option value="Occupied">Occupied</option>
+                      <option value="Maintenance">Maintenance</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Unit Layout Descriptions</label>
                     <textarea
                       rows={3}
@@ -1482,7 +1504,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <Button
                     variant="secondary"
                     fullWidth
-                    onClick={() => setShowAddUnitModal(false)}
+                    onClick={() => {
+                      setShowAddUnitModal(false);
+                      setUnitStatus('Available');
+                    }}
                   >
                     Cancel
                   </Button>

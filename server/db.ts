@@ -44,6 +44,13 @@ const DB_FILE = fs.existsSync(PRIMARY_DB_FILE) ? PRIMARY_DB_FILE : FALLBACK_DB_F
 const DB_SOURCE = DB_FILE === PRIMARY_DB_FILE ? 'primary' : 'backup';
 const DB_DIR = path.dirname(DB_FILE);
 
+function normalizeUnitStatus(status?: string): 'Available' | 'Occupied' | 'Maintenance' {
+  const value = typeof status === 'string' ? status.trim() : '';
+  if (value === 'Maintenance') return 'Maintenance';
+  if (value === 'Occupied' || value === 'Booked') return 'Occupied';
+  return 'Available';
+}
+
 function readDatabaseFile(filePath: string): DatabaseSchema | null {
   try {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -123,6 +130,7 @@ class MockDatabase {
           bookings: this.data.bookings.length
         });
 
+        this.normalizeUnitStatuses();
         this.normalizeExistingPayments();
         this.backfillMissingBookingPayments();
       } else if (fs.existsSync(PRIMARY_DB_FILE)) {
@@ -142,6 +150,30 @@ class MockDatabase {
     } catch (err) {
       console.error('Failed to initialize JSON database:', err);
       this.data = { ...emptyData };
+    }
+  }
+
+  private normalizeUnitStatuses() {
+    let changed = false;
+
+    this.data.units = this.data.units.map((unit) => {
+      const normalizedStatus = normalizeUnitStatus(unit.status);
+      const needsUpdate = normalizedStatus !== unit.status || Boolean(unit.availability) !== (normalizedStatus === 'Available');
+
+      if (needsUpdate) {
+        changed = true;
+        return {
+          ...unit,
+          status: normalizedStatus,
+          availability: normalizedStatus === 'Available' ? true : false
+        };
+      }
+
+      return unit;
+    });
+
+    if (changed) {
+      this.save();
     }
   }
 
@@ -243,7 +275,15 @@ class MockDatabase {
   }
 
   public findUserByEmail(email: string): User | undefined {
-    return this.data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!normalizedEmail) {
+      return undefined;
+    }
+
+    return this.data.users.find((user) => {
+      const currentEmail = typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+      return currentEmail === normalizedEmail;
+    });
   }
 
   public createUser(user: Partial<User> & { password?: string }): User {
@@ -305,15 +345,16 @@ class MockDatabase {
   }
 
   public createUnit(unit: Partial<Unit>, operatorId: string, operatorName: string): Unit {
+    const explicitStatus = normalizeUnitStatus(unit.status);
     const newUnit: Unit = {
       id: 'unit-' + Math.random().toString(36).substr(2, 9),
       name: unit.name || 'Gales Urban Haven Unit 1',
       type: unit.type || 'Studio',
       description: unit.description || '',
       price: Number(unit.price) || 120.00,
-      availability: unit.availability !== undefined ? unit.availability : true,
+      availability: explicitStatus === 'Available',
       capacity: Number(unit.capacity) || 2,
-      status: unit.status || 'Available',
+      status: explicitStatus,
       images: unit.images && unit.images.length > 0 ? unit.images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'],
       createdAt: new Date().toISOString()
     };
@@ -327,10 +368,15 @@ class MockDatabase {
     const idx = this.data.units.findIndex(u => u.id === id);
     if (idx === -1) return undefined;
     const original = this.data.units[idx];
-    
-    const updated = { 
-      ...original, 
+    const requestedStatus = normalizeUnitStatus(updates.status ?? original.status);
+    const nextStatus = requestedStatus;
+    const nextAvailability = nextStatus === 'Available';
+
+    const updated = {
+      ...original,
       ...updates,
+      status: nextStatus,
+      availability: nextAvailability,
       price: updates.price !== undefined ? Number(updates.price) : original.price,
       capacity: updates.capacity !== undefined ? Number(updates.capacity) : original.capacity,
     };
@@ -413,7 +459,7 @@ class MockDatabase {
     if (status === 'Approved') {
       const unit = this.findUnitById(booking.unitId);
       if (unit) {
-        unit.status = 'Booked';
+        unit.status = 'Occupied';
         unit.availability = false;
       }
       this.createNotification({
@@ -425,7 +471,7 @@ class MockDatabase {
       });
     } else if (status === 'Rejected' || status === 'Cancelled') {
       const unit = this.findUnitById(booking.unitId);
-      if (unit && unit.status === 'Booked') {
+      if (unit && unit.status === 'Occupied') {
         unit.status = 'Available';
         unit.availability = true;
       }
@@ -588,7 +634,7 @@ class MockDatabase {
         }
         const unit = this.findUnitById(booking.unitId);
         if (unit) {
-          unit.status = 'Booked';
+          unit.status = 'Occupied';
           unit.availability = false;
         }
       } else if (payment.status === 'Partially Paid') {
@@ -785,9 +831,9 @@ class MockDatabase {
     const totalInvoices = payments.length;
     const pendingPayments = payments.filter(p => p.status === 'Pending').length;
 
-    // Calculate Occupancy Rate: Booked units / Total units
-    const bookedCount = units.filter(u => u.status === 'Booked' || !u.availability).length;
-    const occupancyRate = units.length > 0 ? Math.round((bookedCount / units.length) * 100) : 0;
+    // Calculate occupancy rate from active occupied inventory.
+    const occupiedCount = units.filter(u => u.status === 'Occupied' || !u.availability).length;
+    const occupancyRate = units.length > 0 ? Math.round((occupiedCount / units.length) * 100) : 0;
 
     // Derived monthly revenue from valid paid payment records only.
     const paidPayments = payments.filter(p => p.status === 'Paid');
