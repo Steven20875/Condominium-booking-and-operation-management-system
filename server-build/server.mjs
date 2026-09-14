@@ -758,6 +758,30 @@ var MockDatabase = class {
       maintenancePriorityData
     };
   }
+  getDiagnostics() {
+    const adminUser = this.data.users.find((u) => u.role === "admin");
+    return {
+      environment: {
+        isVercel,
+        cwd: process.cwd(),
+        dbFile: DB_FILE,
+        dbSource: DB_SOURCE
+      },
+      database: {
+        exists: fs.existsSync(DB_FILE),
+        userCount: this.data.users.length,
+        unitCount: this.data.units.length,
+        bookingCount: this.data.bookings.length
+      },
+      adminUser: adminUser ? {
+        id: adminUser.id,
+        email: adminUser.email,
+        name: adminUser.name,
+        role: adminUser.role
+      } : null,
+      adminExists: Boolean(this.data.users.find((u) => u.email === "admin@condo.com"))
+    };
+  }
 };
 var db = new MockDatabase();
 
@@ -1335,6 +1359,10 @@ async function createApp() {
   });
   app.get("/api/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
+  });
+  app.get("/api/diagnostics/db-status", (_req, res) => {
+    const diag = db.getDiagnostics();
+    res.status(200).json(diag);
   });
   app.get("/api/events", (req, res) => {
     const token = req.query.token && String(req.query.token).trim() || (String(req.headers.authorization || "").startsWith("Bearer ") ? String(req.headers.authorization).split(" ")[1] : "");

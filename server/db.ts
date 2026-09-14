@@ -912,6 +912,31 @@ class MockDatabase {
       maintenancePriorityData
     };
   }
+
+  public getDiagnostics() {
+    const adminUser = this.data.users.find(u => u.role === 'admin');
+    return {
+      environment: {
+        isVercel,
+        cwd: process.cwd(),
+        dbFile: DB_FILE,
+        dbSource: DB_SOURCE
+      },
+      database: {
+        exists: fs.existsSync(DB_FILE),
+        userCount: this.data.users.length,
+        unitCount: this.data.units.length,
+        bookingCount: this.data.bookings.length
+      },
+      adminUser: adminUser ? {
+        id: adminUser.id,
+        email: adminUser.email,
+        name: adminUser.name,
+        role: adminUser.role
+      } : null,
+      adminExists: Boolean(this.data.users.find(u => u.email === 'admin@condo.com'))
+    };
+  }
 }
 
 export const db = new MockDatabase();

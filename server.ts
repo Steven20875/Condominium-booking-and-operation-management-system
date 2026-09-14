@@ -701,6 +701,12 @@ export async function createApp() {
     res.status(200).json({ status: 'ok' });
   });
 
+  // Diagnostic endpoint for troubleshooting database loading on production
+  app.get('/api/diagnostics/db-status', (_req: Request, res: Response) => {
+    const diag = db.getDiagnostics();
+    res.status(200).json(diag);
+  });
+
   // Server-Sent Events stream for realtime updates (requires token query or Bearer header)
   app.get('/api/events', (req: Request, res: Response) => {
     const token = (req.query.token && String(req.query.token).trim()) || (String(req.headers.authorization || '').startsWith('Bearer ') ? String(req.headers.authorization).split(' ')[1] : '');
