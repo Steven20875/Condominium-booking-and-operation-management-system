@@ -4,7 +4,7 @@ import { useToast } from './ToastContext.tsx';
 import { 
   Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, ChevronLeft, ChevronRight, Sun, Heart, X, Sparkles, Upload, FileText, DollarSign, HelpCircle, QrCode, Smartphone, ShieldCheck 
 } from 'lucide-react';
-import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification, Inquiry, Purchase } from '../types.ts';
+import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification } from '../types.ts';
 import { formatCurrency, formatCurrencyText } from '../utils/currency.ts';
 import UserManual from './UserManual';
 
@@ -63,12 +63,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [bookingNotes, setBookingNotes] = useState<string>('');
   const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
 
-  // Inquire / Buy action state
-  const [selectedUnitForAction, setSelectedUnitForAction] = useState<Unit | null>(null);
-  const [actionType, setActionType] = useState<'inquire' | 'buy'>('inquire');
-  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const [actionMessage, setActionMessage] = useState<string>('');
-  const [submittingAction, setSubmittingAction] = useState<boolean>(false);
+  const [hasValidId, setHasValidId] = useState<boolean>(Boolean(user.hasValidId));
 
   // Unit Filtering Sizing
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -188,7 +183,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       })
       .catch(e => console.error(e));
 
-    // Note: Inquiries and purchases are POST-only endpoints; no GET retrieval is supported
   };
 
   useEffect(() => {
@@ -210,7 +204,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
           name: profileName,
           phone: profilePhone,
           unitNumber: profileUnit,
-          avatarUrl: profileAvatar
+          avatarUrl: profileAvatar,
+          hasValidId
         })
       });
 
@@ -226,45 +221,9 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     }
   };
 
-  // Submit inquire or buy action
-  const handleSubmitAction = async () => {
-    if (!selectedUnitForAction) return;
-    setSubmittingAction(true);
-
-    try {
-      const payload: any = {
-        unitId: selectedUnitForAction.id,
-        unitName: selectedUnitForAction.name,
-        residentId: user.id,
-        residentName: user.name,
-        type: actionType,
-        frequency: actionType === 'inquire' ? frequency : frequency,
-        message: actionMessage,
-      };
-
-      const endpoint = actionType === 'inquire' ? '/api/inquiries' : '/api/purchases';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Action failed.');
-
-      toast(`${actionType === 'inquire' ? 'Inquiry' : 'Purchase request'} submitted for ${selectedUnitForAction.name}`, 'success');
-      setSelectedUnitForAction(null);
-      setActionMessage('');
-      fetchAllData();
-    } catch (err: any) {
-      toast(err.message || 'Failed to submit request.', 'error');
-    } finally {
-      setSubmittingAction(false);
-    }
-  };
+  useEffect(() => {
+    setHasValidId(Boolean(user.hasValidId));
+  }, [user.hasValidId]);
 
   // Avatar Upload simulation
   const handleAvatarSelect = (url: string) => {
@@ -293,13 +252,23 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   };
 
   const calculateTotalCost = (price: number) => {
-    return calculateDays() * price;
+    const days = calculateDays();
+    const isHolidayWindow = [11, 12].includes(new Date(checkInDate).getMonth()) || [11, 12].includes(new Date(checkOutDate).getMonth());
+    const holidayMultiplier = isHolidayWindow ? 0.9 : 1;
+    const seasonalSurcharge = (new Date(checkInDate).getMonth() === 11 || new Date(checkInDate).getMonth() === 0 || new Date(checkOutDate).getMonth() === 11 || new Date(checkOutDate).getMonth() === 0) ? 250 : 0;
+    const base = days * price;
+    return Math.round((base * holidayMultiplier + seasonalSurcharge) * 100) / 100;
   };
 
   // Currency formatting (display in PHP)
   // Submit Booking request
   const handleConfirmBooking = async () => {
     if (!selectedUnitForBooking) return;
+    if (!hasValidId) {
+      toast('A valid ID must be verified in Profile Settings before a booking can be submitted.', 'error');
+      setActiveTab('profile');
+      return;
+    }
     setSubmittingBooking(true);
     
     const cost = calculateTotalCost(selectedUnitForBooking.price);
@@ -349,7 +318,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       if (amountToPay <= 0 || amountToPay > payingInvoice.remainingBalance) {
         throw new Error('Enter a valid payment amount within the remaining balance.');
       }
-      const mockRef = (selectedMethod === 'Cash' ? 'CASH-' : selectedMethod.startsWith('QR') ? 'QRPH-' : 'TXN-') + Math.random().toString(36).substr(2, 6).toUpperCase();
       const res = await fetch(`/api/payments/${payingInvoice.id}/pay`, {
         method: 'POST',
         headers: {
@@ -357,8 +325,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          method: selectedMethod,
-          referenceNumber: mockRef,
+          method: 'Cash',
           amount: amountToPay
         })
       });
@@ -900,13 +867,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                         </div>
                         <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{item.description}</p>
                         
-                        <div className="flex flex-wrap gap-1 leading-none">
-                          {item.amenities.map((am, idx) => (
-                            <span key={idx} className="text-[9px] bg-slate-50 border border-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                              {am}
-                            </span>
-                          ))}
-                        </div>
                       </div>
                     </div>
 
@@ -928,14 +888,16 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
                         <button
                           onClick={() => {
-                            setSelectedUnitForAction(item);
-                            setActionType('inquire');
-                            setFrequency('daily');
-                            setActionMessage('');
+                            if (!hasValidId) {
+                              toast('Valid ID verification is required before booking. Update your profile first.', 'warning');
+                              setActiveTab('profile');
+                              return;
+                            }
+                            setSelectedUnitForBooking(item);
                           }}
                           className="glass-button-secondary text-white px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider"
                         >
-                          Inquire / Buy
+                          Book Unit
                         </button>
                       </div>
                     </div>
@@ -1392,6 +1354,36 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                   />
                 </div>
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Valid Government ID</p>
+                      <p className="text-xs text-slate-500">Required before any booking can be submitted.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-[9px] font-bold uppercase ${hasValidId ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                        {hasValidId ? 'Verified' : 'Not Verified'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setHasValidId(true)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold ${hasValidId ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                    >
+                      Yes, I have a valid ID
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHasValidId(false)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold ${!hasValidId ? 'border-rose-500 bg-rose-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                    >
+                      No, I do not have one
+                    </button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label htmlFor="profile-phone" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">SMS / Call Coordinates</label>
@@ -1555,67 +1547,6 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
           </div>
         )}
       </AnimatePresence>
-
-        {/* C. INQUIRE / BUY MODAL */}
-        <AnimatePresence>
-          {selectedUnitForAction && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden flex flex-col"
-              >
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-serif font-black">{selectedUnitForAction.name}</h3>
-                      <p className="text-xs text-slate-500">{selectedUnitForAction.type} • {formatCurrency(selectedUnitForAction.price)} / day</p>
-                    </div>
-                    <button type="button" aria-label="Close action modal" onClick={() => setSelectedUnitForAction(null)} className="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 rounded-full">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase text-slate-600">Action</label>
-                      <div className="mt-2 flex gap-2">
-                        <button type="button" onClick={() => setActionType('inquire')} className={`py-2 px-3 rounded-xl text-xs font-bold ${actionType === 'inquire' ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-700'}`}>
-                          Inquire
-                        </button>
-                        <button type="button" onClick={() => setActionType('buy')} className={`py-2 px-3 rounded-xl text-xs font-bold ${actionType === 'buy' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-700'}`}>
-                          Buy / Lease
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="action-frequency" className="text-[10px] font-bold uppercase text-slate-600">Frequency</label>
-                      <select id="action-frequency" value={frequency} onChange={(e) => setFrequency(e.target.value as any)} className="w-full mt-2 bg-slate-50 border border-slate-200 py-2 px-3 rounded-xl text-xs">
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="action-message" className="text-[10px] font-bold uppercase text-slate-600">Message (optional)</label>
-                    <textarea id="action-message" value={actionMessage} onChange={(e) => setActionMessage(e.target.value)} rows={4} className="w-full mt-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" placeholder="Additional notes for the admin or seller..." />
-                  </div>
-                </div>
-
-                <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
-                  <button onClick={() => setSelectedUnitForAction(null)} className="flex-1 py-3 border border-slate-200 bg-white text-slate-700 font-bold text-xs rounded-xl">Cancel</button>
-                  <button onClick={handleSubmitAction} disabled={submittingAction} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl">
-                    {submittingAction ? 'Submitting…' : actionType === 'inquire' ? 'Send Inquiry' : 'Request Purchase'}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
 
       {/* B. SECURED CARD PAYMENT TERMINAL MODAL */}
       <AnimatePresence>

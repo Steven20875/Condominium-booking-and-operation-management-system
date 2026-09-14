@@ -14,6 +14,18 @@ export class PaymentService {
     return this.database.getUserPayments(userId);
   }
 
+  getPaymentByBookingId(bookingId: string) {
+    return this.database.getPaymentByBookingId(bookingId);
+  }
+
+  ensureBookingPayment(booking: any) {
+    return this.database.ensureBookingPayment(booking);
+  }
+
+  generateCashReference(paymentId: string) {
+    return this.database.generateCashReference(paymentId);
+  }
+
   submitPayment(paymentId: string, method: string, reference: string, amountPaid: number, residentId: string, residentName: string) {
     return this.database.submitPayment(paymentId, method, reference, amountPaid, residentId, residentName);
   }

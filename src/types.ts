@@ -14,6 +14,8 @@ export interface User {
   avatarUrl?: string;
   authProvider?: 'email' | 'google' | 'firebase';
   authUid?: string;
+  hasValidId?: boolean;
+  validIdVerifiedAt?: string;
   createdAt: string;
   password?: string; // Kept in backend, stripped on API responses
 }
@@ -26,12 +28,12 @@ export interface Unit {
   type: string;
   description: string;
   price: number;
-  amenities: string[];
   availability: boolean;
   capacity: number;
-  floorNumber: number;
   status: UnitStatus;
   images: string[]; // URLs or base64 data items
+  amenities?: string[]; // kept optional for compatibility with legacy data
+  floorNumber?: number; // kept optional for compatibility with legacy data
   createdAt: string;
 }
 
@@ -129,29 +131,3 @@ export interface DashboardStats {
   maintenancePriorityData: { name: string; value: number }[];
 }
 
-export type InquiryFrequency = 'daily' | 'weekly' | 'monthly';
-
-export interface Inquiry {
-  id: string;
-  unitId: string;
-  unitName?: string;
-  residentId: string;
-  residentName?: string;
-  type: 'inquire' | 'buy';
-  frequency?: InquiryFrequency; // Optional for one-off buys
-  message?: string;
-  status?: 'Open' | 'Responded' | 'Closed';
-  createdAt: string;
-}
-
-export interface Purchase {
-  id: string;
-  unitId: string;
-  unitName?: string;
-  residentId: string;
-  residentName?: string;
-  amount?: number;
-  frequency?: InquiryFrequency;
-  status?: 'Pending' | 'Completed' | 'Cancelled';
-  createdAt: string;
-}

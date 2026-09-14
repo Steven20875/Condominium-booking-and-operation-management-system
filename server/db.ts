@@ -124,6 +124,7 @@ class MockDatabase {
         });
 
         this.normalizeExistingPayments();
+        this.backfillMissingBookingPayments();
       } else if (fs.existsSync(PRIMARY_DB_FILE)) {
         console.warn('[DB] Primary data/db.json exists but was unreadable. Refusing backup override so Vercel does not silently switch to stale credentials.');
         this.data = { ...emptyData };
@@ -163,6 +164,8 @@ class MockDatabase {
         remainingBalance: remaining,
         downpaymentAmount: down,
         status: payment.status || 'Pending',
+        method: payment.bookingId ? 'Cash' : (payment.method || 'Cash'),
+        referenceNumber: payment.referenceNumber || `CASH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
         // keep `amount` as the invoice total for backward-compatibility
         amount: total
       };
@@ -255,6 +258,8 @@ class MockDatabase {
       avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name || 'user')}`,
       authProvider: user.authProvider || 'email',
       authUid: user.authUid || '',
+      hasValidId: user.hasValidId ?? false,
+      validIdVerifiedAt: user.validIdVerifiedAt || (user.hasValidId ? new Date().toISOString() : undefined),
       createdAt: new Date().toISOString()
     };
     this.data.users.push(newUser);
@@ -302,21 +307,19 @@ class MockDatabase {
   public createUnit(unit: Partial<Unit>, operatorId: string, operatorName: string): Unit {
     const newUnit: Unit = {
       id: 'unit-' + Math.random().toString(36).substr(2, 9),
-      name: unit.name!,
+      name: unit.name || 'Gales Urban Haven Unit 1',
       type: unit.type || 'Studio',
       description: unit.description || '',
       price: Number(unit.price) || 120.00,
-      amenities: unit.amenities || [],
       availability: unit.availability !== undefined ? unit.availability : true,
       capacity: Number(unit.capacity) || 2,
-      floorNumber: Number(unit.floorNumber) || 1,
       status: unit.status || 'Available',
       images: unit.images && unit.images.length > 0 ? unit.images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'],
       createdAt: new Date().toISOString()
     };
     this.data.units.push(newUnit);
     this.save();
-    this.addActivityLog(operatorId, operatorName, 'admin', 'Unit Added', `Created unit ${newUnit.name} on floor ${newUnit.floorNumber}`);
+    this.addActivityLog(operatorId, operatorName, 'admin', 'Unit Added', `Created unit ${newUnit.name}`);
     return newUnit;
   }
 
@@ -330,7 +333,6 @@ class MockDatabase {
       ...updates,
       price: updates.price !== undefined ? Number(updates.price) : original.price,
       capacity: updates.capacity !== undefined ? Number(updates.capacity) : original.capacity,
-      floorNumber: updates.floorNumber !== undefined ? Number(updates.floorNumber) : original.floorNumber,
     };
     
     this.data.units[idx] = updated;
@@ -383,25 +385,7 @@ class MockDatabase {
     };
     
     this.data.bookings.unshift(newBooking);
-    
-    // Create automatic pending payment for tracker
-    const newPayment: Payment = {
-      id: 'pay-' + Math.random().toString(36).substr(2, 9),
-      bookingId: newBooking.id,
-      residentId: newBooking.residentId,
-      residentName: newBooking.residentName,
-      unitName: newBooking.unitName,
-      amount: newBooking.totalPrice,
-      totalAmount: newBooking.totalPrice,
-      paidAmount: 0,
-      remainingBalance: newBooking.totalPrice,
-      downpaymentAmount: 0,
-      status: 'Pending',
-      method: 'Credit Card',
-      referenceNumber: 'TXN-PENDING-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-      createdAt: new Date().toISOString()
-    };
-    this.data.payments.unshift(newPayment);
+    this.ensureBookingPayment(newBooking);
 
     // Create automatic system notification for Admin
     this.createNotification({
@@ -423,6 +407,7 @@ class MockDatabase {
     
     const booking = this.data.bookings[idx];
     booking.status = status;
+    this.ensureBookingPayment(booking);
 
     // Side effects of status change
     if (status === 'Approved') {
@@ -481,41 +466,118 @@ class MockDatabase {
     return this.data.payments.filter(p => p.residentId === userId);
   }
 
+  public getPaymentByBookingId(bookingId: string): Payment | undefined {
+    return this.data.payments.find((p) => p.bookingId === bookingId);
+  }
+
+  public ensureBookingPayment(booking: Booking): Payment {
+    const existing = this.getPaymentByBookingId(booking.id);
+    const totalAmount = Number(booking.totalPrice || 0);
+
+    if (existing) {
+      const paidAmount = Math.max(0, Number(existing.paidAmount || 0));
+      const normalizedTotal = Math.max(0, Number(existing.totalAmount || totalAmount || existing.amount || 0));
+      const nextRemaining = Math.max(0, normalizedTotal - paidAmount);
+      const nextStatus: Payment['status'] = nextRemaining <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partially Paid' : 'Pending');
+
+      const normalizedPayment: Payment = {
+        ...existing,
+        bookingId: booking.id,
+        residentId: existing.residentId || booking.residentId,
+        residentName: existing.residentName || booking.residentName || 'Unknown Resident',
+        unitName: existing.unitName || booking.unitName || 'Unit',
+        amount: normalizedTotal,
+        totalAmount: normalizedTotal,
+        paidAmount,
+        remainingBalance: nextRemaining,
+        status: nextStatus,
+        method: 'Cash',
+        referenceNumber: existing.referenceNumber || `CASH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+        createdAt: existing.createdAt || booking.createdAt
+      };
+
+      if (JSON.stringify(existing) !== JSON.stringify(normalizedPayment)) {
+        const idx = this.data.payments.findIndex((p) => p.id === existing.id);
+        this.data.payments[idx] = normalizedPayment;
+        this.save();
+      }
+
+      return normalizedPayment;
+    }
+
+    const newPayment: Payment = {
+      id: 'pay-' + Math.random().toString(36).substr(2, 9),
+      bookingId: booking.id,
+      residentId: booking.residentId,
+      residentName: booking.residentName || 'Unknown Resident',
+      unitName: booking.unitName || 'Unit',
+      amount: totalAmount,
+      totalAmount: totalAmount,
+      paidAmount: 0,
+      remainingBalance: totalAmount,
+      downpaymentAmount: 0,
+      status: 'Pending',
+      method: 'Cash',
+      referenceNumber: `CASH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      createdAt: new Date().toISOString()
+    };
+
+    this.data.payments.unshift(newPayment);
+    this.save();
+    this.addActivityLog(booking.residentId, booking.residentName || 'Resident', 'resident', 'Ledger Created', `Created automatic cash ledger for booking ${booking.id}`);
+    return newPayment;
+  }
+
+  public backfillMissingBookingPayments(): void {
+    let changed = false;
+
+    for (const booking of this.data.bookings) {
+      const existing = this.getPaymentByBookingId(booking.id);
+      if (!existing) {
+        this.ensureBookingPayment(booking);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.save();
+    }
+  }
+
+  public generateCashReference(paymentId: string): string {
+    return `CASH-${paymentId.replace(/^pay-/, '').slice(0, 8).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  }
+
   public submitPayment(paymentId: string, method: string, reference: string, amountPaid: number, residentId: string, residentName: string): Payment | undefined {
-    const idx = this.data.payments.findIndex(p => p.id === paymentId);
+    const idx = this.data.payments.findIndex(p => p.id === paymentId || p.bookingId === paymentId);
     if (idx === -1) return undefined;
     
     const payment = this.data.payments[idx];
-    // Compute remaining based on authoritative fields
-    const remainingBefore = (typeof payment.remainingBalance === 'number') ? payment.remainingBalance : ((typeof payment.totalAmount === 'number' ? payment.totalAmount : payment.amount) - (typeof payment.paidAmount === 'number' ? payment.paidAmount : 0));
+    const totalAmount = Number(payment.totalAmount || payment.amount || 0);
+    const remainingBefore = Number(payment.remainingBalance ?? Math.max(0, totalAmount - (Number(payment.paidAmount || 0))));
+
     if (amountPaid <= 0) {
       return undefined;
     }
     if (amountPaid > remainingBefore) {
       return undefined;
     }
+    if (payment.status === 'Paid') {
+      return undefined;
+    }
 
-    payment.method = method as any;
-    payment.referenceNumber = reference;
+    payment.method = 'Cash';
+    payment.referenceNumber = reference || this.generateCashReference(payment.id);
     payment.paidAt = new Date().toISOString();
-    // Accumulate paid amount and recalc remaining; never overwrite invoice total
-    payment.paidAmount = (typeof payment.paidAmount === 'number' ? payment.paidAmount : 0) + amountPaid;
-    payment.totalAmount = typeof payment.totalAmount === 'number' ? payment.totalAmount : (typeof payment.amount === 'number' ? payment.amount : 0);
-    payment.remainingBalance = Math.max(0, payment.totalAmount - payment.paidAmount);
+    payment.paidAmount = Number(payment.paidAmount || 0) + amountPaid;
+    payment.totalAmount = totalAmount;
+    payment.remainingBalance = Math.max(0, totalAmount - payment.paidAmount);
 
-    // Preserve the first downpayment as the downpaymentAmount; subsequent payments accumulate in paidAmount
     if (!payment.downpaymentAmount || payment.downpaymentAmount <= 0) {
       payment.downpaymentAmount = amountPaid;
     }
 
-    // Set status according to paid vs total
-    if (payment.paidAmount < payment.totalAmount) {
-      payment.status = 'Partially Paid';
-    } else {
-      payment.status = 'Paid';
-    }
-
-    // Keep `amount` representing the invoice total for compatibility
+    payment.status = payment.remainingBalance <= 0 ? 'Paid' : (payment.paidAmount > 0 ? 'Partially Paid' : 'Pending');
     payment.amount = payment.totalAmount;
 
     const booking = this.findBookingById(payment.bookingId);
@@ -537,15 +599,15 @@ class MockDatabase {
     }
 
     this.createNotification({
-      title: 'Payment Received',
-      message: `${residentName} submitted a payment of ₱${amountPaid.toFixed(2)} for ${payment.unitName || 'unit'} (Ref: ${reference}).`,
+      title: 'Cash Payment Received',
+      message: `${residentName} paid ₱${amountPaid.toFixed(2)} in cash for ${payment.unitName || 'unit'} (Ref: ${payment.referenceNumber}).`,
       recipientId: 'all',
       recipientRole: 'admin',
       type: 'success'
     });
 
     this.save();
-    this.addActivityLog(residentId, residentName, 'resident', 'Payment Submitted', `Paid ₱${amountPaid.toFixed(2)} references ${reference}`);
+    this.addActivityLog(residentId, residentName, 'resident', 'Cash Payment Submitted', `Paid ₱${amountPaid.toFixed(2)} cash. Ref: ${payment.referenceNumber}`);
     return payment;
   }
 

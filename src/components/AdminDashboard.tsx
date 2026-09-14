@@ -51,8 +51,6 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [unitDescription, setUnitDescription] = useState<string>('');
   const [unitPrice, setUnitPrice] = useState<number>(0);
   const [unitCapacity, setUnitCapacity] = useState<number>(0);
-  const [unitFloor, setUnitFloor] = useState<number>(0);
-  const [unitAmenities, setUnitAmenities] = useState<string>('');
   const [unitImages, setUnitImages] = useState<string[]>([]);
   const [submittingUnit, setSubmittingUnit] = useState<boolean>(false);
 
@@ -188,21 +186,19 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   // Handler for adding dynamic units
   const handleAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!unitName || !unitPrice) {
-      toast('Please supply a listing name and pricing.', 'warning');
+    const normalizedUnitName = unitName.trim() || 'Gales Urban Haven Unit 1';
+    if (!unitPrice) {
+      toast('Please supply a listing price.', 'warning');
       return;
     }
 
     setSubmittingUnit(true);
-    const splitAm = unitAmenities.split(',').map(a => a.trim());
     const payload = {
-      name: unitName,
+      name: normalizedUnitName,
       type: unitType,
       description: unitDescription,
       price: Number(unitPrice),
-      amenities: splitAm,
       capacity: Number(unitCapacity),
-      floorNumber: Number(unitFloor),
       images: unitImages
     };
 
@@ -799,7 +795,6 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     setUnitName('');
                     setUnitDescription('');
                     setUnitPrice(0);
-                    setUnitAmenities('');
                     setShowAddUnitModal(true);
                   }}
                   icon={Plus}
@@ -828,11 +823,9 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         <p className="text-xs text-slate-500 line-clamp-2">{item.description}</p>
                         
                         <div className="flex flex-wrap gap-1 leading-none pt-1">
-                          {item.amenities.map((a, i) => (
-                            <span key={i} className="text-[9px] bg-slate-50 border border-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                              {a}
-                            </span>
-                          ))}
+                          <span className="text-[9px] bg-slate-50 border border-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                            Guest-ready stay
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -854,8 +847,6 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             setUnitDescription(item.description);
                             setUnitPrice(item.price);
                             setUnitCapacity(item.capacity);
-                            setUnitFloor(item.floorNumber);
-                            setUnitAmenities(item.amenities.join(', '));
                             setUnitImages(item.images);
                             setShowAddUnitModal(true);
                           }}
@@ -1429,9 +1420,8 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                       <input
                         id="unit-name"
                         type="text"
-                        required
                         className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none focus:bg-white text-slate-900 font-semibold"
-                        placeholder="The Zenith Suite"
+                        placeholder="Gales Urban Haven Unit 1"
                         value={unitName}
                         onChange={(e) => setUnitName(e.target.value)}
                       />
@@ -1450,7 +1440,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 text-xs">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="space-y-1">
                       <label htmlFor="unit-price" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Rate / Night</label>
                       <input
@@ -1474,29 +1464,6 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                         onChange={(e) => setUnitCapacity(Number(e.target.value))}
                       />
                     </div>
-
-                    <div className="space-y-1">
-                      <label htmlFor="unit-floor" className="text-[10px] font-bold uppercase tracking-wider text-slate-655 font-bold">Floor Level</label>
-                      <input
-                        id="unit-floor"
-                        type="number"
-                        required
-                        className="w-full bg-slate-50 border border-slate-200 py-2 px-3 rounded-xl focus:outline-none font-bold text-slate-900"
-                        value={unitFloor}
-                        onChange={(e) => setUnitFloor(Number(e.target.value))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Offered Amenities (Comma Separated)</label>
-                    <input
-                      type="text"
-                      className="w-full bg-slate-50 border border-slate-200 text-xs py-2.5 px-3 rounded-xl focus:outline-none text-slate-900 font-semibold"
-                        placeholder="Enter amenities separated by commas"
-                      value={unitAmenities}
-                      onChange={(e) => setUnitAmenities(e.target.value)}
-                    />
                   </div>
 
                   <div className="space-y-1">

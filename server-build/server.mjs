@@ -11,12 +11,7 @@ import { EventEmitter } from "events";
 var isVercel = Boolean("1");
 var currentFile = fileURLToPath(import.meta.url);
 var currentDir = path.dirname(currentFile);
-var DB_CANDIDATES = [
-  path.join(process.cwd(), "data", "db.json"),
-  path.join(currentDir, "..", "data", "db.json"),
-  path.join(currentDir, "data", "db.json"),
-  path.join(currentDir, "..", "..", "data", "db.json")
-];
+var PRIMARY_DB_FILE = path.join(process.cwd(), "data", "db.json");
 var BACKUP_DB_CANDIDATES = [
   path.join(process.cwd(), "data", "db.before-full-dummy-data-cleanup-2026-09-08.json"),
   path.join(process.cwd(), "data", "db.pre-admin-name-change-2026-09-05.json"),
@@ -28,21 +23,24 @@ var BACKUP_DB_CANDIDATES = [
   path.join(currentDir, "data", "db.pre-admin-name-change-2026-09-05.json"),
   path.join(currentDir, "data", "db.backup-2026-08-12.json")
 ];
-var existingDbFile = DB_CANDIDATES.find((file) => fs.existsSync(file));
-var fallbackDbFile = BACKUP_DB_CANDIDATES.find((file) => fs.existsSync(file) && (() => {
+function isValidJsonFile(filePath) {
+  if (!fs.existsSync(filePath)) return false;
   try {
-    JSON.parse(fs.readFileSync(file, "utf-8"));
+    JSON.parse(fs.readFileSync(filePath, "utf-8"));
     return true;
   } catch {
     return false;
   }
-})());
-var DB_FILE = existingDbFile || path.join(process.cwd(), "data", "db.json");
+}
+var FALLBACK_DB_FILE = BACKUP_DB_CANDIDATES.find(isValidJsonFile) ?? PRIMARY_DB_FILE;
+var DB_FILE = fs.existsSync(PRIMARY_DB_FILE) ? PRIMARY_DB_FILE : FALLBACK_DB_FILE;
+var DB_SOURCE = DB_FILE === PRIMARY_DB_FILE ? "primary" : "backup";
 var DB_DIR = path.dirname(DB_FILE);
 function readDatabaseFile(filePath) {
   try {
     const fileContent = fs.readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(fileContent);
+    const normalizedContent = fileContent.replace(/^\uFEFF/, "");
+    const parsed = JSON.parse(normalizedContent);
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       units: Array.isArray(parsed.units) ? parsed.units : [],
@@ -87,51 +85,25 @@ var MockDatabase = class {
       cwd: process.cwd(),
       currentDir,
       dbFile: DB_FILE,
+      dbSource: DB_SOURCE,
       exists: fs.existsSync(DB_FILE)
     });
     try {
-      if (fs.existsSync(DB_FILE)) {
-        const parsedDb = readDatabaseFile(DB_FILE);
-        if (parsedDb) {
-          this.data = parsedDb;
-          console.log("[DB] Counts:", {
-            users: this.data.users.length,
-            units: this.data.units.length,
-            bookings: this.data.bookings.length
-          });
-          this.normalizeExistingPayments();
-        } else if (fallbackDbFile) {
-          console.warn("[DB] Primary database file is unreadable or malformed. Falling back to the last valid backup snapshot without modifying the live file.");
-          const backupData = readDatabaseFile(fallbackDbFile);
-          if (backupData) {
-            this.data = backupData;
-            console.log("[DB] Counts from fallback snapshot:", {
-              users: this.data.users.length,
-              units: this.data.units.length,
-              bookings: this.data.bookings.length
-            });
-            this.normalizeExistingPayments();
-          } else {
-            throw new Error("No valid database snapshot available.");
-          }
-        } else {
-          throw new Error("Primary database file is unreadable and no valid fallback exists.");
-        }
-      } else if (fallbackDbFile) {
-        const backupData = readDatabaseFile(fallbackDbFile);
-        if (backupData) {
-          this.data = backupData;
-          console.log("[DB] Loaded fallback database snapshot:", {
-            users: this.data.users.length,
-            units: this.data.units.length,
-            bookings: this.data.bookings.length
-          });
-          this.normalizeExistingPayments();
-        } else {
-          throw new Error("Fallback backup database is unavailable.");
-        }
+      const parsedDb = readDatabaseFile(DB_FILE);
+      if (parsedDb) {
+        this.data = parsedDb;
+        console.log("[DB] Counts:", {
+          users: this.data.users.length,
+          units: this.data.units.length,
+          bookings: this.data.bookings.length
+        });
+        this.normalizeExistingPayments();
+        this.backfillMissingBookingPayments();
+      } else if (fs.existsSync(PRIMARY_DB_FILE)) {
+        console.warn("[DB] Primary data/db.json exists but was unreadable. Refusing backup override so Vercel does not silently switch to stale credentials.");
+        this.data = { ...emptyData };
       } else if (isVercel) {
-        console.warn("[DB] Vercel runtime detected without a bundled database file. Loading in-memory data only; no filesystem write is attempted.");
+        console.warn("[DB] Vercel runtime detected without a readable database file. Loading in-memory data only; no filesystem write is attempted.");
         this.data = { ...emptyData };
       } else {
         if (!fs.existsSync(DB_DIR)) {
@@ -159,6 +131,8 @@ var MockDatabase = class {
         remainingBalance: remaining,
         downpaymentAmount: down,
         status: payment.status || "Pending",
+        method: payment.bookingId ? "Cash" : payment.method || "Cash",
+        referenceNumber: payment.referenceNumber || `CASH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
         // keep `amount` as the invoice total for backward-compatibility
         amount: total
       };
@@ -238,6 +212,8 @@ var MockDatabase = class {
       avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name || "user")}`,
       authProvider: user.authProvider || "email",
       authUid: user.authUid || "",
+      hasValidId: user.hasValidId ?? false,
+      validIdVerifiedAt: user.validIdVerifiedAt || (user.hasValidId ? (/* @__PURE__ */ new Date()).toISOString() : void 0),
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     this.data.users.push(newUser);
@@ -277,21 +253,19 @@ var MockDatabase = class {
   createUnit(unit, operatorId, operatorName) {
     const newUnit = {
       id: "unit-" + Math.random().toString(36).substr(2, 9),
-      name: unit.name,
+      name: unit.name || "Gales Urban Haven Unit 1",
       type: unit.type || "Studio",
       description: unit.description || "",
       price: Number(unit.price) || 120,
-      amenities: unit.amenities || [],
       availability: unit.availability !== void 0 ? unit.availability : true,
       capacity: Number(unit.capacity) || 2,
-      floorNumber: Number(unit.floorNumber) || 1,
       status: unit.status || "Available",
       images: unit.images && unit.images.length > 0 ? unit.images : ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"],
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     this.data.units.push(newUnit);
     this.save();
-    this.addActivityLog(operatorId, operatorName, "admin", "Unit Added", `Created unit ${newUnit.name} on floor ${newUnit.floorNumber}`);
+    this.addActivityLog(operatorId, operatorName, "admin", "Unit Added", `Created unit ${newUnit.name}`);
     return newUnit;
   }
   updateUnit(id, updates, operatorId, operatorName) {
@@ -302,8 +276,7 @@ var MockDatabase = class {
       ...original,
       ...updates,
       price: updates.price !== void 0 ? Number(updates.price) : original.price,
-      capacity: updates.capacity !== void 0 ? Number(updates.capacity) : original.capacity,
-      floorNumber: updates.floorNumber !== void 0 ? Number(updates.floorNumber) : original.floorNumber
+      capacity: updates.capacity !== void 0 ? Number(updates.capacity) : original.capacity
     };
     this.data.units[idx] = updated;
     this.save();
@@ -348,23 +321,7 @@ var MockDatabase = class {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     this.data.bookings.unshift(newBooking);
-    const newPayment = {
-      id: "pay-" + Math.random().toString(36).substr(2, 9),
-      bookingId: newBooking.id,
-      residentId: newBooking.residentId,
-      residentName: newBooking.residentName,
-      unitName: newBooking.unitName,
-      amount: newBooking.totalPrice,
-      totalAmount: newBooking.totalPrice,
-      paidAmount: 0,
-      remainingBalance: newBooking.totalPrice,
-      downpaymentAmount: 0,
-      status: "Pending",
-      method: "Credit Card",
-      referenceNumber: "TXN-PENDING-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    this.data.payments.unshift(newPayment);
+    this.ensureBookingPayment(newBooking);
     this.createNotification({
       title: "New Reservation Pending",
       message: `${newBooking.residentName} submitted a request to book ${newBooking.unitName} from ${newBooking.startDate} to ${newBooking.endDate}.`,
@@ -381,6 +338,7 @@ var MockDatabase = class {
     if (idx === -1) return void 0;
     const booking = this.data.bookings[idx];
     booking.status = status;
+    this.ensureBookingPayment(booking);
     if (status === "Approved") {
       const unit = this.findUnitById(booking.unitId);
       if (unit) {
@@ -430,31 +388,101 @@ var MockDatabase = class {
   getUserPayments(userId) {
     return this.data.payments.filter((p) => p.residentId === userId);
   }
+  getPaymentByBookingId(bookingId) {
+    return this.data.payments.find((p) => p.bookingId === bookingId);
+  }
+  ensureBookingPayment(booking) {
+    const existing = this.getPaymentByBookingId(booking.id);
+    const totalAmount = Number(booking.totalPrice || 0);
+    if (existing) {
+      const paidAmount = Math.max(0, Number(existing.paidAmount || 0));
+      const normalizedTotal = Math.max(0, Number(existing.totalAmount || totalAmount || existing.amount || 0));
+      const nextRemaining = Math.max(0, normalizedTotal - paidAmount);
+      const nextStatus = nextRemaining <= 0 ? "Paid" : paidAmount > 0 ? "Partially Paid" : "Pending";
+      const normalizedPayment = {
+        ...existing,
+        bookingId: booking.id,
+        residentId: existing.residentId || booking.residentId,
+        residentName: existing.residentName || booking.residentName || "Unknown Resident",
+        unitName: existing.unitName || booking.unitName || "Unit",
+        amount: normalizedTotal,
+        totalAmount: normalizedTotal,
+        paidAmount,
+        remainingBalance: nextRemaining,
+        status: nextStatus,
+        method: "Cash",
+        referenceNumber: existing.referenceNumber || `CASH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+        createdAt: existing.createdAt || booking.createdAt
+      };
+      if (JSON.stringify(existing) !== JSON.stringify(normalizedPayment)) {
+        const idx = this.data.payments.findIndex((p) => p.id === existing.id);
+        this.data.payments[idx] = normalizedPayment;
+        this.save();
+      }
+      return normalizedPayment;
+    }
+    const newPayment = {
+      id: "pay-" + Math.random().toString(36).substr(2, 9),
+      bookingId: booking.id,
+      residentId: booking.residentId,
+      residentName: booking.residentName || "Unknown Resident",
+      unitName: booking.unitName || "Unit",
+      amount: totalAmount,
+      totalAmount,
+      paidAmount: 0,
+      remainingBalance: totalAmount,
+      downpaymentAmount: 0,
+      status: "Pending",
+      method: "Cash",
+      referenceNumber: `CASH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    this.data.payments.unshift(newPayment);
+    this.save();
+    this.addActivityLog(booking.residentId, booking.residentName || "Resident", "resident", "Ledger Created", `Created automatic cash ledger for booking ${booking.id}`);
+    return newPayment;
+  }
+  backfillMissingBookingPayments() {
+    let changed = false;
+    for (const booking of this.data.bookings) {
+      const existing = this.getPaymentByBookingId(booking.id);
+      if (!existing) {
+        this.ensureBookingPayment(booking);
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.save();
+    }
+  }
+  generateCashReference(paymentId) {
+    return `CASH-${paymentId.replace(/^pay-/, "").slice(0, 8).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  }
   submitPayment(paymentId, method, reference, amountPaid, residentId, residentName) {
-    const idx = this.data.payments.findIndex((p) => p.id === paymentId);
+    const idx = this.data.payments.findIndex((p) => p.id === paymentId || p.bookingId === paymentId);
     if (idx === -1) return void 0;
     const payment = this.data.payments[idx];
-    const remainingBefore = typeof payment.remainingBalance === "number" ? payment.remainingBalance : (typeof payment.totalAmount === "number" ? payment.totalAmount : payment.amount) - (typeof payment.paidAmount === "number" ? payment.paidAmount : 0);
+    const totalAmount = Number(payment.totalAmount || payment.amount || 0);
+    const remainingBefore = Number(payment.remainingBalance ?? Math.max(0, totalAmount - Number(payment.paidAmount || 0)));
     if (amountPaid <= 0) {
       return void 0;
     }
     if (amountPaid > remainingBefore) {
       return void 0;
     }
-    payment.method = method;
-    payment.referenceNumber = reference;
+    if (payment.status === "Paid") {
+      return void 0;
+    }
+    payment.method = "Cash";
+    payment.referenceNumber = reference || this.generateCashReference(payment.id);
     payment.paidAt = (/* @__PURE__ */ new Date()).toISOString();
-    payment.paidAmount = (typeof payment.paidAmount === "number" ? payment.paidAmount : 0) + amountPaid;
-    payment.totalAmount = typeof payment.totalAmount === "number" ? payment.totalAmount : typeof payment.amount === "number" ? payment.amount : 0;
-    payment.remainingBalance = Math.max(0, payment.totalAmount - payment.paidAmount);
+    payment.paidAmount = Number(payment.paidAmount || 0) + amountPaid;
+    payment.totalAmount = totalAmount;
+    payment.remainingBalance = Math.max(0, totalAmount - payment.paidAmount);
     if (!payment.downpaymentAmount || payment.downpaymentAmount <= 0) {
       payment.downpaymentAmount = amountPaid;
     }
-    if (payment.paidAmount < payment.totalAmount) {
-      payment.status = "Partially Paid";
-    } else {
-      payment.status = "Paid";
-    }
+    payment.status = payment.remainingBalance <= 0 ? "Paid" : payment.paidAmount > 0 ? "Partially Paid" : "Pending";
     payment.amount = payment.totalAmount;
     const booking = this.findBookingById(payment.bookingId);
     if (booking) {
@@ -474,14 +502,14 @@ var MockDatabase = class {
       }
     }
     this.createNotification({
-      title: "Payment Received",
-      message: `${residentName} submitted a payment of \u20B1${amountPaid.toFixed(2)} for ${payment.unitName || "unit"} (Ref: ${reference}).`,
+      title: "Cash Payment Received",
+      message: `${residentName} paid \u20B1${amountPaid.toFixed(2)} in cash for ${payment.unitName || "unit"} (Ref: ${payment.referenceNumber}).`,
       recipientId: "all",
       recipientRole: "admin",
       type: "success"
     });
     this.save();
-    this.addActivityLog(residentId, residentName, "resident", "Payment Submitted", `Paid \u20B1${amountPaid.toFixed(2)} references ${reference}`);
+    this.addActivityLog(residentId, residentName, "resident", "Cash Payment Submitted", `Paid \u20B1${amountPaid.toFixed(2)} cash. Ref: ${payment.referenceNumber}`);
     return payment;
   }
   generateManualPayment(payment, operatorId, operatorName) {
@@ -728,6 +756,15 @@ var PaymentService = class {
   getUserPayments(userId) {
     return this.database.getUserPayments(userId);
   }
+  getPaymentByBookingId(bookingId) {
+    return this.database.getPaymentByBookingId(bookingId);
+  }
+  ensureBookingPayment(booking) {
+    return this.database.ensureBookingPayment(booking);
+  }
+  generateCashReference(paymentId) {
+    return this.database.generateCashReference(paymentId);
+  }
   submitPayment(paymentId, method, reference, amountPaid, residentId, residentName) {
     return this.database.submitPayment(paymentId, method, reference, amountPaid, residentId, residentName);
   }
@@ -813,6 +850,23 @@ function isNonEmptyString(value) {
 function parseNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+function calculateBookingTotal(unitPrice, startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 0;
+  }
+  const diffMs = Math.max(end.getTime() - start.getTime(), 0);
+  const days = Math.max(1, Math.ceil(diffMs / (1e3 * 60 * 60 * 24)) || 1);
+  const base = days * Number(unitPrice || 0);
+  const months = /* @__PURE__ */ new Set([start.getMonth(), end.getMonth()]);
+  const isHolidayWindow = [...months].some((month) => month === 11 || month === 0);
+  const hasSeasonalAddOn = [...months].some((month) => month === 11 || month === 0);
+  const holidayDiscountFactor = isHolidayWindow ? 0.9 : 1;
+  const seasonalSurcharge = hasSeasonalAddOn ? 250 : 0;
+  const total = base * holidayDiscountFactor + seasonalSurcharge;
+  return Number(total.toFixed(2));
 }
 function validateFields(body, requiredFields) {
   return requiredFields.filter((key) => {
@@ -917,12 +971,14 @@ async function createApp() {
   });
   app.put("/api/auth/profile", requireAuth, (req, res) => {
     const user = req.user;
-    const { name, phone, unitNumber, avatarUrl } = req.body;
+    const { name, phone, unitNumber, avatarUrl, hasValidId } = req.body;
     const updated = db.updateUser(user.id, {
       name: name || user.name,
       phone: phone !== void 0 ? phone : user.phone,
       unitNumber: unitNumber !== void 0 ? unitNumber : user.unitNumber,
-      avatarUrl: avatarUrl !== void 0 ? avatarUrl : user.avatarUrl
+      avatarUrl: avatarUrl !== void 0 ? avatarUrl : user.avatarUrl,
+      hasValidId: hasValidId !== void 0 ? Boolean(hasValidId) : user.hasValidId,
+      validIdVerifiedAt: hasValidId !== void 0 ? Boolean(hasValidId) ? (/* @__PURE__ */ new Date()).toISOString() : void 0 : user.validIdVerifiedAt
     });
     if (!updated) {
       return res.status(500).json({ error: "Failed to update user profile." });
@@ -967,7 +1023,7 @@ async function createApp() {
   });
   app.post("/api/units", requireAdmin, (req, res) => {
     const user = req.user;
-    const { name, type, description, price, amenities, capacity, floorNumber, status, images } = req.body;
+    const { name, type, description, price, capacity, status, images } = req.body;
     if (!name || !type || !price) {
       return res.status(400).json({ error: "Please specify required properties: name, type, and price." });
     }
@@ -976,9 +1032,7 @@ async function createApp() {
       type,
       description,
       price: Number(price),
-      amenities: Array.isArray(amenities) ? amenities : [],
       capacity: Number(capacity) || 2,
-      floorNumber: Number(floorNumber) || 1,
       status: status || "Available",
       images: Array.isArray(images) ? images : []
     }, user.id, user.name);
@@ -1018,13 +1072,24 @@ async function createApp() {
     if (!isNonEmptyString(unitId) || !isNonEmptyString(startDate) || !isNonEmptyString(endDate)) {
       return res.status(400).json({ error: "unitId, startDate, and endDate must be valid strings." });
     }
-    const priceValue = parseNumber(totalPrice, -1);
-    if (priceValue < 0) {
-      return res.status(400).json({ error: "totalPrice must be a valid number." });
+    if (!user.hasValidId) {
+      return res.status(403).json({ error: "A valid government ID is required before any booking can be created." });
     }
     const unit = db.findUnitById(unitId);
     if (!unit) {
       return res.status(404).json({ error: "The requested unit does not exist." });
+    }
+    const serverCalculatedTotal = calculateBookingTotal(unit.price, startDate.trim(), endDate.trim());
+    const priceValue = parseNumber(totalPrice, -1);
+    if (priceValue < 0) {
+      return res.status(400).json({ error: "totalPrice must be a valid number." });
+    }
+    if (Math.abs(priceValue - serverCalculatedTotal) > 0.01) {
+      return res.status(400).json({
+        error: "Booking total does not match the server-calculated price.",
+        expectedTotal: serverCalculatedTotal,
+        receivedTotal: priceValue
+      });
     }
     if (unit.status !== "Available") {
       return res.status(400).json({ error: "This unit is currently unavailable for booking." });
@@ -1034,59 +1099,11 @@ async function createApp() {
       residentId: user.id,
       startDate: startDate.trim(),
       endDate: endDate.trim(),
-      totalPrice: priceValue,
+      totalPrice: serverCalculatedTotal,
       guestsCount: Number(guestsCount) || 1,
       notes: isNonEmptyString(notes) ? notes.trim() : ""
     });
     res.status(201).json(booking);
-  });
-  app.post("/api/inquiries", requireAuth, (req, res) => {
-    const user = req.user;
-    const { unitId, unitName, type, frequency, message } = req.body;
-    const missing = validateFields(req.body, ["unitId"]);
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing mandatory field: ${missing.join(", ")}.` });
-    }
-    const inquiry = {
-      id: "inq-" + Math.random().toString(36).substring(2, 11),
-      unitId: unitId.trim(),
-      unitName: isNonEmptyString(unitName) ? unitName.trim() : "",
-      residentId: user.id,
-      residentName: user.name,
-      type: isNonEmptyString(type) ? type.trim() : "inquire",
-      frequency: isNonEmptyString(frequency) ? frequency.trim() : null,
-      message: isNonEmptyString(message) ? message.trim() : "",
-      status: "Open",
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    db.addActivityLog(user.id, user.name, user.role, "Inquiry Submitted", `Inquiry for ${unitId}`);
-    res.status(201).json(inquiry);
-  });
-  app.post("/api/purchases", requireAuth, (req, res) => {
-    const user = req.user;
-    const { unitId, unitName, amount, frequency, message } = req.body;
-    const missing = validateFields(req.body, ["unitId", "amount"]);
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing mandatory fields: ${missing.join(", ")}.` });
-    }
-    const amountValue = parseNumber(amount, -1);
-    if (amountValue < 0) {
-      return res.status(400).json({ error: "amount must be a valid numerical value." });
-    }
-    const purchase = {
-      id: "pur-" + Math.random().toString(36).substring(2, 11),
-      unitId: unitId.trim(),
-      unitName: isNonEmptyString(unitName) ? unitName.trim() : "",
-      residentId: user.id,
-      residentName: user.name,
-      amount: amountValue,
-      frequency: isNonEmptyString(frequency) ? frequency.trim() : null,
-      message: isNonEmptyString(message) ? message.trim() : "",
-      status: "Pending",
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    db.addActivityLog(user.id, user.name, user.role, "Purchase Request", `Purchase request for ${unitId}`);
-    res.status(201).json(purchase);
   });
   app.put("/api/bookings/:id/status", requireAuth, (req, res) => {
     const user = req.user;
@@ -1117,39 +1134,50 @@ async function createApp() {
   });
   app.post("/api/payments/:id/pay", requireAuth, (req, res) => {
     const user = req.user;
-    const { method, referenceNumber, amount } = req.body;
-    const missing = validateFields(req.body, ["method", "referenceNumber", "amount"]);
+    const { method, amount } = req.body;
+    const missing = validateFields(req.body, ["amount"]);
     if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing payment fields: ${missing.join(", ")}.` });
+      return res.status(400).json({ error: `Missing payment field: ${missing.join(", ")}.` });
     }
-    if (!isNonEmptyString(method) || !isNonEmptyString(referenceNumber)) {
-      return res.status(400).json({ error: "Payment method and reference number must be valid strings." });
+    const normalizedMethod = String(method ?? "Cash").trim();
+    if (normalizedMethod.toLowerCase() !== "cash") {
+      return res.status(400).json({ error: "Cash payment only. Please settle in person at the property office or with the Gales cashier." });
     }
     const amountValue = parseNumber(amount, -1);
     if (amountValue <= 0) {
       return res.status(400).json({ error: "Payment amount must be a valid positive number." });
     }
-    const paymentRecord = paymentService.getPayments().find((p) => p.id === req.params.id);
+    let paymentRecord = paymentService.getPayments().find((p) => p.id === req.params.id) || paymentService.getPayments().find((p) => p.bookingId === req.params.id);
     if (!paymentRecord) {
-      return res.status(404).json({ error: "No invoice found with the given ledger ID." });
+      const booking = bookingService.findBookingById(req.params.id);
+      if (booking) {
+        paymentRecord = paymentService.ensureBookingPayment(booking);
+      }
+    }
+    if (!paymentRecord) {
+      return res.status(404).json({ error: "No payment ledger was found for this booking. Please ensure the booking exists and try again." });
     }
     if (user.role !== "admin" && paymentRecord.residentId !== user.id) {
       return res.status(403).json({ error: "Access denied. You can only pay your own invoices." });
     }
-    const remaining = paymentRecord.remainingBalance ?? paymentRecord.totalAmount - paymentRecord.paidAmount;
+    const remaining = Number(paymentRecord.remainingBalance ?? Math.max(0, Number(paymentRecord.totalAmount || paymentRecord.amount || 0) - Number(paymentRecord.paidAmount || 0)));
     if (amountValue > remaining) {
       return res.status(400).json({ error: "Payment amount exceeds the remaining balance." });
     }
+    if (paymentRecord.status === "Paid") {
+      return res.status(400).json({ error: "This payment ledger is already fully settled." });
+    }
+    const generatedReference = paymentService.generateCashReference(paymentRecord.id);
     const payment = paymentService.submitPayment(
-      req.params.id,
-      method.trim(),
-      referenceNumber.trim(),
+      paymentRecord.id,
+      "Cash",
+      generatedReference,
       amountValue,
       user.id,
       user.name
     );
     if (!payment) {
-      return res.status(500).json({ error: "Unable to apply payment at this time." });
+      return res.status(400).json({ error: "Unable to apply the cash payment. Please check the remaining balance and try again." });
     }
     res.json(payment);
   });

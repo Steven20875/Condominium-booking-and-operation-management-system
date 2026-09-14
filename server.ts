@@ -135,6 +135,29 @@ function parseNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function calculateBookingTotal(unitPrice: number, startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 0;
+  }
+
+  const diffMs = Math.max(end.getTime() - start.getTime(), 0);
+  const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) || 1);
+  const base = days * Number(unitPrice || 0);
+
+  const months = new Set([start.getMonth(), end.getMonth()]);
+  const isHolidayWindow = [...months].some((month) => month === 11 || month === 0);
+  const hasSeasonalAddOn = [...months].some((month) => month === 11 || month === 0);
+
+  const holidayDiscountFactor = isHolidayWindow ? 0.9 : 1;
+  const seasonalSurcharge = hasSeasonalAddOn ? 250 : 0;
+  const total = base * holidayDiscountFactor + seasonalSurcharge;
+
+  return Number(total.toFixed(2));
+}
+
 function validateFields(body: any, requiredFields: string[]) {
   return requiredFields.filter(key => {
     const value = body?.[key];
@@ -265,13 +288,15 @@ export async function createApp() {
 
   app.put('/api/auth/profile', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
-    const { name, phone, unitNumber, avatarUrl } = req.body;
+    const { name, phone, unitNumber, avatarUrl, hasValidId } = req.body;
 
     const updated = db.updateUser(user.id, {
       name: name || user.name,
       phone: phone !== undefined ? phone : user.phone,
       unitNumber: unitNumber !== undefined ? unitNumber : user.unitNumber,
-      avatarUrl: avatarUrl !== undefined ? avatarUrl : user.avatarUrl
+      avatarUrl: avatarUrl !== undefined ? avatarUrl : user.avatarUrl,
+      hasValidId: hasValidId !== undefined ? Boolean(hasValidId) : user.hasValidId,
+      validIdVerifiedAt: hasValidId !== undefined ? (Boolean(hasValidId) ? new Date().toISOString() : undefined) : user.validIdVerifiedAt
     });
 
     if (!updated) {
@@ -327,7 +352,7 @@ export async function createApp() {
 
   app.post('/api/units', requireAdmin, (req: Request, res: Response) => {
     const user = (req as any).user;
-    const { name, type, description, price, amenities, capacity, floorNumber, status, images } = req.body;
+    const { name, type, description, price, capacity, status, images } = req.body;
 
     if (!name || !type || !price) {
       return res.status(400).json({ error: 'Please specify required properties: name, type, and price.' });
@@ -338,9 +363,7 @@ export async function createApp() {
       type,
       description,
       price: Number(price),
-      amenities: Array.isArray(amenities) ? amenities : [],
       capacity: Number(capacity) || 2,
-      floorNumber: Number(floorNumber) || 1,
       status: status || 'Available',
       images: Array.isArray(images) ? images : []
     }, user.id, user.name);
@@ -389,15 +412,28 @@ export async function createApp() {
       return res.status(400).json({ error: 'unitId, startDate, and endDate must be valid strings.' });
     }
 
-    const priceValue = parseNumber(totalPrice, -1);
-    if (priceValue < 0) {
-      return res.status(400).json({ error: 'totalPrice must be a valid number.' });
+    if (!user.hasValidId) {
+      return res.status(403).json({ error: 'A valid government ID is required before any booking can be created.' });
     }
 
     const unit = db.findUnitById(unitId);
     if (!unit) {
       return res.status(404).json({ error: 'The requested unit does not exist.' });
     }
+
+    const serverCalculatedTotal = calculateBookingTotal(unit.price, startDate.trim(), endDate.trim());
+    const priceValue = parseNumber(totalPrice, -1);
+    if (priceValue < 0) {
+      return res.status(400).json({ error: 'totalPrice must be a valid number.' });
+    }
+    if (Math.abs(priceValue - serverCalculatedTotal) > 0.01) {
+      return res.status(400).json({
+        error: 'Booking total does not match the server-calculated price.',
+        expectedTotal: serverCalculatedTotal,
+        receivedTotal: priceValue
+      });
+    }
+
     if (unit.status !== 'Available') {
       return res.status(400).json({ error: 'This unit is currently unavailable for booking.' });
     }
@@ -407,66 +443,12 @@ export async function createApp() {
       residentId: user.id,
       startDate: startDate.trim(),
       endDate: endDate.trim(),
-      totalPrice: priceValue,
+      totalPrice: serverCalculatedTotal,
       guestsCount: Number(guestsCount) || 1,
       notes: isNonEmptyString(notes) ? notes.trim() : ''
     });
 
     res.status(201).json(booking);
-  });
-
-  // 3b. INQUIRIES & PURCHASES (simple endpoints)
-  app.post('/api/inquiries', requireAuth, (req: Request, res: Response) => {
-    const user = (req as any).user;
-    const { unitId, unitName, type, frequency, message } = req.body;
-    const missing = validateFields(req.body, ['unitId']);
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing mandatory field: ${missing.join(', ')}.` });
-    }
-
-    const inquiry = {
-      id: 'inq-' + Math.random().toString(36).substring(2, 11),
-      unitId: unitId.trim(),
-      unitName: isNonEmptyString(unitName) ? unitName.trim() : '',
-      residentId: user.id,
-      residentName: user.name,
-      type: isNonEmptyString(type) ? type.trim() : 'inquire',
-      frequency: isNonEmptyString(frequency) ? frequency.trim() : null,
-      message: isNonEmptyString(message) ? message.trim() : '',
-      status: 'Open',
-      createdAt: new Date().toISOString()
-    };
-    db.addActivityLog(user.id, user.name, user.role, 'Inquiry Submitted', `Inquiry for ${unitId}`);
-    res.status(201).json(inquiry);
-  });
-
-  app.post('/api/purchases', requireAuth, (req: Request, res: Response) => {
-    const user = (req as any).user;
-    const { unitId, unitName, amount, frequency, message } = req.body;
-    const missing = validateFields(req.body, ['unitId', 'amount']);
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing mandatory fields: ${missing.join(', ')}.` });
-    }
-
-    const amountValue = parseNumber(amount, -1);
-    if (amountValue < 0) {
-      return res.status(400).json({ error: 'amount must be a valid numerical value.' });
-    }
-
-    const purchase = {
-      id: 'pur-' + Math.random().toString(36).substring(2, 11),
-      unitId: unitId.trim(),
-      unitName: isNonEmptyString(unitName) ? unitName.trim() : '',
-      residentId: user.id,
-      residentName: user.name,
-      amount: amountValue,
-      frequency: isNonEmptyString(frequency) ? frequency.trim() : null,
-      message: isNonEmptyString(message) ? message.trim() : '',
-      status: 'Pending',
-      createdAt: new Date().toISOString()
-    };
-    db.addActivityLog(user.id, user.name, user.role, 'Purchase Request', `Purchase request for ${unitId}`);
-    res.status(201).json(purchase);
   });
 
   app.put('/api/bookings/:id/status', requireAuth, (req: Request, res: Response) => {
@@ -507,14 +489,15 @@ export async function createApp() {
 
   app.post('/api/payments/:id/pay', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
-    const { method, referenceNumber, amount } = req.body;
-    const missing = validateFields(req.body, ['method', 'referenceNumber', 'amount']);
+    const { method, amount } = req.body;
+    const missing = validateFields(req.body, ['amount']);
     if (missing.length > 0) {
-      return res.status(400).json({ error: `Missing payment fields: ${missing.join(', ')}.` });
+      return res.status(400).json({ error: `Missing payment field: ${missing.join(', ')}.` });
     }
 
-    if (!isNonEmptyString(method) || !isNonEmptyString(referenceNumber)) {
-      return res.status(400).json({ error: 'Payment method and reference number must be valid strings.' });
+    const normalizedMethod = String(method ?? 'Cash').trim();
+    if (normalizedMethod.toLowerCase() !== 'cash') {
+      return res.status(400).json({ error: 'Cash payment only. Please settle in person at the property office or with the Gales cashier.' });
     }
 
     const amountValue = parseNumber(amount, -1);
@@ -522,31 +505,44 @@ export async function createApp() {
       return res.status(400).json({ error: 'Payment amount must be a valid positive number.' });
     }
 
-    const paymentRecord = paymentService.getPayments().find((p: any) => p.id === req.params.id);
+    let paymentRecord = paymentService.getPayments().find((p: any) => p.id === req.params.id)
+      || paymentService.getPayments().find((p: any) => p.bookingId === req.params.id);
+
     if (!paymentRecord) {
-      return res.status(404).json({ error: 'No invoice found with the given ledger ID.' });
+      const booking = bookingService.findBookingById(req.params.id);
+      if (booking) {
+        paymentRecord = paymentService.ensureBookingPayment(booking);
+      }
+    }
+
+    if (!paymentRecord) {
+      return res.status(404).json({ error: 'No payment ledger was found for this booking. Please ensure the booking exists and try again.' });
     }
 
     if (user.role !== 'admin' && paymentRecord.residentId !== user.id) {
       return res.status(403).json({ error: 'Access denied. You can only pay your own invoices.' });
     }
 
-    const remaining = paymentRecord.remainingBalance ?? (paymentRecord.totalAmount - paymentRecord.paidAmount);
+    const remaining = Number(paymentRecord.remainingBalance ?? Math.max(0, Number(paymentRecord.totalAmount || paymentRecord.amount || 0) - Number(paymentRecord.paidAmount || 0)));
     if (amountValue > remaining) {
       return res.status(400).json({ error: 'Payment amount exceeds the remaining balance.' });
     }
+    if (paymentRecord.status === 'Paid') {
+      return res.status(400).json({ error: 'This payment ledger is already fully settled.' });
+    }
 
+    const generatedReference = paymentService.generateCashReference(paymentRecord.id);
     const payment = paymentService.submitPayment(
-      req.params.id,
-      method.trim(),
-      referenceNumber.trim(),
+      paymentRecord.id,
+      'Cash',
+      generatedReference,
       amountValue,
       user.id,
       user.name
     );
 
     if (!payment) {
-      return res.status(500).json({ error: 'Unable to apply payment at this time.' });
+      return res.status(400).json({ error: 'Unable to apply the cash payment. Please check the remaining balance and try again.' });
     }
 
     res.json(payment);
