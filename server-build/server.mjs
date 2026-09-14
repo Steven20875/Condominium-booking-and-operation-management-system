@@ -11,8 +11,12 @@ import { EventEmitter } from "events";
 var isVercel = Boolean("1");
 var currentFile = fileURLToPath(import.meta.url);
 var currentDir = path.dirname(currentFile);
-var PRIMARY_DB_FILE = path.join(process.cwd(), "data", "db.json");
+var appRoot = isVercel ? path.join(process.cwd()) : path.join(currentDir, "..");
+var PRIMARY_DB_FILE = path.join(appRoot, "data", "db.json");
 var BACKUP_DB_CANDIDATES = [
+  path.join(appRoot, "data", "db.before-full-dummy-data-cleanup-2026-09-08.json"),
+  path.join(appRoot, "data", "db.pre-admin-name-change-2026-09-05.json"),
+  path.join(appRoot, "data", "db.backup-2026-08-12.json"),
   path.join(process.cwd(), "data", "db.before-full-dummy-data-cleanup-2026-09-08.json"),
   path.join(process.cwd(), "data", "db.pre-admin-name-change-2026-09-05.json"),
   path.join(process.cwd(), "data", "db.backup-2026-08-12.json"),

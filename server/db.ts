@@ -16,8 +16,18 @@ const isVercel = Boolean(process.env.VERCEL);
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
 
-const PRIMARY_DB_FILE = path.join(process.cwd(), 'data', 'db.json');
+// Determine the application root directory
+// On Vercel, the server-build/server.mjs is bundled and currentDir might be inside the bundle
+// We need to find the actual data/ directory relative to the application root
+const appRoot = isVercel 
+  ? path.join(process.cwd()) // On Vercel, process.cwd() is /var/task (app root)
+  : path.join(currentDir, '..'); // Locally, go up from server/ to project root
+
+const PRIMARY_DB_FILE = path.join(appRoot, 'data', 'db.json');
 const BACKUP_DB_CANDIDATES = [
+  path.join(appRoot, 'data', 'db.before-full-dummy-data-cleanup-2026-09-08.json'),
+  path.join(appRoot, 'data', 'db.pre-admin-name-change-2026-09-05.json'),
+  path.join(appRoot, 'data', 'db.backup-2026-08-12.json'),
   path.join(process.cwd(), 'data', 'db.before-full-dummy-data-cleanup-2026-09-08.json'),
   path.join(process.cwd(), 'data', 'db.pre-admin-name-change-2026-09-05.json'),
   path.join(process.cwd(), 'data', 'db.backup-2026-08-12.json'),
