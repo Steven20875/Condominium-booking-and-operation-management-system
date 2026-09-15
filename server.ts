@@ -62,9 +62,15 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db, dbEvents } from './server/db.ts';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import rateLimit from 'express-rate-limit';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { db, dbEvents, dbReady } from './server/db/index.ts';
 import { bookingService } from './server/services/BookingService.ts';
 import { paymentService } from './server/services/PaymentService.ts';
 import { notificationService } from './server/services/NotificationService.ts';
@@ -82,6 +88,15 @@ dotenv.config({ path: path.resolve(projectRoot, '.env') });
 const PORT = Number(process.env.PORT) || 3000;
 const VITE_HMR_PORT = Number(process.env.VITE_HMR_PORT) || 24678;
 const isVercel = Boolean(process.env.VERCEL);
+const configuredJwtSecret = process.env.JWT_SECRET;
+if (isVercel && !configuredJwtSecret) {
+  throw new Error('JWT_SECRET must be configured in the production environment.');
+}
+const JWT_SECRET = configuredJwtSecret || crypto.randomBytes(32).toString('hex');
+if (!configuredJwtSecret) {
+  console.warn('[AUTH] JWT_SECRET is not configured. Local tokens will be invalidated when the server restarts.');
+}
+const JWT_EXPIRES_IN = '8h';
 const GOVERNMENT_ID_STORAGE_DIR = path.join(projectRoot, 'data', 'private', 'government-ids');
 const MAX_GOVERNMENT_ID_SIZE_BYTES = 5 * 1024 * 1024;
 const firebaseConfigFromEnv = {
@@ -105,19 +120,27 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: 'Authentication required. Missing Bearer token.' });
   }
   
-  const userId = authHeader.split(' ')[1]?.trim();
-  if (!isNonEmptyString(userId)) {
+  const token = authHeader.slice('Bearer '.length).trim();
+  if (!isNonEmptyString(token)) {
     return res.status(401).json({ error: 'Authentication token malformed.' });
   }
 
-  const user = db.findUserById(userId);
-  if (!user) {
-    return res.status(401).json({ error: 'User session invalid or expired.' });
+  try {
+    const claims = jwt.verify(token, JWT_SECRET, {
+      issuer: 'one-spatial-iloilo',
+      audience: 'one-spatial-portal'
+    }) as jwt.JwtPayload;
+    const userId = typeof claims.sub === 'string' ? claims.sub : '';
+    const user = db.findUserById(userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User session invalid or expired.' });
+    }
+
+    (req as any).user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired authentication token.' });
   }
-  
-  // Attach user to request
-  (req as any).user = user;
-  next();
 }
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -220,7 +243,40 @@ function validateFields(body: any, requiredFields: string[]) {
   });
 }
 
+function createAuthToken(user: { id: string; role: string }) {
+  return jwt.sign({}, JWT_SECRET, {
+    subject: user.id,
+    expiresIn: JWT_EXPIRES_IN,
+    issuer: 'one-spatial-iloilo',
+    audience: 'one-spatial-portal'
+  });
+}
+
+async function verifyFirebaseIdentityToken(idToken: string) {
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!serviceAccountJson) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not configured.');
+  }
+
+  if (getApps().length === 0) {
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    initializeApp({ credential: cert(serviceAccount) });
+  }
+
+  return getAuth().verifyIdToken(idToken);
+}
+
+const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Please try again later.' } });
+const registrationRateLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many registration attempts. Please try again later.' } });
+const sensitiveMutationRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please try again later.' } });
+
+const migratedPasswords = db.migratePlaintextPasswords((password) => bcrypt.hashSync(password, 12));
+if (migratedPasswords > 0) {
+  console.log(`[AUTH] Migrated ${migratedPasswords} plaintext password(s) to bcrypt hashes.`);
+}
+
 export async function createApp() {
+  await dbReady;
   const app = express();
 
   // Increase payload limits for direct base64 image uploads of condo units
@@ -230,7 +286,7 @@ export async function createApp() {
   // --- API ROUTING INTERFACE ---
 
   // 1. AUTHENTICATION MODULE
-  app.post('/api/auth/register', (req: Request, res: Response) => {
+  app.post('/api/auth/register', registrationRateLimit, (req: Request, res: Response) => {
     const { email, password, name, phone, unitNumber } = req.body;
     const missing = validateFields(req.body, ['email', 'password', 'name']);
     if (missing.length > 0) {
@@ -241,6 +297,14 @@ export async function createApp() {
       return res.status(400).json({ error: 'Email, password, and name must be valid non-empty strings.' });
     }
 
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.' });
+    }
+
+    if (phone !== undefined && phone !== '' && !/^(09\d{9}|\+639\d{9})$/.test(String(phone).replace(/[\s()-]/g, ''))) {
+      return res.status(400).json({ error: 'Please enter a valid Philippine phone number.' });
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
     const existing = db.findUserByEmail(normalizedEmail);
     if (existing) {
@@ -249,7 +313,7 @@ export async function createApp() {
 
     const newUser = db.createUser({
       email: normalizedEmail,
-      password,
+      password: bcrypt.hashSync(password, 12),
       name: name.trim(),
       phone: isNonEmptyString(phone) ? phone.trim() : undefined,
       unitNumber: isNonEmptyString(unitNumber) ? unitNumber.trim() : undefined,
@@ -258,10 +322,10 @@ export async function createApp() {
 
     // Strip password from payload
     const userSafe = sanitizeUserForApi(newUser);
-    res.status(201).json({ user: userSafe, token: newUser.id });
+    res.status(201).json({ user: userSafe, token: createAuthToken(newUser) });
   });
 
-  app.post('/api/auth/login', (req: Request, res: Response) => {
+  app.post('/api/auth/login', loginRateLimit, (req: Request, res: Response) => {
     const rawEmail = req.body?.email;
     const rawPassword = req.body?.password;
 
@@ -279,12 +343,12 @@ export async function createApp() {
       const password = String(rawPassword);
       const user = db.findUserByEmail(email);
 
-      if (!user || typeof user.password !== 'string' || user.password !== password) {
+      if (!user || typeof user.password !== 'string' || !bcrypt.compareSync(password, user.password)) {
         return res.status(401).json({ error: 'Invalid email or password combination.' });
       }
 
       const userSafe = sanitizeUserForApi(user);
-      return res.status(200).json({ user: userSafe, token: user.id });
+      return res.status(200).json({ user: userSafe, token: createAuthToken(user) });
     } catch (error) {
       console.error('[AUTH] Login exception:', {
         email: typeof rawEmail === 'string' ? rawEmail : String(rawEmail ?? ''),
@@ -299,18 +363,36 @@ export async function createApp() {
     res.json({ firebase: firebaseConfigFromEnv });
   });
 
-  app.post('/api/auth/firebase', (req: Request, res: Response) => {
-    const { uid, email, name, avatarUrl, provider } = req.body;
-    const missing = validateFields(req.body, ['uid', 'email']);
+  app.post('/api/auth/firebase', loginRateLimit, async (req: Request, res: Response) => {
+    const { name, phone, avatarUrl, provider, idToken } = req.body;
+    const missing = validateFields(req.body, ['idToken']);
     if (missing.length > 0) {
       return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
     }
 
-    if (!isNonEmptyString(uid) || !isNonEmptyString(email)) {
-      return res.status(400).json({ error: 'Firebase UID and email are required.' });
+    if (!isNonEmptyString(idToken)) {
+      return res.status(401).json({ error: 'Verified Firebase identity token is required.' });
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
+    let verifiedClaims;
+    try {
+      verifiedClaims = await verifyFirebaseIdentityToken(idToken);
+    } catch (error) {
+      console.error('[AUTH] Firebase token verification failed:', error instanceof Error ? error.message : String(error));
+      return res.status(503).json({ error: 'Google sign-in is not configured for this deployment.' });
+    }
+
+    const uid = verifiedClaims.uid;
+    const email = verifiedClaims.email;
+    if (!isNonEmptyString(uid) || !isNonEmptyString(email)) {
+      return res.status(401).json({ error: 'Verified Firebase identity is incomplete.' });
+    }
+
+    if (verifiedClaims.email_verified !== true) {
+      return res.status(403).json({ error: 'Please verify your email address before continuing.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
     const allUsers = db.getUsers();
     const existingUserByUid = allUsers.find((user) => user.authUid === uid);
     const existingUserByEmail = allUsers.find((user) => user.email.toLowerCase() === normalizedEmail);
@@ -321,10 +403,12 @@ export async function createApp() {
       const nextAuthProvider = existingUser.authProvider || (isGoogleLogin ? 'google' : 'email');
       const updatedUser = db.updateUser(existingUser.id, {
         name: isNonEmptyString(name) ? String(name).trim() : existingUser.name,
+        phone: isNonEmptyString(phone) ? String(phone).trim() : existingUser.phone,
         avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : existingUser.avatarUrl,
         authProvider: nextAuthProvider,
         authUid: uid,
         email: normalizedEmail,
+        emailVerified: verifiedClaims.email_verified === true,
       });
 
       if (!updatedUser) {
@@ -332,21 +416,23 @@ export async function createApp() {
       }
 
       const userSafe = sanitizeUserForApi(updatedUser);
-      return res.status(200).json({ user: userSafe, token: updatedUser.id });
+      return res.status(200).json({ user: userSafe, token: createAuthToken(updatedUser) });
     }
 
     const newUser = db.createUser({
       email: normalizedEmail,
-      password: Math.random().toString(36).slice(2, 12),
+      password: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 12),
       name: isNonEmptyString(name) ? String(name).trim() : normalizedEmail.split('@')[0],
+      phone: isNonEmptyString(phone) ? String(phone).trim() : undefined,
       avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : undefined,
       role: 'resident',
       authProvider: provider === 'google' ? 'google' : 'firebase',
-      authUid: uid
+      authUid: uid,
+      emailVerified: verifiedClaims.email_verified === true
     });
 
     const userSafe = sanitizeUserForApi(newUser);
-    return res.status(201).json({ user: userSafe, token: newUser.id });
+    return res.status(201).json({ user: userSafe, token: createAuthToken(newUser) });
   });
 
   app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {
@@ -357,15 +443,13 @@ export async function createApp() {
 
   app.put('/api/auth/profile', requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
-    const { name, phone, unitNumber, avatarUrl, hasValidId } = req.body;
+    const { name, phone, unitNumber, avatarUrl } = req.body;
 
     const updated = db.updateUser(user.id, {
       name: name || user.name,
       phone: phone !== undefined ? phone : user.phone,
       unitNumber: unitNumber !== undefined ? unitNumber : user.unitNumber,
-      avatarUrl: avatarUrl !== undefined ? avatarUrl : user.avatarUrl,
-      hasValidId: hasValidId !== undefined ? Boolean(hasValidId) : user.hasValidId,
-      validIdVerifiedAt: hasValidId !== undefined ? (Boolean(hasValidId) ? new Date().toISOString() : undefined) : user.validIdVerifiedAt
+      avatarUrl: avatarUrl !== undefined ? avatarUrl : user.avatarUrl
     });
 
     if (!updated) {
@@ -403,7 +487,7 @@ export async function createApp() {
     res.json(response);
   });
 
-  app.post('/api/profile/government-id', requireAuth, (req: Request, res: Response) => {
+  app.post('/api/profile/government-id', sensitiveMutationRateLimit, requireAuth, (req: Request, res: Response) => {
     const user = db.findUserById((req as any).user.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
@@ -688,6 +772,9 @@ export async function createApp() {
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
     }
+    if (user.role !== 'resident') {
+      return res.status(403).json({ error: 'Only resident accounts can create bookings.' });
+    }
 
     const { unitId, startDate, endDate, totalPrice, guestsCount, notes } = req.body;
     const missing = validateFields(req.body, ['unitId', 'startDate', 'endDate', 'totalPrice']);
@@ -697,6 +784,23 @@ export async function createApp() {
 
     if (!isNonEmptyString(unitId) || !isNonEmptyString(startDate) || !isNonEmptyString(endDate)) {
       return res.status(400).json({ error: 'unitId, startDate, and endDate must be valid strings.' });
+    }
+
+    const parsedStart = new Date(startDate.trim());
+    const parsedEnd = new Date(endDate.trim());
+    if (Number.isNaN(parsedStart.getTime()) || Number.isNaN(parsedEnd.getTime()) || parsedEnd <= parsedStart) {
+      return res.status(400).json({ error: 'Booking dates must be valid, and endDate must be after startDate.' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (parsedStart < today) {
+      return res.status(400).json({ error: 'Bookings cannot start in the past.' });
+    }
+
+    const durationDays = Math.ceil((parsedEnd.getTime() - parsedStart.getTime()) / (1000 * 60 * 60 * 24));
+    if (durationDays > 365) {
+      return res.status(400).json({ error: 'Booking duration cannot exceed 365 days.' });
     }
 
     const governmentIdStatus = getGovernmentIdStatusForUser(user);
@@ -711,7 +815,7 @@ export async function createApp() {
 
     const serverCalculatedTotal = calculateBookingTotal(unit.price, startDate.trim(), endDate.trim());
     const priceValue = parseNumber(totalPrice, -1);
-    if (priceValue < 0) {
+    if (priceValue <= 0) {
       return res.status(400).json({ error: 'totalPrice must be a valid number.' });
     }
     if (Math.abs(priceValue - serverCalculatedTotal) > 0.01) {
@@ -726,13 +830,22 @@ export async function createApp() {
       return res.status(400).json({ error: 'This unit is currently unavailable for booking.' });
     }
 
+    const guestCount = Number(guestsCount);
+    if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > unit.capacity) {
+      return res.status(400).json({ error: `guestsCount must be a whole number between 1 and ${unit.capacity}.` });
+    }
+
+    if (db.hasOverlappingActiveBooking(unit.id, startDate.trim(), endDate.trim())) {
+      return res.status(409).json({ error: 'This unit already has an active booking during the selected dates.' });
+    }
+
     const booking = bookingService.createBooking({
       unitId,
       residentId: user.id,
       startDate: startDate.trim(),
       endDate: endDate.trim(),
       totalPrice: serverCalculatedTotal,
-      guestsCount: Number(guestsCount) || 1,
+      guestsCount: guestCount,
       notes: isNonEmptyString(notes) ? notes.trim() : ''
     });
 
@@ -757,8 +870,24 @@ export async function createApp() {
       return res.status(403).json({ error: 'Access denied. You can only alter your own reservations.' });
     }
 
-    if (user.role !== 'admin' && status === 'Approved') {
-      return res.status(403).json({ error: 'Resident accounts are not authorized to self-approve bookings.' });
+    if (user.role !== 'admin') {
+      if (status !== 'Cancelled' || booking.status !== 'Pending') {
+        return res.status(403).json({ error: 'Residents may only cancel their own pending bookings.' });
+      }
+    }
+
+    if (user.role === 'admin') {
+      const allowedTransitions: Record<string, string[]> = {
+        Pending: ['Approved', 'Rejected', 'Cancelled'],
+        Approved: ['Completed', 'Cancelled'],
+        'Partially Paid': ['Completed', 'Cancelled'],
+        Rejected: [],
+        Cancelled: [],
+        Completed: []
+      };
+      if (!allowedTransitions[booking.status]?.includes(status)) {
+        return res.status(400).json({ error: `Booking cannot transition from ${booking.status} to ${status}.` });
+      }
     }
 
     const updated = bookingService.updateBookingStatus(req.params.id, status, user.id, user.name);
@@ -775,7 +904,7 @@ export async function createApp() {
     }
   });
 
-  app.post('/api/payments/:id/pay', requireAuth, (req: Request, res: Response) => {
+  app.post('/api/payments/:id/pay', sensitiveMutationRateLimit, requireAuth, (req: Request, res: Response) => {
     const user = (req as any).user;
     const { method, amount } = req.body;
     const missing = validateFields(req.body, ['amount']);
@@ -837,19 +966,26 @@ export async function createApp() {
   });
 
   // 4b. PUBLIC PAYMENTS SANDBOX (QR CODE REAL-WORLD PH SIMULATION)
-  app.get('/api/public/payments/:id', (req: Request, res: Response) => {
+  app.get('/api/public/payments/:id', requireAuth, (req: Request, res: Response) => {
     const payment = paymentService.getPayments().find((p: any) => p.id === req.params.id);
     if (!payment) {
       return res.status(404).json({ error: 'Invoice ledger entity not found.' });
     }
-    res.json(payment);
+
+    const user = (req as any).user;
+    if (user.role !== 'admin' && payment.residentId !== user.id) {
+      return res.status(403).json({ error: 'Access denied. You can only view your own payment information.' });
+    }
+
+    const { residentName: _residentName, unitName: _unitName, ...safePayment } = payment;
+    res.json(safePayment);
   });
 
   app.post('/api/public/payments/:id/pay', (req: Request, res: Response) => {
     res.status(403).json({ error: 'Public payment mutation is disabled. Use the authenticated payment endpoint.' });
   });
 
-  app.post('/api/payments/manual', requireAdmin, (req: Request, res: Response) => {
+  app.post('/api/payments/manual', sensitiveMutationRateLimit, requireAdmin, (req: Request, res: Response) => {
     const user = (req as any).user;
     const { residentId, unitName, amount, status, method } = req.body;
 
@@ -976,9 +1112,9 @@ export async function createApp() {
   });
 
   // Diagnostic endpoint for troubleshooting database loading on production
-  app.get('/api/diagnostics/db-status', (_req: Request, res: Response) => {
+  app.get('/api/diagnostics/db-status', requireAdmin, (_req: Request, res: Response) => {
     const diag = db.getDiagnostics();
-    res.status(200).json(diag);
+    res.status(200).json({ status: 'ok', counts: diag.database });
   });
 
   // Server-Sent Events stream for realtime updates (requires token query or Bearer header)
@@ -988,10 +1124,18 @@ export async function createApp() {
       return res.status(401).json({ error: 'Authentication required for event stream.' });
     }
 
-    const user = db.findUserById(token);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid event stream token.' });
+    let claims: jwt.JwtPayload;
+    try {
+      claims = jwt.verify(token, JWT_SECRET, {
+        issuer: 'one-spatial-iloilo',
+        audience: 'one-spatial-portal'
+      }) as jwt.JwtPayload;
+    } catch {
+      return res.status(401).json({ error: 'Invalid or expired event stream token.' });
     }
+
+    const user = db.findUserById(typeof claims.sub === 'string' ? claims.sub : '');
+    if (!user) return res.status(401).json({ error: 'Invalid event stream token.' });
 
     if (user.role !== 'admin') {
       return res.status(403).json({ error: 'Event stream access restricted to administrators.' });
@@ -1033,7 +1177,7 @@ export async function createApp() {
   });
 
   // 8. CHATBOT ASSISTANT FOR SALES AND OPERATIONS
-  app.post('/api/chatbot', async (req: Request, res: Response) => {
+  app.post('/api/chatbot', sensitiveMutationRateLimit, async (req: Request, res: Response) => {
     const { messages } = req.body;
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Invalid messages format.' });

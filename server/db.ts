@@ -82,7 +82,7 @@ function readDatabaseFile(filePath: string): DatabaseSchema | null {
   }
 }
 
-interface DatabaseSchema {
+export interface DatabaseSchema {
   users: User[];
   units: Unit[];
   bookings: Booking[];
@@ -103,8 +103,9 @@ function normalizeGovernmentIdStatus(status?: string | null): User['governmentId
 
 export const dbEvents = new EventEmitter();
 
-class MockDatabase {
+export class MockDatabase {
   private notificationReadState = new Map<string, Set<string>>();
+  private persistenceHook?: (snapshot: DatabaseSchema) => Promise<void>;
 
   private normalizeUserRecord(user: Partial<User>): User {
     const status = normalizeGovernmentIdStatus(user.governmentIdStatus ?? (user.hasValidId ? 'verified' : 'not_submitted'));
@@ -120,6 +121,7 @@ class MockDatabase {
       avatarUrl: user.avatarUrl || '',
       authProvider: user.authProvider || 'email',
       authUid: user.authUid || '',
+      emailVerified: user.emailVerified ?? true,
       hasValidId,
       governmentIdStatus: status,
       governmentIdUrl: user.governmentIdUrl || '',
@@ -261,6 +263,12 @@ class MockDatabase {
 
   private save() {
     try {
+      if (this.persistenceHook) {
+        void this.persistenceHook(this.getSnapshot()).catch((error) => {
+          console.error('[DB] Persistence hook failed:', error);
+        });
+      }
+
       if (isVercel) {
         dbEvents.emit('change', { stats: this.getDashboardStats(), timestamp: Date.now() });
         return;
@@ -285,6 +293,19 @@ class MockDatabase {
         console.error('dbEvents emit error:', emitErr);
       }
     }
+  }
+
+  public setPersistenceHook(hook?: (snapshot: DatabaseSchema) => Promise<void>) {
+    this.persistenceHook = hook;
+  }
+
+  public getSnapshot(): DatabaseSchema {
+    return JSON.parse(JSON.stringify(this.data)) as DatabaseSchema;
+  }
+
+  public replaceSnapshot(snapshot: DatabaseSchema) {
+    this.data = JSON.parse(JSON.stringify(snapshot)) as DatabaseSchema;
+    this.data.users = this.data.users.map((user) => this.normalizeUserRecord(user));
   }
 
   // --- LOG RELATED ---
@@ -333,6 +354,25 @@ class MockDatabase {
     });
 
     return user ? this.normalizeUserRecord(user) : undefined;
+  }
+
+  public migratePlaintextPasswords(hashPassword: (password: string) => string): number {
+    let migrated = 0;
+
+    this.data.users = this.data.users.map((user) => {
+      if (!user.password || user.password.startsWith('$2')) {
+        return user;
+      }
+
+      migrated += 1;
+      return { ...user, password: hashPassword(user.password) };
+    });
+
+    if (migrated > 0) {
+      this.save();
+    }
+
+    return migrated;
   }
 
   public createUser(user: Partial<User> & { password?: string }): User {
@@ -541,6 +581,23 @@ class MockDatabase {
 
   public getUserBookings(userId: string): Booking[] {
     return this.data.bookings.filter(b => b.residentId === userId);
+  }
+
+  public hasOverlappingActiveBooking(unitId: string, startDate: string, endDate: string, excludeBookingId?: string): boolean {
+    const requestedStart = new Date(startDate).getTime();
+    const requestedEnd = new Date(endDate).getTime();
+    if (!Number.isFinite(requestedStart) || !Number.isFinite(requestedEnd)) return false;
+
+    return this.data.bookings.some((booking) => {
+      if (booking.unitId !== unitId || booking.id === excludeBookingId) return false;
+      if (!['Pending', 'Approved', 'Partially Paid'].includes(booking.status)) return false;
+
+      const existingStart = new Date(booking.startDate).getTime();
+      const existingEnd = new Date(booking.endDate).getTime();
+      return Number.isFinite(existingStart) && Number.isFinite(existingEnd)
+        && requestedStart < existingEnd
+        && requestedEnd > existingStart;
+    });
   }
 
   public createBooking(booking: Partial<Booking>): Booking {

@@ -10,11 +10,12 @@
       "avatarUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
       "authProvider": "email",
       "authUid": "",
+      "emailVerified": true,
       "hasValidId": false,
       "governmentIdStatus": "not_submitted",
       "governmentIdUrl": "",
       "createdAt": "2026-05-28T04:07:00.916Z",
-      "password": "admin123"
+      "password": "$2b$12$wPmch6MUUVrHgJIUVosKyuHjPABrqEzPxsfNkm3NIwhDIhzbBfLLe"
     },
     {
       "id": "user-resident-1",
@@ -26,13 +27,68 @@
       "avatarUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80",
       "authProvider": "email",
       "authUid": "",
+      "emailVerified": true,
       "hasValidId": false,
       "governmentIdStatus": "rejected",
       "governmentIdUrl": "C:\\Users\\ASUS\\OneDrive\\Documents\\Desktop\\one-iloilo\\Condominium\\data\\private\\government-ids\\user-resident-1-1789413478377-test-id-rejection.png",
       "governmentIdUploadedAt": "2026-09-14T19:17:58.381Z",
       "governmentIdRejectionReason": "The uploaded ID is not clear enough for verification.",
       "createdAt": "2026-05-28T04:07:00.916Z",
-      "password": "Resident@2026"
+      "password": "$2b$12$Vtw1XyxPorWxtoDT3mzxZu2urHqULtkp6V/65NJybJ7YLA0Hrhcd."
+    },
+    {
+      "id": "user-x508qmlmo",
+      "email": "fstevenchristian@gmail.com",
+      "name": "Steven Christian Felarca",
+      "role": "resident",
+      "phone": "",
+      "unitNumber": "",
+      "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocLTeAY6EafYnts3nm_587WKSy_OhR6LAb9KpXzsGZ2hL6b4Kg=s96-c",
+      "authProvider": "google",
+      "authUid": "FCijCwPjG6Scg7GPrO3uuVgHnJ43",
+      "emailVerified": true,
+      "hasValidId": true,
+      "governmentIdStatus": "verified",
+      "governmentIdUrl": "C:\\Users\\ASUS\\OneDrive\\Documents\\Desktop\\one-iloilo\\Condominium\\data\\private\\government-ids\\user-x508qmlmo-1789441961292-Screenshot-2024-10-29-200940.png",
+      "governmentIdUploadedAt": "2026-09-15T03:12:41.295Z",
+      "governmentIdVerifiedAt": "2026-09-15T03:13:13.860Z",
+      "validIdVerifiedAt": "2026-09-15T03:13:13.860Z",
+      "createdAt": "2026-09-15T03:12:13.930Z",
+      "password": "$2b$12$fTbjXEOs.pK5WBQ.3tDwhOgayjbG01eiP8MpXxASKwa83xXlLfp.i"
+    },
+    {
+      "id": "user-gwydi0vn5",
+      "email": "christianpabiona559@gmail.com",
+      "name": "Christian Pabiona",
+      "role": "resident",
+      "phone": "",
+      "unitNumber": "",
+      "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocKxQA1kXgjte0QwWLXjiMWNns5TtexyIu_YyC8qKLQNKOJUhg=s96-c",
+      "authProvider": "google",
+      "authUid": "HAzJJshwn0XYhzfTJlxXSs6RMRf2",
+      "emailVerified": true,
+      "hasValidId": false,
+      "governmentIdStatus": "not_submitted",
+      "governmentIdUrl": "",
+      "createdAt": "2026-09-15T03:15:47.840Z",
+      "password": "$2b$12$XZDFo.ugmwkBpVY9yund3uteS./p47RA2pUKXnKd.SIQeLqYH6fVq"
+    },
+    {
+      "id": "user-r3w3g6opg",
+      "email": "stca.felarca.ui@phinmaed.com",
+      "name": "stca.felarca.ui",
+      "role": "resident",
+      "phone": "09128342423",
+      "unitNumber": "",
+      "avatarUrl": "https://api.dicebear.com/7.x/adventurer/svg?seed=Felarca%20Christian",
+      "authProvider": "firebase",
+      "authUid": "ZLDApZPzv0QQ1arhPBVWcO4lIQh1",
+      "emailVerified": true,
+      "hasValidId": false,
+      "governmentIdStatus": "not_submitted",
+      "governmentIdUrl": "",
+      "createdAt": "2026-09-15T04:37:45.261Z",
+      "password": "$2b$12$/Ou1lGRadkkzBR7WUhEfFOzqWHdSvQhIXefZz2x2qcPfJkVhelY.i"
     }
   ],
   "units": [
@@ -122,10 +178,10 @@
         "Two Queen Beds",
         "Bath Tub"
       ],
-      "availability": true,
+      "availability": false,
       "capacity": 4,
       "floorNumber": 15,
-      "status": "Available",
+      "status": "Occupied",
       "images": [
         "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80"
       ],
@@ -239,6 +295,36 @@
   ],
   "bookings": [
     {
+      "id": "book-rpymm6vkp",
+      "unitId": "unit-104",
+      "unitName": "The Solarium Duplex",
+      "residentId": "user-x508qmlmo",
+      "residentName": "Steven Christian Felarca",
+      "residentEmail": "fstevenchristian@gmail.com",
+      "startDate": "2026-09-16",
+      "endDate": "2026-09-19",
+      "totalPrice": 5100,
+      "status": "Approved",
+      "guestsCount": 2,
+      "notes": "",
+      "createdAt": "2026-09-15T03:13:50.111Z"
+    },
+    {
+      "id": "book-nt1juzfd8",
+      "unitId": "unit-102",
+      "unitName": "The Grand Horizon Penthouse",
+      "residentId": "user-x508qmlmo",
+      "residentName": "Steven Christian Felarca",
+      "residentEmail": "fstevenchristian@gmail.com",
+      "startDate": "2026-09-16",
+      "endDate": "2026-09-19",
+      "totalPrice": 7500,
+      "status": "Pending",
+      "guestsCount": 2,
+      "notes": "",
+      "createdAt": "2026-09-15T03:13:33.072Z"
+    },
+    {
       "id": "book-yxchlr10e",
       "unitId": "unit-101",
       "unitName": "The Zenith Suite",
@@ -285,6 +371,39 @@
     }
   ],
   "payments": [
+    {
+      "id": "pay-pxlz8h191",
+      "bookingId": "book-rpymm6vkp",
+      "residentId": "user-x508qmlmo",
+      "residentName": "Steven Christian Felarca",
+      "unitName": "The Solarium Duplex",
+      "amount": 5100,
+      "totalAmount": 5100,
+      "paidAmount": 5100,
+      "remainingBalance": 0,
+      "downpaymentAmount": 5100,
+      "status": "Paid",
+      "method": "Cash",
+      "referenceNumber": "CASH-PXLZ8H19-2KH2C",
+      "createdAt": "2026-09-15T03:13:50.111Z",
+      "paidAt": "2026-09-15T03:13:59.802Z"
+    },
+    {
+      "id": "pay-po7gea2qa",
+      "bookingId": "book-nt1juzfd8",
+      "residentId": "user-x508qmlmo",
+      "residentName": "Steven Christian Felarca",
+      "unitName": "The Grand Horizon Penthouse",
+      "amount": 7500,
+      "totalAmount": 7500,
+      "paidAmount": 0,
+      "remainingBalance": 7500,
+      "downpaymentAmount": 0,
+      "status": "Pending",
+      "method": "Cash",
+      "referenceNumber": "CASH-CD7C81",
+      "createdAt": "2026-09-15T03:13:33.072Z"
+    },
     {
       "id": "pay-3d16ilzvy",
       "bookingId": "book-yxchlr10e",
@@ -339,6 +458,36 @@
   ],
   "maintenanceRequests": [],
   "notifications": [
+    {
+      "id": "notif-1znnu3qfn",
+      "title": "Cash Payment Received",
+      "message": "Steven Christian Felarca paid ₱5100.00 in cash for The Solarium Duplex (Ref: CASH-PXLZ8H19-2KH2C).",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "success",
+      "createdAt": "2026-09-15T03:13:59.802Z"
+    },
+    {
+      "id": "notif-m14lrvw2i",
+      "title": "New Reservation Pending",
+      "message": "Steven Christian Felarca submitted a request to book The Solarium Duplex from 2026-09-16 to 2026-09-19.",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-09-15T03:13:50.122Z"
+    },
+    {
+      "id": "notif-6gaz8d9og",
+      "title": "New Reservation Pending",
+      "message": "Steven Christian Felarca submitted a request to book The Grand Horizon Penthouse from 2026-09-16 to 2026-09-19.",
+      "recipientId": "all",
+      "recipientRole": "admin",
+      "isRead": false,
+      "type": "info",
+      "createdAt": "2026-09-15T03:13:33.085Z"
+    },
     {
       "id": "notif-3ongvof5g",
       "title": "New Reservation Pending",
@@ -431,6 +580,141 @@
     }
   ],
   "activityLogs": [
+    {
+      "id": "log-n2y9u0h2r",
+      "userId": "user-r3w3g6opg",
+      "userName": "stca.felarca.ui",
+      "userRole": "resident",
+      "action": "Profile Updated",
+      "details": "User modified profile settings.",
+      "createdAt": "2026-09-15T04:44:25.155Z"
+    },
+    {
+      "id": "log-958k15mvs",
+      "userId": "user-r3w3g6opg",
+      "userName": "Felarca Christian",
+      "userRole": "resident",
+      "action": "User Registered",
+      "details": "Account created with email stca.felarca.ui@phinmaed.com",
+      "createdAt": "2026-09-15T04:37:45.327Z"
+    },
+    {
+      "id": "log-dl00vmbls",
+      "userId": "user-gwydi0vn5",
+      "userName": "Christian Pabiona",
+      "userRole": "resident",
+      "action": "Profile Updated",
+      "details": "User modified profile settings.",
+      "createdAt": "2026-09-15T04:02:13.328Z"
+    },
+    {
+      "id": "log-fh1xq0hgn",
+      "userId": "user-gwydi0vn5",
+      "userName": "Christian Pabiona",
+      "userRole": "resident",
+      "action": "Profile Updated",
+      "details": "User modified profile settings.",
+      "createdAt": "2026-09-15T04:02:13.266Z"
+    },
+    {
+      "id": "log-boxmoghx0",
+      "userId": "user-gwydi0vn5",
+      "userName": "Christian Pabiona",
+      "userRole": "resident",
+      "action": "User Registered",
+      "details": "Account created with email christianpabiona559@gmail.com",
+      "createdAt": "2026-09-15T03:15:47.846Z"
+    },
+    {
+      "id": "log-uxkmo8c08",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Profile Updated",
+      "details": "User modified profile settings.",
+      "createdAt": "2026-09-15T03:14:59.090Z"
+    },
+    {
+      "id": "log-hn3703zcb",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Cash Payment Submitted",
+      "details": "Paid ₱5100.00 cash. Ref: CASH-PXLZ8H19-2KH2C",
+      "createdAt": "2026-09-15T03:13:59.815Z"
+    },
+    {
+      "id": "log-f0rbtfflr",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Booking Created",
+      "details": "Requested booking for The Solarium Duplex",
+      "createdAt": "2026-09-15T03:13:50.130Z"
+    },
+    {
+      "id": "log-5sb0an1xb",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Ledger Created",
+      "details": "Created automatic cash ledger for booking book-rpymm6vkp",
+      "createdAt": "2026-09-15T03:13:50.116Z"
+    },
+    {
+      "id": "log-qm2dzci4l",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Booking Created",
+      "details": "Requested booking for The Grand Horizon Penthouse",
+      "createdAt": "2026-09-15T03:13:33.094Z"
+    },
+    {
+      "id": "log-6h2tuy4yd",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Ledger Created",
+      "details": "Created automatic cash ledger for booking book-nt1juzfd8",
+      "createdAt": "2026-09-15T03:13:33.078Z"
+    },
+    {
+      "id": "log-c8spvg8fa",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Profile Updated",
+      "details": "User modified profile settings.",
+      "createdAt": "2026-09-15T03:13:28.044Z"
+    },
+    {
+      "id": "log-iqe9j1icl",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Government ID Approved",
+      "details": "Government ID verified and approved by an administrator.",
+      "createdAt": "2026-09-15T03:13:13.874Z"
+    },
+    {
+      "id": "log-fhdqb48hl",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "Government ID Submitted",
+      "details": "Submitted a valid government ID for verification (Screenshot 2024-10-29 200940.png)",
+      "createdAt": "2026-09-15T03:12:41.300Z"
+    },
+    {
+      "id": "log-blfundxsd",
+      "userId": "user-x508qmlmo",
+      "userName": "Steven Christian Felarca",
+      "userRole": "resident",
+      "action": "User Registered",
+      "details": "Account created with email fstevenchristian@gmail.com",
+      "createdAt": "2026-09-15T03:12:13.956Z"
+    },
     {
       "id": "log-brjlw8688",
       "userId": "user-resident-1",

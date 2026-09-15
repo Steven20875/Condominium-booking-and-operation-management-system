@@ -241,6 +241,13 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     }
   };
 
+  const getGovernmentIdStatusMessage = (status: UserType['governmentIdStatus']) => {
+    if (status === 'verified') return 'Your Government ID has been verified. You can now make bookings.';
+    if (status === 'pending') return 'Your Government ID is waiting for admin review.';
+    if (status === 'rejected') return 'Your Government ID was not approved. Please review the reason and submit a valid ID.';
+    return 'Government ID has not been submitted.';
+  };
+
   const handleGovernmentIdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -587,6 +594,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     return !content.includes('deploy test') && !content.includes('persistence test');
   });
   const unreadNotifications = visibleNotifications.filter(notification => !notification.isRead);
+  const emailStepComplete = user.emailVerified !== false;
 
   return (
     <div id="res-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
@@ -1446,6 +1454,15 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 <p className="text-slate-400 text-xs">Verify your registered mobile phone and billing address coordinates.</p>
               </div>
 
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Resident onboarding</p>
+                <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                  <div className="rounded-xl bg-emerald-50 px-3 py-2 text-emerald-800">Step 1 ✓ Account Created</div>
+                  <div className={`rounded-xl px-3 py-2 ${emailStepComplete ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{emailStepComplete ? 'Step 2 ✓ Email Verified' : 'Step 2 → Email Verification'}</div>
+                  <div className={`rounded-xl px-3 py-2 ${governmentIdStatus === 'verified' ? 'bg-emerald-50 text-emerald-800' : governmentIdStatus === 'pending' ? 'bg-amber-50 text-amber-800' : governmentIdStatus === 'rejected' ? 'bg-rose-50 text-rose-800' : 'bg-white text-slate-600'}`}>{governmentIdStatus === 'verified' ? 'Step 3 ✓ Resident Approved' : governmentIdStatus === 'pending' ? 'Step 3 → Admin Review' : governmentIdStatus === 'rejected' ? 'Step 3 → Resubmission Required' : 'Step 3 → Resident Verification'}</div>
+                </div>
+              </div>
+
               {/* Visual Avatar Selector */}
               <div className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Select Profile Identity Avatar</label>
@@ -1490,8 +1507,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Valid Government ID</p>
-                      <p className="text-xs text-slate-500">Required before any booking can be submitted.</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Government ID Verification</p>
+                      <p className="text-xs text-slate-500">To help protect residents and prevent unauthorized bookings, we require a valid Government ID before you can make a reservation.</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`inline-flex items-center rounded-full px-2 py-1 text-[9px] font-bold uppercase ${getGovernmentIdBadge(governmentIdStatus).className}`}>
@@ -1499,7 +1516,29 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                       </span>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-3">
+                  <p className="text-xs leading-relaxed text-slate-600">{getGovernmentIdStatusMessage(governmentIdStatus)}</p>
+                  <p className="text-xs leading-relaxed text-slate-500">Your ID will be used only for verification and security purposes. We take the privacy and security of your information seriously.</p>
+                  <p className="text-xs font-bold text-slate-700">Do you have a valid Government ID?</p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setHasValidId(true)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold ${hasValidId ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                    >
+                      Yes, I have a valid ID
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHasValidId(false)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold ${!hasValidId ? 'border-slate-500 bg-slate-700 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                    >
+                      No, I don't have a valid ID
+                    </button>
+                  </div>
+                  {!hasValidId && governmentIdStatus === 'not_submitted' && (
+                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">Government ID has not been submitted. You cannot make a booking until a valid ID is submitted and verified.</p>
+                  )}
+                  {(hasValidId || governmentIdStatus !== 'not_submitted') && <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-3">
                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                       <Upload className="h-3.5 w-3.5" />
                       Upload Government ID
@@ -1536,7 +1575,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                         {submittingGovernmentId ? 'Submitting...' : 'Submit for Review'}
                       </button>
                     </div>
-                  </div>
+                  </div>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -20,7 +20,18 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type TabType = 'metrics' | 'units' | 'residents' | 'bookings' | 'payments' | 'maintenance' | 'broadcast' | 'audit';
+type TabType = 'metrics' | 'units' | 'residents' | 'bookings' | 'payments' | 'idVerification' | 'maintenance' | 'broadcast' | 'audit';
+
+type VerificationRecord = {
+  id: string;
+  name: string;
+  email: string;
+  unitNumber: string;
+  governmentIdStatus: string;
+  governmentIdUploadedAt: string | null;
+  governmentIdRejectionReason: string | null;
+  hasValidId: boolean;
+};
 
 const COLORS = ['#0f172a', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -89,20 +100,15 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const [dispatchTicket, setDispatchTicket] = useState<MaintenanceRequest | null>(null);
   const [dispatchStaff, setDispatchStaff] = useState<string>('');
   const [dispatchStatus, setDispatchStatus] = useState<string>('In Progress');
+  const [selectedVerification, setSelectedVerification] = useState<VerificationRecord | null>(null);
+  const [verificationPreviewUrl, setVerificationPreviewUrl] = useState<string | null>(null);
+  const [verificationPreviewType, setVerificationPreviewType] = useState<string>('');
+  const [loadingVerificationPreview, setLoadingVerificationPreview] = useState<boolean>(false);
+  const [verificationRejectionReason, setVerificationRejectionReason] = useState<string>('');
 
   // Search/Filters logic
   const [searchUnit, setSearchUnit] = useState<string>('');
   const [searchRes, setSearchRes] = useState<string>('');
-  const [verificationQueue, setVerificationQueue] = useState<Array<{
-    id: string;
-    name: string;
-    email: string;
-    unitNumber: string;
-    governmentIdStatus: string;
-    governmentIdUploadedAt: string | null;
-    governmentIdRejectionReason: string | null;
-    hasValidId: boolean;
-  }>>([]);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -120,15 +126,14 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       };
 
       // Execute all fetches in parallel and wait for all to complete
-      const [statsRes, unitsRes, bookingsRes, paymentsRes, maintenanceRes, logsRes, residentsRes, verificationRes] = await Promise.all([
+      const [statsRes, unitsRes, bookingsRes, paymentsRes, maintenanceRes, logsRes, residentsRes] = await Promise.all([
         fetch('/api/dashboard/stats', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Stats fetch error:', e); return null; }),
         fetch('/api/units').then(safeJson).catch(e => { console.error('Units fetch error:', e); return null; }),
         fetch('/api/bookings', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Bookings fetch error:', e); return null; }),
         fetch('/api/payments', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Payments fetch error:', e); return null; }),
         fetch('/api/maintenance', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Maintenance fetch error:', e); return null; }),
         fetch('/api/logs', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Logs fetch error:', e); return null; }),
-        fetch('/api/residents', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Residents fetch error:', e); return null; }),
-        fetch('/api/admin/government-id-verifications', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Government ID verification fetch error:', e); return null; })
+        fetch('/api/residents', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Residents fetch error:', e); return null; })
       ]);
 
       // Update state atomically once all data is fetched
@@ -143,7 +148,6 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       if (Array.isArray(maintenanceRes)) setMaintenance(maintenanceRes);
       if (Array.isArray(logsRes)) setLogs(logsRes);
       if (Array.isArray(residentsRes)) setResidents(residentsRes as UserType[]);
-      if (Array.isArray(verificationRes)) setVerificationQueue(verificationRes as typeof verificationQueue);
     } catch (e) {
       console.error('Fatal data synchronization error:', e);
       toast('Error refreshing dashboard data. Please try again.', 'error');
@@ -167,7 +171,13 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
         body: action === 'reject' ? JSON.stringify({ reason: reason || 'Please upload a clearer and valid government-issued ID.' }) : undefined
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: { error?: string; message?: string } = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        data = { error: responseText };
+      }
       if (!response.ok) throw new Error(data.error || `Unable to ${action} government ID.`);
 
       toast(data.message || `Government ID ${action}d.`, 'success');
@@ -177,29 +187,49 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
     }
   };
 
-  const handleViewGovernmentId = async (userId: string) => {
-    const previewWindow = window.open('', '_blank', 'noopener,noreferrer');
+  const closeVerificationReview = () => {
+    if (verificationPreviewUrl) {
+      URL.revokeObjectURL(verificationPreviewUrl);
+    }
+    setVerificationPreviewUrl(null);
+    setVerificationPreviewType('');
+    setSelectedVerification(null);
+    setVerificationRejectionReason('');
+  };
+
+  const handleViewGovernmentId = async (resident: VerificationRecord) => {
+    setSelectedVerification(resident);
+    setVerificationRejectionReason(resident.governmentIdRejectionReason || '');
+    setLoadingVerificationPreview(true);
     try {
-      const response = await fetch(`/api/admin/government-id-verifications/${userId}/file`, {
+      const response = await fetch(`/api/admin/government-id-verifications/${resident.id}/file`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) {
-        previewWindow?.close();
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Unable to open the submitted government ID.');
       }
 
-      const fileUrl = URL.createObjectURL(await response.blob());
-      if (previewWindow) {
-        previewWindow.location.href = fileUrl;
-        window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60000);
-      } else {
-        URL.revokeObjectURL(fileUrl);
-        throw new Error('Please allow pop-ups to view the submitted government ID.');
-      }
+      const previewBlob = await response.blob();
+      setVerificationPreviewType(response.headers.get('content-type') || previewBlob.type || '');
+      setVerificationPreviewUrl(URL.createObjectURL(previewBlob));
     } catch (err: any) {
+      setSelectedVerification(null);
       toast(err.message || 'Unable to open the submitted government ID.', 'error');
+    } finally {
+      setLoadingVerificationPreview(false);
     }
+  };
+
+  const submitVerificationDecision = async (action: 'approve' | 'reject') => {
+    if (!selectedVerification) return;
+    if (action === 'reject' && !verificationRejectionReason.trim()) {
+      toast('Please provide a reason for rejecting this Government ID.', 'warning');
+      return;
+    }
+
+    await handleGovernmentIdDecision(selectedVerification.id, action, verificationRejectionReason.trim());
+    closeVerificationReview();
   };
 
   // Realtime updates via Server-Sent Events (SSE)
@@ -481,6 +511,27 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const revenueTrendLabel = revenueDelta >= 0
     ? `+${formatCurrency(Math.abs(revenueDelta))} vs previous month`
     : `-${formatCurrency(Math.abs(revenueDelta))} vs previous month`;
+  const verificationRecords: VerificationRecord[] = residents
+    .filter((resident) => resident.role === 'resident' && resident.governmentIdStatus && resident.governmentIdStatus !== 'not_submitted')
+    .map((resident) => ({
+      id: resident.id,
+      name: resident.name,
+      email: resident.email,
+      unitNumber: resident.unitNumber || '',
+      governmentIdStatus: resident.governmentIdStatus || 'not_submitted',
+      governmentIdUploadedAt: resident.governmentIdUploadedAt || null,
+      governmentIdRejectionReason: resident.governmentIdRejectionReason || null,
+      hasValidId: Boolean(resident.hasValidId)
+    }));
+  const pendingVerificationRecords = verificationRecords.filter((record) => record.governmentIdStatus === 'pending');
+  const verifiedVerificationRecords = verificationRecords.filter((record) => record.governmentIdStatus === 'verified');
+  const rejectedVerificationRecords = verificationRecords.filter((record) => record.governmentIdStatus === 'rejected');
+
+  const getVerificationStatusLabel = (status: string) => {
+    if (status === 'verified') return 'Verified';
+    if (status === 'rejected') return 'Rejected';
+    return 'Pending Verification';
+  };
 
   return (
     <div id="admin-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
@@ -550,6 +601,15 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               }`}
             >
               <Calendar className="h-4 w-4" /> Bookings
+            </button>
+            <button
+              onClick={() => setActiveTab('idVerification')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+                activeTab === 'idVerification' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-500/10 border border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4" /> ID Verification
+              {pendingVerificationRecords.length > 0 && <span className="ml-auto rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">{pendingVerificationRecords.length}</span>}
             </button>
             <button
               onClick={() => setActiveTab('payments')}
@@ -1001,7 +1061,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Pending ID Reviews</p>
-                  <p className="mt-2 text-2xl font-serif font-black text-amber-900">{verificationQueue.length}</p>
+                  <p className="mt-2 text-2xl font-serif font-black text-amber-900">{pendingVerificationRecords.length}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Resident Accounts</p>
@@ -1012,46 +1072,6 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   <p className="mt-2 text-2xl font-serif font-black text-emerald-900">{residents.filter((resident) => resident.governmentIdStatus === 'verified' || resident.hasValidId).length}</p>
                 </div>
               </div>
-
-              {verificationQueue.length > 0 && (
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Government ID Verification Queue</h3>
-                    <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-bold uppercase text-amber-700">{verificationQueue.length} awaiting review</span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {verificationQueue.map((resident) => (
-                      <div key={resident.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="font-bold text-slate-900">{resident.name}</p>
-                          <p className="text-[10px] text-slate-500">{resident.email} • {resident.unitNumber || 'No unit assigned'}</p>
-                          <p className="text-[9px] text-slate-400">Submitted {resident.governmentIdUploadedAt ? new Date(resident.governmentIdUploadedAt).toLocaleDateString() : 'Unknown date'}</p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <a
-                            href="#government-id-preview"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              void handleViewGovernmentId(resident.id);
-                            }}
-                            className="rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-700"
-                          >
-                            View ID
-                          </a>
-                          <Button variant="success" size="sm" onClick={() => handleGovernmentIdDecision(resident.id, 'approve')}>
-                            Approve
-                          </Button>
-                          <Button variant="danger" size="sm" onClick={() => handleGovernmentIdDecision(resident.id, 'reject')}>
-                            Reject
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Roster database Table representation */}
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -1189,6 +1209,91 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   </div>
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {/* E. GOVERNMENT ID VERIFICATION TAB */}
+          {activeTab === 'idVerification' && (
+            <motion.div
+              key="id-verification-tab"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="space-y-6"
+            >
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-400">Resident security</p>
+                <h2 className="mt-1 font-serif text-2xl font-black text-white">ID Verification</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-400">Review resident Government IDs before allowing bookings.</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {[
+                  { label: 'Pending', value: pendingVerificationRecords.length, className: 'border-amber-200 bg-amber-50 text-amber-900' },
+                  { label: 'Verified', value: verifiedVerificationRecords.length, className: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
+                  { label: 'Rejected', value: rejectedVerificationRecords.length, className: 'border-rose-200 bg-rose-50 text-rose-900' }
+                ].map((item) => (
+                  <div key={item.label} className={`rounded-2xl border p-4 ${item.className}`}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">{item.label}</p>
+                    <p className="mt-2 text-2xl font-serif font-black">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Pending Verification</h3>
+                    <p className="mt-1 text-xs text-slate-500">Review submitted documents before enabling resident bookings.</p>
+                  </div>
+                  <span className="w-fit rounded-full bg-amber-100 px-2 py-1 text-[9px] font-bold uppercase text-amber-700">{pendingVerificationRecords.length} awaiting review</span>
+                </div>
+
+                <div className="space-y-3 p-4 sm:p-5">
+                  {pendingVerificationRecords.length > 0 ? pendingVerificationRecords.map((resident) => (
+                    <div key={resident.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900">{resident.name}</p>
+                        <p className="mt-1 break-all text-xs text-slate-500">{resident.email}</p>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500">
+                          <span>Unit: {resident.unitNumber || 'Not assigned'}</span>
+                          <span>Submitted: {resident.governmentIdUploadedAt ? new Date(resident.governmentIdUploadedAt).toLocaleDateString() : 'Unknown'}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="secondary" size="sm" onClick={() => void handleViewGovernmentId(resident)} icon={FileText}>View ID</Button>
+                        <Button variant="success" size="sm" onClick={() => void handleGovernmentIdDecision(resident.id, 'approve')}>Approve</Button>
+                        <Button variant="danger" size="sm" onClick={() => void handleViewGovernmentId(resident)}>Reject</Button>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center">
+                      <ShieldCheck className="mx-auto h-8 w-8 text-emerald-500" />
+                      <p className="mt-3 font-serif text-lg font-bold text-slate-900">No pending Government IDs</p>
+                      <p className="mt-1 text-xs text-slate-500">New resident submissions will appear here for review.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {(verifiedVerificationRecords.length > 0 || rejectedVerificationRecords.length > 0) && (
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Review History</h3>
+                  <div className="mt-4 space-y-2">
+                    {verificationRecords.filter((record) => record.governmentIdStatus !== 'pending').map((resident) => (
+                      <div key={resident.id} className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{resident.name}</p>
+                          <p className="text-[10px] text-slate-500">{resident.unitNumber || 'No unit assigned'} · {resident.email}</p>
+                        </div>
+                        <span className={`w-fit rounded-full px-2 py-1 text-[9px] font-bold uppercase ${resident.governmentIdStatus === 'verified' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                          {getVerificationStatusLabel(resident.governmentIdStatus)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -1484,6 +1589,95 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       </main>
 
       {/* --- ADMIN OPERATIONS DICTIONARY OVERLAYS --- */}
+
+      <Modal
+        isOpen={Boolean(selectedVerification)}
+        onClose={closeVerificationReview}
+        title="Review Government ID"
+        subtitle="Secure resident verification"
+        size="xl"
+        className="max-h-[calc(100vh-2rem)] overflow-y-auto"
+      >
+        {selectedVerification && (
+          <>
+            <ModalBody className="space-y-5">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Resident</p>
+                  <p className="mt-1 font-bold text-slate-900">{selectedVerification.name}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email</p>
+                  <p className="mt-1 break-all text-slate-700">{selectedVerification.email}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit</p>
+                  <p className="mt-1 text-slate-700">{selectedVerification.unitNumber || 'Not assigned'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Submitted</p>
+                  <p className="mt-1 text-slate-700">{selectedVerification.governmentIdUploadedAt ? new Date(selectedVerification.governmentIdUploadedAt).toLocaleDateString() : 'Unknown'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</span>
+                <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase ${selectedVerification.governmentIdStatus === 'verified' ? 'bg-emerald-100 text-emerald-800' : selectedVerification.governmentIdStatus === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
+                  {getVerificationStatusLabel(selectedVerification.governmentIdStatus)}
+                </span>
+              </div>
+
+              <div className="flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 p-3">
+                {loadingVerificationPreview ? (
+                  <p className="text-sm text-slate-500">Loading protected ID preview...</p>
+                ) : verificationPreviewUrl ? (
+                  verificationPreviewType.includes('pdf') ? (
+                    <iframe src={verificationPreviewUrl} title={`Government ID submitted by ${selectedVerification.name}`} className="h-[48vh] w-full rounded-xl border border-slate-200 bg-white" />
+                  ) : (
+                    <img src={verificationPreviewUrl} alt={`Government ID submitted by ${selectedVerification.name}`} className="max-h-[48vh] w-full object-contain" />
+                  )
+                ) : (
+                  <p className="text-sm text-slate-500">Preview unavailable. The protected file could not be loaded.</p>
+                )}
+              </div>
+
+              {selectedVerification.governmentIdStatus !== 'verified' && (
+                <div className="space-y-2">
+                  <label htmlFor="verification-rejection-reason" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Rejection reason</label>
+                  <select
+                    id="verification-rejection-reason"
+                    value={verificationRejectionReason}
+                    onChange={(event) => setVerificationRejectionReason(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-500"
+                  >
+                    <option value="">Choose a reason or enter a custom reason below</option>
+                    <option value="ID is expired">ID is expired</option>
+                    <option value="ID image is unclear">ID image is unclear</option>
+                    <option value="ID information does not match">ID information does not match</option>
+                    <option value="Invalid Government ID">Invalid Government ID</option>
+                  </select>
+                  <textarea
+                    value={verificationRejectionReason}
+                    onChange={(event) => setVerificationRejectionReason(event.target.value)}
+                    placeholder="Enter a custom reason when needed"
+                    rows={3}
+                    className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-500"
+                  />
+                </div>
+              )}
+            </ModalBody>
+            <ModalFooter align="right">
+              <Button variant="secondary" size="sm" onClick={closeVerificationReview}>Close</Button>
+              {selectedVerification.governmentIdStatus !== 'verified' && (
+                <>
+                  <Button variant="danger" size="sm" onClick={() => void submitVerificationDecision('reject')}>Reject ID</Button>
+                  <Button variant="success" size="sm" onClick={() => void submitVerificationDecision('approve')}>Approve ID</Button>
+                </>
+              )}
+            </ModalFooter>
+          </>
+        )}
+      </Modal>
 
       {/* 1. ADD / LIST CONDO SUITE LISTING MODAL */}
       <AnimatePresence>

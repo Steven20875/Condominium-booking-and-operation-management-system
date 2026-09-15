@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db/index';
 
 /**
  * PaymentService - OOP wrapper around payment operations

@@ -26,7 +26,7 @@ export default function Chatbot({ user }: ChatbotProps) {
     {
       id: 'welcome',
       role: 'assistant',
-      content: `Welcome to **Gales Urban Haven** support desk! 🌟\n\nI can help you with renting rates, booking suites, paying bills via **One Spatial Pay**, or reporting maintenance issues (resolved in **under 20 minutes**).\n\nWhat can I assist you with?`,
+      content: `Welcome to **Gales Urban Haven** support desk! 🌟\n\nI can help you with rental rates, booking suites, cash ledger payments, or reporting maintenance requests.\n\nWhat can I assist you with?`,
       timestamp: new Date()
     }
   ]);

@@ -7,6 +7,8 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
+  sendEmailVerification,
+  reload,
   type Auth,
   type UserCredential,
   type User as FirebaseUser,
@@ -253,6 +255,52 @@ export async function createAccountWithEmailPassword(email: string, password: st
   }
 
   return createUserWithEmailAndPassword(auth, email, password);
+}
+
+export async function sendFirebaseEmailVerification(user: FirebaseUser) {
+  await initializeFirebase();
+
+  const auth = getAuthInstance();
+
+  if (!auth) {
+    throw new Error('Firebase authentication is not configured.');
+  }
+
+  if (!user) {
+    throw new Error('Firebase user is not available.');
+  }
+
+  try {
+    await sendEmailVerification(user);
+
+    console.log('[firebase] Verification email sent successfully', {
+      email: user.email,
+      uid: user.uid,
+    });
+
+    return true;
+  } catch (error: any) {
+    console.error('[firebase] Verification email failed', {
+      code: error?.code,
+      message: error?.message,
+    });
+
+    throw error;
+  }
+}
+
+export async function refreshFirebaseEmailVerification() {
+  const auth = getAuthInstance();
+  if (!auth?.currentUser) {
+    throw new Error('Firebase account is not available.');
+  }
+
+  await reload(auth.currentUser);
+  return {
+    user: auth.currentUser,
+    emailVerified: Boolean(auth.currentUser?.emailVerified),
+    idToken: await auth.currentUser?.getIdToken(true),
+  };
 }
 
 export async function signInWithGooglePopup(): Promise<UserCredential> {

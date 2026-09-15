@@ -5,7 +5,7 @@ import FerrofluidBackground from './FerrofluidBackground.tsx';
 import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, Bell } from 'lucide-react';
 import { User as UserType } from '../types.ts';
 import { Button, Input } from './ui';
-import { signInWithGooglePopup, getFirebaseConfigStatus, initializeFirebase } from '../lib/firebase.ts';
+import { createAccountWithEmailPassword, refreshFirebaseEmailVerification, sendFirebaseEmailVerification, signInWithGooglePopup, getFirebaseConfigStatus, initializeFirebase } from '../lib/firebase.ts';
 
 interface AuthPageProps {
   onLoginSuccess: (user: UserType, token: string) => void;
@@ -19,15 +19,19 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   const [isForgotPassword, setIsForgotPassword] = useState<boolean>(false);
   const [isEmailSent, setIsEmailSent] = useState<boolean>(false);
   const [isEmailVerifying, setIsEmailVerifying] = useState<boolean>(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState<{ user: UserType; token: string; emailVerificationSent: boolean } | null>(null);
+  const [isRefreshingVerification, setIsRefreshingVerification] = useState<boolean>(false);
 
   // Form states
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
-  const [unitNumber, setUnitNumber] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [emailValid, setEmailValid] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [firebaseConfigStatus, setFirebaseConfigStatus] = useState(getFirebaseConfigStatus());
@@ -66,6 +70,43 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
     setEmailValid(value === '' || validateEmail(value));
   };
 
+  const passwordChecks = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /\d/.test(password),
+    special: /[^A-Za-z0-9]/.test(password),
+  };
+  const passwordStrength = Object.values(passwordChecks).filter(Boolean).length >= 5
+    ? 'Strong'
+    : Object.values(passwordChecks).filter(Boolean).length >= 3
+      ? 'Fair'
+      : 'Weak';
+  const phoneValid = phone === '' || /^(09\d{9}|\+639\d{9})$/.test(phone.replace(/[\s()-]/g, ''));
+  const registrationErrors = {
+    name: !name.trim() ? 'Full Name is required.' : '',
+    email: !email ? 'Email Address is required.' : !emailValid ? 'Email format is invalid.' : '',
+    phone: !phoneValid ? 'Use 09XXXXXXXXX or +639XXXXXXXXX.' : '',
+    password: Object.values(passwordChecks).every(Boolean) ? '' : 'Password does not meet all requirements.',
+    confirmPassword: confirmPassword && confirmPassword !== password ? 'Passwords do not match.' : '',
+    terms: !termsAccepted ? 'You must accept the Terms of Service and Privacy Policy.' : '',
+  };
+
+  const hasRegistrationErrors = Object.values(registrationErrors).some(Boolean) || !name.trim() || !email.trim() || !password || !confirmPassword;
+
+  const getFirebaseErrorMessage = (error: any, fallback: string) => {
+    const messages: Record<string, string> = {
+      'auth/too-many-requests': 'Too many verification requests were made. Please wait before trying again.',
+      'auth/email-already-in-use': 'An account with this email already exists. Please sign in instead.',
+      'auth/invalid-email': 'Please enter a valid email address.',
+      'auth/weak-password': 'Firebase requires a stronger password. Use at least 8 characters with upper/lowercase, a number, and a special character.',
+      'auth/network-request-failed': 'Firebase could not connect. Check your network and try again.',
+      'auth/operation-not-allowed': 'Email/password registration is not enabled for this Firebase project.',
+    };
+
+    return messages[error?.code] || error?.message || fallback;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -97,36 +138,105 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !name) {
-      toast('Please fill out all required fields: Name, Email, and Password.', 'warning');
+    if (hasRegistrationErrors) {
+      toast('Please correct the highlighted registration fields before continuing.', 'warning');
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/register', {
+      let user: UserType;
+      let token: string;
+      let emailVerificationSent = false;
+
+      if (isFirebaseConfigured) {
+        const firebaseCredential = await createAccountWithEmailPassword(email.trim().toLowerCase(), password);
+        await sendFirebaseEmailVerification(firebaseCredential.user);
+        user = {
+          id: `firebase-pending-${firebaseCredential.user.uid}`,
+          email: email.trim().toLowerCase(),
+          name: name.trim(),
+          role: 'resident',
+          phone: phone.trim() || undefined,
+          emailVerified: false,
+          governmentIdStatus: 'not_submitted',
+          hasValidId: false,
+          createdAt: new Date().toISOString()
+        };
+        token = '';
+        emailVerificationSent = true;
+      } else {
+        const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password,
           name: name.trim(),
-          phone: phone.trim() || undefined,
-          unitNumber: unitNumber.trim() || undefined
+          phone: phone.trim() || undefined
         })
-      });
+        });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Local registration failed.');
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Local registration failed.');
+        }
+        user = data.user;
+        token = data.token;
       }
 
-      toast('Your resident account is ready. Welcome to One Spatial Iloilo.', 'success');
-      onLoginSuccess(data.user, data.token);
+      setRegistrationSuccess({ user, token, emailVerificationSent });
+      toast(emailVerificationSent ? 'Account created. Check your email to verify your account.' : 'Account created successfully.', 'success');
     } catch (err: any) {
-      toast(err.message || 'Registration failed.', 'error');
+      toast(getFirebaseErrorMessage(err, 'Registration failed.'), 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const continueAfterRegistration = async () => {
+    if (!registrationSuccess) return;
+
+    if (!registrationSuccess.emailVerificationSent) {
+      onLoginSuccess(registrationSuccess.user, registrationSuccess.token);
+      return;
+    }
+
+    setIsRefreshingVerification(true);
+    try {
+      const verification = await refreshFirebaseEmailVerification();
+      if (!verification.emailVerified || !verification.idToken) {
+        toast('Your email is not verified yet. Open the verification email, then try again.', 'warning');
+        return;
+      }
+
+      const response = await fetch('/api/auth/firebase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: verification.idToken, name: name.trim(), phone: phone.trim() || undefined, provider: 'email' })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Unable to update email verification status.');
+      onLoginSuccess(data.user, data.token);
+    } catch (err: any) {
+      toast(getFirebaseErrorMessage(err, 'Unable to check email verification status.'), 'error');
+    } finally {
+      setIsRefreshingVerification(false);
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    try {
+      const verification = await refreshFirebaseEmailVerification();
+      if (verification.emailVerified) {
+        toast('Your email is already verified. Continue to the Resident Portal.', 'success');
+        return;
+      }
+      if (!verification.user) throw new Error('Firebase account is not available.');
+      await sendFirebaseEmailVerification(verification.user);
+      toast('A new verification email has been sent.', 'success');
+    } catch (err: any) {
+      toast(getFirebaseErrorMessage(err, 'Unable to resend the verification email.'), 'error');
     }
   };
 
@@ -196,12 +306,9 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
       return;
     }
     
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsEmailSent(true);
-      toast('Password reset directives dispatched to your inbox!', 'success');
-    }, 1200);
+    setIsLoading(false);
+    setIsEmailSent(true);
+    toast('Password reset is not available in the local demo. Please contact the administrator.', 'warning');
   };
 
   return (
@@ -257,7 +364,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                 {[
                   { icon: <Sparkles className="h-4 w-4 text-blue-300" />, label: 'Online Booking' },
                   { icon: <ShieldCheck className="h-4 w-4 text-blue-300" />, label: 'Secure Authentication' },
-                  { icon: <Building className="h-4 w-4 text-blue-300" />, label: 'Visitor Management' },
+                  { icon: <Building className="h-4 w-4 text-blue-300" />, label: 'Guest Access (Planned)' },
                   { icon: <Clipboard className="h-4 w-4 text-blue-300" />, label: 'Digital Billing' },
                   { icon: <Bell className="h-4 w-4 text-blue-300" />, label: 'Real-Time Notifications' },
                   { icon: <User className="h-4 w-4 text-blue-300" />, label: 'Resident Dashboard' },
@@ -300,7 +407,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                   <div>
                     <h3 className="text-2xl font-serif font-bold text-white">Restore Password</h3>
                     <p className="text-sm text-slate-400 mt-2">
-                      Submit your registered email address and our server triggers recovery operations.
+                      Password reset is not available in the local demo. Contact the administrator for account recovery.
                     </p>
                   </div>
 
@@ -309,9 +416,9 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       <div className="inline-flex p-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-full mb-3">
                         <Check className="h-6 w-6" />
                       </div>
-                      <h4 className="font-bold text-white text-sm">Dispatched Successfully</h4>
+                      <h4 className="font-bold text-white text-sm">Password Reset Unavailable</h4>
                       <p className="text-xs text-slate-300 mt-1 max-w-sm mx-auto">
-                        An override code has been dispatched. For testing, you may simply return to login and authenticate using standard default accounts.
+                        No email or reset token was sent. Return to sign-in or contact the administrator for help recovering the account.
                       </p>
                       <button
                         onClick={() => {
@@ -376,6 +483,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
                   <form onSubmit={handleLogin} className="space-y-4">
                     <Input
+                      id="register-full-name"
                       type="email"
                       label="Email Address"
                       variant="glass"
@@ -479,6 +587,36 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                     </button>
                   </p>
                 </motion.div>
+              ) : registrationSuccess ? (
+                <motion.div
+                  key="registration-success"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6 text-center"
+                >
+                  <div className="mx-auto inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
+                    <Check className="h-8 w-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-serif font-bold text-white">Account Created Successfully</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                      {registrationSuccess.emailVerificationSent
+                        ? 'Please check your email to verify your account before continuing.'
+                        : 'Your resident account is ready. Email verification is unavailable in the local demo.'}
+                    </p>
+                  </div>
+                  {registrationSuccess.emailVerificationSent && (
+                    <div className="rounded-2xl border border-blue-400/20 bg-blue-400/10 p-4 text-left text-xs leading-relaxed text-slate-300">
+                      <p>Step 1 ✓ Account Created</p>
+                      <p>Step 2 → Email Verification</p>
+                      <p>Step 3 ○ Resident Verification</p>
+                      <button type="button" onClick={resendVerificationEmail} className="mt-3 text-blue-300 underline">Resend verification email</button>
+                    </div>
+                  )}
+                  <Button type="button" variant="primary" fullWidth onClick={continueAfterRegistration} disabled={isRefreshingVerification} isLoading={isRefreshingVerification}>
+                    {registrationSuccess.emailVerificationSent ? 'I Verified My Email' : 'Continue to Resident Portal'}
+                  </Button>
+                </motion.div>
               ) : (
                 /* Registration Form */
                 <motion.div
@@ -489,20 +627,23 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                   className="space-y-6"
                 >
                   <div>
-                    <h3 className="text-2xl sm:text-3xl font-serif font-bold text-white">Claim Your Unit</h3>
+                    <h3 className="text-2xl sm:text-3xl font-serif font-bold text-white">Create Your Resident Account</h3>
                     <p className="text-sm text-slate-400 mt-1 font-medium">
-                      Register as a resident and gain access to full portal features.
+                      Create an account to browse and reserve units, book staycations, manage payments, submit maintenance requests, receive notifications, and access the Resident Portal.
                     </p>
                   </div>
 
                   <form onSubmit={handleRegister} className="space-y-4">
                     <Input
+                      id="register-email"
                       type="text"
                       label="Full Name"
                       variant="glass"
                       placeholder="John Doe"
+                      autoComplete="name"
                       value={name}
                       onChange={(e: any) => setName(e.target.value)}
+                      error={registrationErrors.name || undefined}
                       icon={User}
                       required
                     />
@@ -512,31 +653,25 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       label="Email Address"
                       variant="glass"
                       placeholder="john@condo.com"
+                      autoComplete="email"
                       value={email}
                       onChange={(e: any) => handleEmailChange(e.target.value)}
-                      error={!emailValid ? 'Enter a valid email address to continue.' : undefined}
+                      error={registrationErrors.email || undefined}
                       icon={Mail}
                       required
                     />
 
                     <Input
+                      id="register-phone"
                       type="tel"
                       label="Phone Number"
                       variant="glass"
                       placeholder="(555) 123-4567"
+                      autoComplete="tel"
                       value={phone}
                       onChange={(e: any) => setPhone(e.target.value)}
+                      error={registrationErrors.phone || undefined}
                       icon={Phone}
-                    />
-
-                    <Input
-                      type="text"
-                      label="Unit Number"
-                      variant="glass"
-                      placeholder="A-1205"
-                      value={unitNumber}
-                      onChange={(e: any) => setUnitNumber(e.target.value)}
-                      icon={Building}
                     />
 
                     <div className="space-y-1">
@@ -546,6 +681,8 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         <input
                           type={showPassword ? 'text' : 'password'}
                           required
+                          autoComplete="new-password"
+                          aria-describedby="password-requirements"
                           placeholder="••••••••"
                           className="w-full glass-input rounded-xl pl-10 pr-11 py-3 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
                           value={password}
@@ -560,16 +697,57 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
+                      <div id="password-requirements" className="rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] text-slate-300">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span>Password strength</span>
+                          <span className={passwordStrength === 'Strong' ? 'text-emerald-300' : passwordStrength === 'Fair' ? 'text-amber-300' : 'text-rose-300'}>{passwordStrength}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          {Object.entries({ length: 'Minimum 8 characters', uppercase: 'At least one uppercase letter', lowercase: 'At least one lowercase letter', number: 'At least one number', special: 'At least one special character' }).map(([key, label]) => (
+                            <span key={key} className={passwordChecks[key as keyof typeof passwordChecks] ? 'text-emerald-300' : 'text-slate-400'}>
+                              {passwordChecks[key as keyof typeof passwordChecks] ? '✓' : '○'} {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {registrationErrors.password && <p className="text-xs text-rose-300">{registrationErrors.password}</p>}
                     </div>
+
+                    <div className="space-y-1">
+                      <label htmlFor="confirm-password" className="text-xs font-semibold uppercase tracking-wider text-slate-300">Confirm Password</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10" />
+                        <input
+                          id="confirm-password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          autoComplete="new-password"
+                          placeholder="••••••••"
+                          className="w-full glass-input rounded-xl pl-10 pr-11 py-3 text-sm focus:outline-none transition-all placeholder:text-slate-600 font-semibold text-white"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                        />
+                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors" aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {registrationErrors.confirmPassword && <p className="text-xs text-rose-300">{registrationErrors.confirmPassword}</p>}
+                    </div>
+
+                    <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-300">
+                      <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-white/20 bg-slate-900 text-blue-500" />
+                      <span>I agree to the <button type="button" className="text-blue-300 underline" onClick={() => toast('Terms of Service will be published for the production release.', 'info')}>Terms of Service</button> and <button type="button" className="text-blue-300 underline" onClick={() => toast('Privacy Policy will be published for the production release.', 'info')}>Privacy Policy</button>.</span>
+                    </label>
+                    {registrationErrors.terms && <p className="text-xs text-rose-300">{registrationErrors.terms}</p>}
 
                     <Button
                       type="submit"
                       variant="primary"
                       fullWidth
-                      disabled={isLoading}
+                      disabled={isLoading || hasRegistrationErrors}
                       isLoading={isLoading}
                     >
-                      {isLoading ? 'Registering...' : 'Claim Your Unit'}
+                      {isLoading ? 'Creating Account...' : 'Create Account'}
                     </Button>
                   </form>
 

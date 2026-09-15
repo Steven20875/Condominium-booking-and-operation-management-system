@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronDown, ChevronUp, ArrowUpRight, CreditCard, Twitter, Instagram, Linkedin, Menu, X
+  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronDown, ChevronUp, ArrowUpRight, CreditCard, Menu, X
 } from 'lucide-react';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
 
@@ -15,7 +15,7 @@ const whyChooseData = [
   { icon: UserCheck, title: 'Resident Portal', description: 'A central dashboard for residents to manage bookings, announcements, and service requests.' },
   { icon: CreditCard, title: 'Digital Payments', description: 'Secure billing and payment flows for deposits, utilities, and rent statements.' },
   { icon: Wrench, title: 'Maintenance Requests', description: 'Streamlined service tickets with live progress updates and technician assignment.' },
-  { icon: Bell, title: 'Visitor Management', description: 'Approve guests, track arrivals, and secure building entries effortlessly.' },
+  { icon: Bell, title: 'Guest Access (Planned)', description: 'Guest registration and access approvals are planned for a future release.' },
   { icon: AreaChart, title: 'Analytics Dashboard', description: 'Executive metrics for occupancy, revenue, and resident satisfaction trends.' },
   { icon: ShieldCheck, title: 'Secure Authentication', description: 'Role-based access for residents, admins, and operations staff.' },
   { icon: Mail, title: 'Announcements', description: 'Broadcast urgent updates and community notices instantly to every resident.' }
@@ -33,7 +33,7 @@ const faqItems = [
   { question: 'What payment methods are accepted?', answer: 'We support digital payment channels for bookings, maintenance fees, and security deposits through our secure billing system.' },
   { question: 'What documents do I need for move-in?', answer: 'Typically you need a valid ID, residency details, and proof of payment to complete the booking process with our operations team.' },
   { question: 'How does maintenance support work?', answer: 'Submit a request through the portal and our maintenance team will triage, assign, and update status in real time until resolution.' },
-  { question: 'Can guests be registered in advance?', answer: 'Yes, visitor registration is managed through the platform so guests receive seamless building access approval.' }
+  { question: 'Can guests be registered in advance?', answer: 'Guest registration is planned for a future release. Contact the property office for current access procedures.' }
 ];
 
 export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPageProps) {
@@ -735,13 +735,9 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               One Spatial Iloilo, Mandurriao <br />
               Iloilo City, Iloilo, Philippines
             </p>
-              <div className="flex items-center gap-3 pt-4">
-                <a href="#" className="text-slate-400 hover:text-white transition-colors" aria-label="Twitter"><Twitter className="h-4 w-4" /></a>
-                <a href="#" className="text-slate-400 hover:text-white transition-colors" aria-label="Instagram"><Instagram className="h-4 w-4" /></a>
-                <a href="#" className="text-slate-400 hover:text-white transition-colors" aria-label="LinkedIn"><Linkedin className="h-4 w-4" /></a>
-              </div>
-            <a href="#landing-root" className="hover:text-slate-400">Legal Agreement</a>
-            <a href="#landing-root" className="hover:text-slate-400">Privacy Charter</a>
+              <p className="pt-4 text-[10px] text-slate-500">Social channels and formal policy pages are planned for the production release.</p>
+            <span className="text-slate-500">Legal Agreement (Planned)</span>
+            <span className="text-slate-500">Privacy Charter (Planned)</span>
             <a href="#landing-root" className="hover:text-slate-400 font-bold uppercase text-slate-300">Back To Peak ↑</a>
           </div>
         </div>

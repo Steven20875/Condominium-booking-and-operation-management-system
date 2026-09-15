@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db/index';
 
 /**
  * NotificationService - manages notifications and a FIFO queue for dispatch

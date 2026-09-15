@@ -83,7 +83,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className={`flex flex-col gap-1 ${widthClass}`}>
         {label && (
-          <label className={`text-xs font-semibold uppercase tracking-wider ${variant === 'glass' ? 'text-slate-200' : 'text-slate-700'}`}>
+          <label htmlFor={props.id} className={`text-xs font-semibold uppercase tracking-wider ${variant === 'glass' ? 'text-slate-200' : 'text-slate-700'}`}>
             {label}
           </label>
         )}

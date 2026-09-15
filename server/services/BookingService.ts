@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db/index';
 
 /**
  * BookingService - OOP wrapper around booking-related operations

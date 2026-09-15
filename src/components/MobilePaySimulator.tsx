@@ -68,23 +68,8 @@ export default function MobilePaySimulator() {
     const mockRef = 'GCSH-MOB-' + Math.random().toString(36).substr(2, 6).toUpperCase();
 
     try {
-      const res = await fetch(`/api/public/payments/${invoiceId}/pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          method: finalMethod,
-          referenceNumber: mockRef,
-          amount: amountToBill,
-          payorName: invoiceDetails ? invoiceDetails.residentName : residentName
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error('Transaction server rejected request.');
-      }
-
+      void amountToBill;
+      void finalMethod;
       setReferenceNum(mockRef);
       setGcashStep('success');
     } catch (err: any) {
@@ -139,8 +124,8 @@ export default function MobilePaySimulator() {
               g)
             </div>
             <div>
-              <span className="text-[9px] uppercase tracking-widest font-bold font-mono text-blue-400 block leading-none">GCash Checkout</span>
-              <h3 className="text-xs font-bold leading-normal text-white">Gales Secure GCash</h3>
+              <span className="text-[9px] uppercase tracking-widest font-bold font-mono text-blue-400 block leading-none">Demo Payment</span>
+                <h3 className="text-xs font-bold leading-normal text-white">GCash Simulation</h3>
             </div>
           </div>
           
@@ -204,7 +189,7 @@ export default function MobilePaySimulator() {
                         <div className="rounded-2xl bg-blue-600/15 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-blue-200">GCash</div>
                       </div>
                       <p className="mt-3 text-[10px] text-slate-500 leading-relaxed">
-                        Real GCash checkout form. Ensure this mobile number is registered with GCash and has sufficient balance before confirming payment.
+                        This is a demonstration flow only. No real GCash account is contacted and no money is transferred.
                       </p>
                     </div>
                   </div>
@@ -223,7 +208,7 @@ export default function MobilePaySimulator() {
                       />
                     </div>
                     <span className="text-[10px] text-slate-400 leading-normal block">
-                      This checkout is prepared for GCash only. The final transaction is recorded in your condominium dashboard after payment is confirmed.
+                      This simulation does not create a payment ledger entry. Use the authenticated cash ledger for real demo records.
                     </span>
                   </div>
                 </div>
@@ -291,7 +276,7 @@ export default function MobilePaySimulator() {
                     type="submit"
                     className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Confirm Settle {phpValue}
+                    Run Demo Payment {phpValue}
                   </button>
                   
                   <button
@@ -319,8 +304,8 @@ export default function MobilePaySimulator() {
                   </div>
                   
                   <div>
-                    <h4 className="text-base font-serif font-black text-white leading-tight">Paid in Local Currency</h4>
-                    <p className="text-[10px] text-emerald-400 mt-0.5 uppercase tracking-widest font-mono font-bold font-semibold">Processed Successfully</p>
+                    <h4 className="text-base font-serif font-black text-white leading-tight">Demo Payment Complete</h4>
+                    <p className="text-[10px] text-emerald-400 mt-0.5 uppercase tracking-widest font-mono font-bold font-semibold">No real transaction was processed</p>
                   </div>
                 </div>
 
@@ -330,7 +315,7 @@ export default function MobilePaySimulator() {
                     <span className="text-white font-semibold">Gales Urban Haven</span>
                   </div>
                   <div className="flex justify-between text-[10px] font-mono">
-                    <span className="text-slate-400 uppercase font-bold text-[9px]">Amount Refunded</span>
+                    <span className="text-slate-400 uppercase font-bold text-[9px]">Simulated Amount</span>
                     <span className="text-white font-bold">{phpValue}</span>
                   </div>
                   <div className="flex justify-between text-[10px] font-mono pt-1.5 border-t border-white/5">
@@ -341,7 +326,7 @@ export default function MobilePaySimulator() {
 
                 <div className="space-y-2">
                   <p className="text-[11px] text-slate-400">
-                    Your desktop dashboard will automatically sync and lock this receipt. Settle closed!
+                    This demonstration does not update your dashboard or settle a real payment.
                   </p>
                   <button
                     onClick={() => {

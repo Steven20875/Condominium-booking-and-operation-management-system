@@ -97,17 +97,16 @@ function AppContent() {
         return;
       }
 
-      void fetch('/api/auth/firebase', {
+      void firebaseUser.getIdToken().then((idToken) => fetch('/api/auth/firebase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Resident',
           avatarUrl: firebaseUser.photoURL || undefined,
           provider: 'google',
+          idToken,
         }),
-      })
+      }))
         .then(async (response) => {
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {

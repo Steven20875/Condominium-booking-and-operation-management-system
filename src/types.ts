@@ -15,6 +15,7 @@ export interface User {
   avatarUrl?: string;
   authProvider?: 'email' | 'google' | 'firebase';
   authUid?: string;
+  emailVerified?: boolean;
   hasValidId?: boolean;
   governmentIdStatus?: GovernmentIdStatus;
   governmentIdUrl?: string;
