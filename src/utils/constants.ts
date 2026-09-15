@@ -54,7 +54,7 @@ export const MAINTENANCE_STATUSES = ['Pending', 'Assigned', 'In Progress', 'Comp
 export const MAINTENANCE_PRIORITIES = ['Low', 'Medium', 'High', 'Emergency'] as const;
 export const UNIT_STATUSES = ['Available', 'Occupied', 'Maintenance'] as const;
 
-export const PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'Bank Transfer', 'E-Wallet', 'QR PH'] as const;
+export const PAYMENT_METHODS = ['Cash'] as const;
 
 export const NOTIFICATION_TYPES = ['info', 'success', 'warning', 'alert'] as const;
 

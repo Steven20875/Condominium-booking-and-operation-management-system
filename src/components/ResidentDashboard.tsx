@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
-import { 
-  Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, ChevronLeft, ChevronRight, Sun, Heart, X, Sparkles, Upload, FileText, DollarSign, HelpCircle, QrCode, Smartphone, ShieldCheck 
+import {
+  Building, Calendar, CreditCard, Wrench, Bell, User, LogOut, CheckCircle, Clock, AlertTriangle, Search, Filter, ArrowUpRight, ShieldAlert, ArrowLeft, ChevronLeft, ChevronRight, Sun, Heart, X, Sparkles, Upload, FileText, DollarSign, HelpCircle, Smartphone, ShieldCheck
 } from 'lucide-react';
 import { User as UserType, Unit, Booking, Payment, MaintenanceRequest, CondoNotification } from '../types.ts';
 import { formatCurrency, formatCurrencyText } from '../utils/currency.ts';
 import UserManual from './UserManual';
-
-const GCASH_DEEPLINK_BASE = 'gcash://com.mynt.gcash/app/006300000800';
 
 const formatDateInput = (date: Date) => {
   const year = date.getFullYear();
@@ -37,7 +35,7 @@ type TabType = 'overview' | 'browse' | 'bookings' | 'payments' | 'maintenance' |
 
 export default function ResidentDashboard({ user, token, onLogout, onUpdateUser, initialActiveTab }: ResidentDashboardProps) {
   const { toast } = useToast();
-  
+
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   useEffect(() => {
@@ -100,61 +98,10 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
   // Complex Pay visual state
   const [payingInvoice, setPayingInvoice] = useState<Payment | null>(null);
-  const [cardHolder, setCardHolder] = useState<string>(user.name);
-  const [cardNumber, setCardNumber] = useState<string>('4000 1234 5678 9010');
-  const [cardExpiry, setCardExpiry] = useState<string>('09/29');
-  const [cardCVC, setCardCVC] = useState<string>('984');
   const [submittingPayment, setSubmittingPayment] = useState<boolean>(false);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
 
   // Cash payment state
-  const [paymentOption, setPaymentOption] = useState<'cash'>('cash');
-  const gcashPhone = user.phone || '09123456789';
-
-  const formatEmvField = (id: string, value: string) => `${id}${value.length.toString().padStart(2, '0')}${value}`;
-
-  const computeGcashQrCrc = (payload: string) => {
-    const bytes = new TextEncoder().encode(payload);
-    let crc = 0xffff;
-
-    for (const byte of bytes) {
-      crc ^= byte << 8;
-      for (let i = 0; i < 8; i += 1) {
-        crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ 0x1021) : (crc << 1);
-        crc &= 0xffff;
-      }
-    }
-
-    return crc.toString(16).toUpperCase().padStart(4, '0');
-  };
-
-  const buildGcashQrPayload = (amount: number, orderId: string) => {
-    const amountString = amount.toFixed(2);
-    const merchantAccountInfo =
-      formatEmvField('00', 'ph.ppmi.p2m') +
-      formatEmvField('01', 'SRCPPHM2XXX') +
-      formatEmvField('03', gcashPhone);
-
-    const additionalData =
-      formatEmvField('03', orderId) +
-      formatEmvField('10', 'GalesCondo');
-
-    const payloadWithoutCrc = [
-      formatEmvField('00', '01'),
-      formatEmvField('01', '12'),
-      formatEmvField('26', merchantAccountInfo),
-      formatEmvField('52', '0000'),
-      formatEmvField('53', '608'),
-      formatEmvField('54', amountString),
-      formatEmvField('58', 'PH'),
-      formatEmvField('59', 'Gales Condominium'),
-      formatEmvField('60', 'Iloilo'),
-      formatEmvField('62', additionalData),
-      '6304'
-    ].join('');
-
-    return payloadWithoutCrc + computeGcashQrCrc(payloadWithoutCrc);
-  };
 
   // Maintenance Filing Form State
   const [mIssueType, setMIssueType] = useState<string>('Plumbing');
@@ -323,7 +270,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     try {
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -409,7 +356,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       return;
     }
     setSubmittingBooking(true);
-    
+
     const cost = calculateTotalCost(selectedUnitForBooking.price);
 
     try {
@@ -434,7 +381,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
       toast(`Reservation for ${selectedUnitForBooking.name} created! Status: Pending Approval.`, 'success');
       setSelectedUnitForBooking(null);
-      
+
       // Auto transition & Fetch new records
       fetchAllData();
       setActiveTab('bookings');
@@ -446,13 +393,12 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   };
 
   // Settle invoice handler
-  const handleSettleInvoice = async (e: React.FormEvent, customMethod?: string) => {
+  const handleSettleInvoice = async (e: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!payingInvoice) return;
     setSubmittingPayment(true);
 
     try {
-      const selectedMethod = customMethod || 'Cash';
       const amountToPay = paymentAmount > 0 ? paymentAmount : payingInvoice.remainingBalance;
       if (amountToPay <= 0 || amountToPay > payingInvoice.remainingBalance) {
         throw new Error('Enter a valid payment amount within the remaining balance.');
@@ -472,7 +418,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed compiling payment.');
 
-      toast(`Transaction settled! Paid ${formatCurrency(amountToPay)} successfully via ${selectedMethod}.`, 'success');
+      toast(`Transaction settled! Paid ${formatCurrency(amountToPay)} successfully via Cash.`, 'success');
       setPayingInvoice(null);
       setPaymentAmount(0);
       fetchAllData();
@@ -573,7 +519,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   // Filters calculation
   const getFilteredUnits = () => {
     return units.filter((u: Unit) => {
-      const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             u.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = filterType ? u.type.toLowerCase() === filterType.toLowerCase() : true;
       const normalizedStatus = (u.status || 'Available').toLowerCase();
@@ -598,7 +544,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
   return (
     <div id="res-dash-root" className="min-h-screen bg-transparent flex flex-col md:flex-row font-sans text-slate-100">
-      
+
       {/* 1. SIDE NAVIGATION BAR */}
       <aside className={`w-full ${isSidebarCollapsed ? 'md:w-20' : 'md:w-72'} bg-slate-950/40 backdrop-blur-md text-white shrink-0 flex flex-col justify-between py-6 px-4 border-r border-white/10 md:h-screen sticky top-0 md:top-auto z-40 transition-all duration-300`}>
         <div className="space-y-6">
@@ -707,7 +653,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
       {/* 2. MAIN HUB INTERFACE */}
       <main className="flex-1 overflow-y-auto px-4 py-8 md:p-12 md:max-h-screen">
-        
+
         {/* TOP STATUS HEADER BAR */}
         <header className="flex flex-col gap-6 mb-8">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -799,7 +745,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
         {/* CONTROLLER SWITCH ROUTING */}
         <AnimatePresence mode="wait">
-          
+
           {/* OVERVIEW PANEL */}
           {activeTab === 'overview' && (
             <motion.div
@@ -811,7 +757,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
             >
               {/* Quick Widget Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                
+
                 <div className="glass-card p-5 rounded-2xl border border-white/10 shadow-sm flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Approved Bookings</p>
@@ -856,7 +802,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
 
               {/* Grid 2 Column */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
+
                 {/* News & Bulletins Block */}
                 <div className="lg:col-span-7 glass-card p-6 rounded-3xl border border-white/10 shadow-sm space-y-4">
                   <div className="flex justify-between items-center pb-3 border-b border-white/15">
@@ -896,13 +842,13 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                   </div>
 
                   <div className="space-y-3">
-                    <button 
+                    <button
                       onClick={() => setActiveTab('browse')}
                       className="w-full glass-button-primary text-white p-4 rounded-xl text-left font-bold text-xs uppercase tracking-wider flex items-center justify-between cursor-pointer"
                     >
                       Book Premium Club Suites <ArrowUpRight className="h-4 w-4" />
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setActiveTab('maintenance');
                         setMIssueType('Plumbing');
@@ -911,7 +857,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     >
                       Report Leakage Anomalies <Wrench className="h-4 w-4" />
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setActiveTab('maintenance');
                         setMIssueType('Security / Parking');
@@ -1005,14 +951,14 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                           {item.status}
                         </span>
                       </div>
-                      
+
                       <div className="p-5 space-y-3">
                         <div>
                           <span className="text-[10px] text-slate-400 font-mono tracking-wider block">{item.type}</span>
                           <h4 className="font-serif font-bold text-slate-900 text-base">{item.name}</h4>
                         </div>
                         <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{item.description}</p>
-                        
+
                       </div>
                     </div>
 
@@ -1103,7 +1049,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                               >
                                 <FileText className="h-3 w-3" /> Receipt
                               </button>
-                              
+
                               {book.status === 'Pending' && (
                                 <button
                                   onClick={async () => {
@@ -1145,7 +1091,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                       You haven’t reserved any condominium facilities yet. Check are catalogs of lofts ready with 48 hours availability overrides!
                     </p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setActiveTab('browse')}
                     className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-5 rounded-xl uppercase tracking-wider shadow"
                   >
@@ -1336,7 +1282,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                             }`}>
                               {ticket.priority} Priority
                             </span>
-                            
+
                             <span className={`px-2 py-0.5 rounded text-[8px] font-mono tracking-wider font-bold uppercase ${
                               ticket.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
                               ticket.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
@@ -1646,7 +1592,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 font-mono block">Layout: {selectedUnitForBooking.type}</span>
                     <h3 className="text-xl font-serif font-black text-slate-950 mt-1">{selectedUnitForBooking.name}</h3>
                   </div>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setSelectedUnitForBooking(null)}
                     aria-label="Close reservation modal"
@@ -1754,7 +1700,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
             >
               <form onSubmit={(e) => {
                 e.preventDefault();
-                handleSettleInvoice(e, 'Cash');
+                handleSettleInvoice(e);
               }}>
                 <div className="p-6 sm:p-8 space-y-6">
                   <div className="flex justify-between items-center">
@@ -1762,8 +1708,8 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">One Spatial Pay</span>
                       <h3 className="font-serif font-black text-slate-950 text-lg leading-tight mt-0.5">Payment Desk</h3>
                     </div>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => {
                         setPayingInvoice(null);
                       }}
@@ -1868,7 +1814,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     </div>
                     <span className="font-serif font-black text-slate-950 leading-none">VISTA RESIDENCE</span>
                   </div>
-                  <button 
+                  <button
                     type="button"
                     aria-label="Close receipt dialog"
                     onClick={() => setSelectedBookingReceipt(null)}

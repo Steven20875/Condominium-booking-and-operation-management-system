@@ -862,7 +862,7 @@ export class MockDatabase {
       remainingBalance: payment.status === 'Paid' ? 0 : totalAmount,
       downpaymentAmount: payment.status === 'Paid' ? totalAmount : 0,
       status: payment.status || 'Pending',
-      method: payment.method || 'Credit Card',
+      method: payment.method || 'Cash',
       referenceNumber: 'TXN-GEN-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
       createdAt: new Date().toISOString()
     };
@@ -1130,4 +1130,3 @@ export class MockDatabase {
 }
 
 export const db = new MockDatabase();
-

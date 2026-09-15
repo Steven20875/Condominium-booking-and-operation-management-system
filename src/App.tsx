@@ -7,7 +7,6 @@ import AdminDashboard from './components/AdminDashboard.tsx';
 import AmbientBackground from './components/AmbientBackground.tsx';
 import { User } from './types.ts';
 import Chatbot from './components/Chatbot.tsx';
-import MobilePaySimulator from './components/MobilePaySimulator.tsx';
 import { signOutFirebaseSession, watchFirebaseAuthState } from './lib/firebase.ts';
 
 /**
@@ -15,12 +14,6 @@ import { signOutFirebaseSession, watchFirebaseAuthState } from './lib/firebase.t
  */
 function AppContent() {
   const { toast } = useToast();
-  
-  // Intercept mobile QR code checkout simulations instantly
-  const isPaySimRoute = window.location.pathname.startsWith('/pay-sim') || window.location.search.includes('pay-sim=');
-  if (isPaySimRoute) {
-    return <MobilePaySimulator />;
-  }
 
   // App routing views: 'landing' | 'auth'
   const [currentView, setCurrentView] = useState<'landing' | 'auth'>('landing');

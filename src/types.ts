@@ -63,7 +63,7 @@ export interface Booking {
 }
 
 export type PaymentStatus = 'Pending' | 'Partially Paid' | 'Paid' | 'Failed' | 'Refunded';
-export type PaymentMethod = 'Credit Card' | 'Debit Card' | 'Bank Transfer' | 'E-Wallet' | 'Cash' | 'GCash Mobile';
+export type PaymentMethod = 'Cash';
 
 export interface Payment {
   id: string;
@@ -137,4 +137,3 @@ export interface DashboardStats {
   unitTypeAvailability: { type: string; count: number }[];
   maintenancePriorityData: { name: string; value: number }[];
 }
-
