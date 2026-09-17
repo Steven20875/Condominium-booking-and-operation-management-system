@@ -396,13 +396,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
         </div>
       </section>
 
-      <section id="reviews" className="px-6 py-24 text-center scroll-mt-10 select-none">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-dashed border-white/10 bg-white/5 p-10">
-          <p className="font-serif text-xl font-bold text-white">Resident reviews will appear here.</p>
-          <p className="mt-2 text-sm text-slate-400">Verified resident feedback will be shown when it is available.</p>
-        </div>
-      </section>
-
       {/* FAQ SECTION */}
       <section id="faq" className="py-24 px-6 max-w-7xl mx-auto scroll-mt-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
