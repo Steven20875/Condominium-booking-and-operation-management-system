@@ -90,11 +90,14 @@ const VITE_HMR_PORT = Number(process.env.VITE_HMR_PORT) || 24678;
 const isVercel = Boolean(process.env.VERCEL);
 const configuredJwtSecret = process.env.JWT_SECRET;
 if (isVercel && !configuredJwtSecret) {
-  throw new Error('JWT_SECRET must be configured in the production environment.');
+  console.warn('[AUTH] JWT_SECRET is not configured in the production environment. Generating a temporary secret for this runtime; set JWT_SECRET in Vercel to keep sessions stable across deploys.');
 }
 const JWT_SECRET = configuredJwtSecret || crypto.randomBytes(32).toString('hex');
 if (!configuredJwtSecret) {
   console.warn('[AUTH] JWT_SECRET is not configured. Local tokens will be invalidated when the server restarts.');
+}
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = JWT_SECRET;
 }
 const JWT_EXPIRES_IN = '8h';
 const GOVERNMENT_ID_STORAGE_DIR = path.join(projectRoot, 'data', 'private', 'government-ids');
@@ -252,14 +255,32 @@ function createAuthToken(user: { id: string; role: string }) {
   });
 }
 
-async function verifyFirebaseIdentityToken(idToken: string) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!serviceAccountJson) {
+function parseFirebaseServiceAccount(): Record<string, any> {
+  const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!rawServiceAccount || !rawServiceAccount.trim()) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not configured.');
   }
 
+  try {
+    return JSON.parse(rawServiceAccount);
+  } catch {
+    const normalized = rawServiceAccount
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t');
+
+    try {
+      return JSON.parse(normalized);
+    } catch {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON. Check the Vercel environment variable formatting.');
+    }
+  }
+}
+
+async function verifyFirebaseIdentityToken(idToken: string) {
+  const serviceAccount = parseFirebaseServiceAccount();
+
   if (getApps().length === 0) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
     initializeApp({ credential: cert(serviceAccount) });
   }
 
@@ -282,6 +303,24 @@ export async function createApp() {
   // Increase payload limits for direct base64 image uploads of condo units
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+    const isLocalHost = /^https?:\/\/localhost(?::\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(?::\d+)?$/.test(origin);
+    const isVercelOrigin = /^https?:\/\/.*\.vercel\.app$/i.test(origin);
+
+    if (!origin || isLocalHost || isVercelOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    }
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+
+    next();
+  });
 
   // --- API ROUTING INTERFACE ---
 
@@ -382,57 +421,70 @@ export async function createApp() {
       return res.status(503).json({ error: 'Google sign-in is not configured for this deployment.' });
     }
 
-    const uid = verifiedClaims.uid;
-    const email = verifiedClaims.email;
-    if (!isNonEmptyString(uid) || !isNonEmptyString(email)) {
-      return res.status(401).json({ error: 'Verified Firebase identity is incomplete.' });
-    }
-
-    if (verifiedClaims.email_verified !== true) {
-      return res.status(403).json({ error: 'Please verify your email address before continuing.' });
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const allUsers = db.getUsers();
-    const existingUserByUid = allUsers.find((user) => user.authUid === uid);
-    const existingUserByEmail = allUsers.find((user) => user.email.toLowerCase() === normalizedEmail);
-    const existingUser = existingUserByUid || existingUserByEmail;
-
-    if (existingUser) {
-      const isGoogleLogin = provider === 'google';
-      const nextAuthProvider = existingUser.authProvider || (isGoogleLogin ? 'google' : 'email');
-      const updatedUser = db.updateUser(existingUser.id, {
-        name: isNonEmptyString(name) ? String(name).trim() : existingUser.name,
-        phone: isNonEmptyString(phone) ? String(phone).trim() : existingUser.phone,
-        avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : existingUser.avatarUrl,
-        authProvider: nextAuthProvider,
-        authUid: uid,
-        email: normalizedEmail,
-        emailVerified: verifiedClaims.email_verified === true,
-      });
-
-      if (!updatedUser) {
-        return res.status(500).json({ error: 'Unable to synchronize the existing account.' });
+    try {
+      const uid = verifiedClaims.uid;
+      const email = verifiedClaims.email;
+      if (!isNonEmptyString(uid) || !isNonEmptyString(email)) {
+        return res.status(401).json({ error: 'Verified Firebase identity is incomplete.' });
       }
 
-      const userSafe = sanitizeUserForApi(updatedUser);
-      return res.status(200).json({ user: userSafe, token: createAuthToken(updatedUser) });
+      if (verifiedClaims.email_verified !== true) {
+        return res.status(403).json({ error: 'Please verify your email address before continuing.' });
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const allUsers = db.getUsers();
+      const existingUserByUid = allUsers.find((user) => user.authUid === uid);
+      const existingUserByEmail = allUsers.find((user) => user.email.toLowerCase() === normalizedEmail);
+      const existingUser = existingUserByUid || existingUserByEmail;
+
+      if (existingUser) {
+        const isGoogleLogin = provider === 'google';
+        const nextAuthProvider = existingUser.authProvider || (isGoogleLogin ? 'google' : 'email');
+        const updatedUser = db.updateUser(existingUser.id, {
+          name: isNonEmptyString(name) ? String(name).trim() : existingUser.name,
+          phone: isNonEmptyString(phone) ? String(phone).trim() : existingUser.phone,
+          avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : existingUser.avatarUrl,
+          authProvider: nextAuthProvider,
+          authUid: uid,
+          email: normalizedEmail,
+          emailVerified: verifiedClaims.email_verified === true,
+        });
+
+        if (!updatedUser) {
+          return res.status(500).json({ error: 'Unable to synchronize the existing account.' });
+        }
+
+        const userSafe = sanitizeUserForApi(updatedUser);
+        return res.status(200).json({ user: userSafe, token: createAuthToken(updatedUser) });
+      }
+
+      const newUser = db.createUser({
+        email: normalizedEmail,
+        password: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 12),
+        name: isNonEmptyString(name) ? String(name).trim() : normalizedEmail.split('@')[0],
+        phone: isNonEmptyString(phone) ? String(phone).trim() : undefined,
+        avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : undefined,
+        role: 'resident',
+        authProvider: provider === 'google' ? 'google' : 'firebase',
+        authUid: uid,
+        emailVerified: verifiedClaims.email_verified === true
+      });
+
+      const userSafe = sanitizeUserForApi(newUser);
+      return res.status(201).json({ user: userSafe, token: createAuthToken(newUser) });
+    } catch (error) {
+      console.error('[AUTH] Firebase user synchronization failed:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        persistenceMode: process.env.USE_POSTGRES === 'true' ? 'postgres' : 'json',
+        hasFirebaseServiceAccount: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim()),
+      });
+      return res.status(500).json({
+        error: 'Unable to synchronize the Firebase account.',
+        code: 'FIREBASE_USER_SYNC_FAILED'
+      });
     }
-
-    const newUser = db.createUser({
-      email: normalizedEmail,
-      password: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 12),
-      name: isNonEmptyString(name) ? String(name).trim() : normalizedEmail.split('@')[0],
-      phone: isNonEmptyString(phone) ? String(phone).trim() : undefined,
-      avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : undefined,
-      role: 'resident',
-      authProvider: provider === 'google' ? 'google' : 'firebase',
-      authUid: uid,
-      emailVerified: verifiedClaims.email_verified === true
-    });
-
-    const userSafe = sanitizeUserForApi(newUser);
-    return res.status(201).json({ user: userSafe, token: createAuthToken(newUser) });
   });
 
   app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {

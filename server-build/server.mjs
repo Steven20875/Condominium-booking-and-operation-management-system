@@ -980,10 +980,20 @@ var PostgresStateAdapter = class {
 var usePostgres = String(process.env.USE_POSTGRES || "").toLowerCase() === "true";
 var databaseUrl = process.env.DATABASE_URL || "";
 if (usePostgres && !databaseUrl) {
-  throw new Error("USE_POSTGRES=true requires DATABASE_URL.");
+  console.warn("[DB] USE_POSTGRES=true requires DATABASE_URL, so the app will continue using the JSON database fallback.");
 }
-var postgresAdapter = usePostgres ? new PostgresStateAdapter(databaseUrl) : void 0;
-var dbReady = postgresAdapter?.ready ?? Promise.resolve();
+var postgresAdapter;
+if (usePostgres && databaseUrl) {
+  try {
+    postgresAdapter = new PostgresStateAdapter(databaseUrl);
+  } catch (error) {
+    console.warn("[DB] Postgres initialization failed. Falling back to JSON database mode.", error);
+    postgresAdapter = void 0;
+  }
+}
+var dbReady = (postgresAdapter?.ready ?? Promise.resolve()).catch((error) => {
+  console.warn("[DB] Postgres readiness check failed. Falling back to JSON database mode.", error);
+});
 var db2 = db;
 
 // server/services/BookingService.ts
@@ -1077,11 +1087,14 @@ var VITE_HMR_PORT = Number(process.env.VITE_HMR_PORT) || 24678;
 var isVercel2 = Boolean("1");
 var configuredJwtSecret = process.env.JWT_SECRET;
 if (isVercel2 && !configuredJwtSecret) {
-  throw new Error("JWT_SECRET must be configured in the production environment.");
+  console.warn("[AUTH] JWT_SECRET is not configured in the production environment. Generating a temporary secret for this runtime; set JWT_SECRET in Vercel to keep sessions stable across deploys.");
 }
 var JWT_SECRET = configuredJwtSecret || crypto.randomBytes(32).toString("hex");
 if (!configuredJwtSecret) {
   console.warn("[AUTH] JWT_SECRET is not configured. Local tokens will be invalidated when the server restarts.");
+}
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = JWT_SECRET;
 }
 var JWT_EXPIRES_IN = "8h";
 var GOVERNMENT_ID_STORAGE_DIR = path2.join(projectRoot, "data", "private", "government-ids");
@@ -1205,13 +1218,25 @@ function createAuthToken(user) {
     audience: "one-spatial-portal"
   });
 }
-async function verifyFirebaseIdentityToken(idToken) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!serviceAccountJson) {
+function parseFirebaseServiceAccount() {
+  const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!rawServiceAccount || !rawServiceAccount.trim()) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not configured.");
   }
+  try {
+    return JSON.parse(rawServiceAccount);
+  } catch {
+    const normalized = rawServiceAccount.replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\t/g, "	");
+    try {
+      return JSON.parse(normalized);
+    } catch {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON. Check the Vercel environment variable formatting.");
+    }
+  }
+}
+async function verifyFirebaseIdentityToken(idToken) {
+  const serviceAccount = parseFirebaseServiceAccount();
   if (getApps().length === 0) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
     initializeApp({ credential: cert(serviceAccount) });
   }
   return getAuth().verifyIdToken(idToken);
@@ -1228,6 +1253,21 @@ async function createApp() {
   const app = express();
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use((req, res, next) => {
+    const origin = typeof req.headers.origin === "string" ? req.headers.origin : "";
+    const isLocalHost = /^https?:\/\/localhost(?::\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(?::\d+)?$/.test(origin);
+    const isVercelOrigin = /^https?:\/\/.*\.vercel\.app$/i.test(origin);
+    if (!origin || isLocalHost || isVercelOrigin) {
+      res.setHeader("Access-Control-Allow-Origin", origin || "*");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    }
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(204);
+    }
+    next();
+  });
   app.post("/api/auth/register", registrationRateLimit, (req, res) => {
     const { email, password, name, phone, unitNumber } = req.body;
     const missing = validateFields(req.body, ["email", "password", "name"]);

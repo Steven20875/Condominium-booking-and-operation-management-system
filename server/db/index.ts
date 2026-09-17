@@ -5,13 +5,24 @@ const usePostgres = String(process.env.USE_POSTGRES || '').toLowerCase() === 'tr
 const databaseUrl = process.env.DATABASE_URL || '';
 
 if (usePostgres && !databaseUrl) {
-  throw new Error('USE_POSTGRES=true requires DATABASE_URL.');
+  console.warn('[DB] USE_POSTGRES=true requires DATABASE_URL, so the app will continue using the JSON database fallback.');
 }
 
-const postgresAdapter = usePostgres ? new PostgresStateAdapter(databaseUrl) : undefined;
+let postgresAdapter: PostgresStateAdapter | undefined;
+
+if (usePostgres && databaseUrl) {
+  try {
+    postgresAdapter = new PostgresStateAdapter(databaseUrl);
+  } catch (error) {
+    console.warn('[DB] Postgres initialization failed. Falling back to JSON database mode.', error);
+    postgresAdapter = undefined;
+  }
+}
 
 /** Resolves before the app accepts requests in PostgreSQL mode. */
-export const dbReady = postgresAdapter?.ready ?? Promise.resolve();
+export const dbReady = (postgresAdapter?.ready ?? Promise.resolve()).catch((error) => {
+  console.warn('[DB] Postgres readiness check failed. Falling back to JSON database mode.', error);
+});
 
 /**
  * Compatibility boundary: existing synchronous services continue using the

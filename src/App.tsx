@@ -44,7 +44,15 @@ function AppContent() {
           signal: controller.signal
         })
           .then(async (res) => {
-            const data = await res.json();
+            const text = await res.text();
+            let data: any = {};
+            if (text) {
+              try {
+                data = JSON.parse(text);
+              } catch {
+                data = { error: text.trim().replace(/\s+/g, ' ').slice(0, 220) };
+              }
+            }
             if (res.ok && data.user) {
               setUser(data.user);
               localStorage.setItem('vista_user', JSON.stringify(data.user));
@@ -101,7 +109,16 @@ function AppContent() {
         }),
       }))
         .then(async (response) => {
-          const data = await response.json().catch(() => ({}));
+          const text = await response.text();
+          let data: any = {};
+          if (text) {
+            try {
+              data = JSON.parse(text);
+            } catch {
+              const snippet = text.trim().replace(/\s+/g, ' ').slice(0, 220);
+              throw new Error(snippet || 'The server returned an unexpected non-JSON response.');
+            }
+          }
           if (!response.ok) {
             throw new Error(data.error || 'Google sign-in failed.');
           }

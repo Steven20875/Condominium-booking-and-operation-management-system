@@ -122,7 +122,17 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
         body: JSON.stringify({ email: email.trim().toLowerCase(), password })
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: any = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          const snippet = text.trim().replace(/\s+/g, ' ').slice(0, 220);
+          throw new Error(snippet || 'The server returned an unexpected non-JSON response.');
+        }
+      }
+
       if (!response.ok) {
         throw new Error(data.error || 'Local email/password sign-in failed.');
       }
@@ -177,7 +187,17 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
         })
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data: any = {};
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch {
+            const snippet = text.trim().replace(/\s+/g, ' ').slice(0, 220);
+            throw new Error(snippet || 'The server returned an unexpected non-JSON response.');
+          }
+        }
+
         if (!response.ok) {
           throw new Error(data.error || 'Local registration failed.');
         }
@@ -215,7 +235,16 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken: verification.idToken, name: name.trim(), phone: phone.trim() || undefined, provider: 'email' })
       });
-      const data = await response.json().catch(() => ({}));
+      const text = await response.text();
+      let data: any = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          const snippet = text.trim().replace(/\s+/g, ' ').slice(0, 220);
+          throw new Error(snippet || 'The server returned an unexpected non-JSON response.');
+        }
+      }
       if (!response.ok) throw new Error(data.error || 'Unable to update email verification status.');
       onLoginSuccess(data.user, data.token);
     } catch (err: any) {
@@ -275,7 +304,16 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
         })
       });
 
-      const data = await response.json().catch(() => ({}));
+      const text = await response.text();
+      let data: any = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          const snippet = text.trim().replace(/\s+/g, ' ').slice(0, 220);
+          throw new Error(snippet || 'The server returned an unexpected non-JSON response.');
+        }
+      }
       if (import.meta.env.DEV) {
         console.debug('[auth] /api/auth/firebase response', { status: response.status, ok: response.ok });
       }
