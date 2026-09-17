@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ChevronDown, ChevronUp, ArrowUpRight, CreditCard, Menu, X
+  Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ArrowUpRight, CreditCard, Menu, X
 } from 'lucide-react';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
 
@@ -28,16 +28,7 @@ const processSteps = [
   { title: 'Move In', description: 'Complete check-in, receive access details, and settle into premium condominium living.', icon: ArrowUpRight }
 ];
 
-const faqItems = [
-  { question: 'How do I book a condo unit?', answer: 'Use the Book Your Unit button to access live listings, choose your preferred suite, and submit a secure reservation request in minutes.' },
-  { question: 'What payment methods are accepted?', answer: 'We support digital payment channels for bookings, maintenance fees, and security deposits through our secure billing system.' },
-  { question: 'What documents do I need for move-in?', answer: 'Typically you need a valid ID, residency details, and proof of payment to complete the booking process with our operations team.' },
-  { question: 'How does maintenance support work?', answer: 'Submit a request through the portal and our maintenance team will triage, assign, and update status in real time until resolution.' },
-  { question: 'Can guests be registered in advance?', answer: 'Guest registration is planned for a future release. Contact the property office for current access procedures.' }
-];
-
 export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPageProps) {
-  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Map simulation
@@ -392,45 +383,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                 Explore Available Units
               </button>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ SECTION */}
-      <section id="faq" className="py-24 px-6 max-w-7xl mx-auto scroll-mt-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <div className="space-y-4">
-            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">FAQ</span>
-            <h2 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-tight">Answers for the most common resident and booking questions.</h2>
-            <p className="text-slate-400 text-sm leading-7 max-w-xl">
-              We built the platform to be transparent and easy to use, with each step supported by secure forms and responsive operations.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {faqItems.map((item, index) => {
-              const isOpen = index === faqOpenIndex;
-              return (
-                <button
-                  key={item.question}
-                  type="button"
-                  onClick={() => setFaqOpenIndex(isOpen ? null : index)}
-                  className="w-full rounded-3xl border border-white/10 bg-slate-950/70 p-5 text-left shadow-lg shadow-slate-950/20 backdrop-blur-xl transition-all hover:border-blue-400/30"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-base font-semibold text-white">{item.question}</p>
-                    </div>
-                    <span className="text-slate-400">
-                      {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                    </span>
-                  </div>
-                  {isOpen && (
-                    <p className="mt-4 text-sm text-slate-400 leading-7">{item.answer}</p>
-                  )}
-                </button>
-              );
-            })}
           </div>
         </div>
       </section>
