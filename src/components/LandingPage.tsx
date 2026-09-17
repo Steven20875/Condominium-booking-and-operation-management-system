@@ -192,7 +192,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               onClick={onBrowseClick}
               className="relative overflow-hidden rounded-[16px] bg-gradient-to-r from-blue-500 to-cyan-400 px-8 py-4 text-sm font-semibold text-white shadow-[0_25px_75px_rgba(59,130,246,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_32px_100px_rgba(59,130,246,0.25)]"
             >
-              Book Your Unit
+              Explore Available Units
               <span className="ml-2 inline-flex"><ArrowUpRight className="h-4 w-4" /></span>
             </button>
             <button
@@ -393,57 +393,6 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               </button>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ANALYTICS PREVIEW SECTION */}
-      <section id="analytics" className="bg-white/5 border-y border-white/5 py-24 px-6 text-white scroll-mt-10 overflow-hidden relative backdrop-blur-sm">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 items-center relative z-10">
-          
-          <div className="lg:col-span-12 xl:col-span-5 space-y-6">
-            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase py-1 px-3 bg-white/5 rounded-full border border-white/10 inline-block">
-              Business Intelligence
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight leading-tight">
-              Operational Metrics Over Time
-            </h2>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              Administrators receive active visual metrics monitoring performance. Secure ledger reports track seasonal rentals, utility spikes, and structural occupancy index trends to help inform layout expansions.
-            </p>
-
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-              <div className="bg-slate-950/45 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
-                <p className="text-xs text-slate-400 font-mono uppercase">Avg Occupancy</p>
-                <p className="text-2xl font-serif font-bold text-teal-400 mt-1">No data</p>
-              </div>
-              <div className="bg-slate-950/45 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
-                <p className="text-xs text-slate-400 font-mono uppercase">Gross Billings</p>
-                <p className="text-2xl font-serif font-bold text-indigo-400 mt-1">No data</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-12 xl:col-span-7 bg-slate-950/50 backdrop-blur-md border border-white/10 p-6 rounded-3xl shadow-2xl relative">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="font-bold text-sm">Monthly Operational Performance</h3>
-                <p className="text-slate-400 text-[10px]">Compiled reports: Q1 - Q2 Revenue & Occupancy trends</p>
-              </div>
-              <span className="text-xs font-mono font-bold tracking-wider text-teal-400 bg-teal-950/40 border border-teal-900/50 px-2 py-0.5 rounded">
-                Live Server Synced
-              </span>
-            </div>
-
-            <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-white/10 text-center">
-              <div>
-                <p className="font-serif text-lg font-bold text-white">Analytics data unavailable.</p>
-                <p className="mt-2 text-xs text-slate-400">Operational metrics will appear when real records are available.</p>
-              </div>
-            </div>
-          </div>
-
         </div>
       </section>
 
