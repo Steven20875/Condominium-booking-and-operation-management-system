@@ -38,28 +38,12 @@ const faqItems = [
 
 export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPageProps) {
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);
-  const [contactSuccess, setContactSuccess] = useState(false);
-  const [contactName, setContactName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactMessage, setContactMessage] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Map simulation
   const [mapLatitude, setMapLatitude] = useState(37.7749);
   const [mapLongitude, setMapLongitude] = useState(-122.4194);
   const [mapZoom, setMapZoom] = useState(13);
-
-  const handleContactSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contactName || !contactEmail || !contactMessage) return;
-    setContactSuccess(true);
-    setTimeout(() => {
-      setContactSuccess(false);
-      setContactName('');
-      setContactEmail('');
-      setContactMessage('');
-    }, 4500);
-  };
 
   return (
     <div id="landing-root" className="min-h-screen overflow-x-hidden bg-transparent text-slate-200 font-sans selection:bg-blue-600 selection:text-white">
@@ -560,7 +544,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               </div>
               <div className="flex items-center gap-3.5">
                 <Mail className="h-5 w-5 text-blue-400" />
-                <p>support@galesurbanhaven.com</p>
+                <p>fstevenchristian@gmail.com</p>
               </div>
             </div>
 
@@ -620,77 +604,38 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
             </div>
           </div>
 
-          <div className="glass-card border border-white/10 p-8 rounded-3xl shadow-2xl flex flex-col justify-between">
-            <div>
-              <h3 className="text-xl font-serif font-bold text-white">Operatives Request Form</h3>
-              <p className="text-xs text-slate-400 mt-1 leading-normal">
-                Complete your details and standard operation managers reply within 2 hours.
-              </p>
-            </div>
+          <div className="glass-card border border-white/10 p-8 rounded-3xl shadow-2xl flex flex-col justify-center">
+            <span className="text-xs font-mono font-bold tracking-widest text-[#60a5fa] uppercase">Contact Information</span>
+            <h3 className="mt-3 text-2xl font-serif font-bold text-white">We’re Here to Help</h3>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300">
+              Contact the One Spatial Iloilo team for inquiries, assistance, or more information about our condominium units and services.
+            </p>
 
-            <AnimatePresence mode="wait">
-              {contactSuccess ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-6 text-center space-y-3 my-6 text-emerald-200"
-                >
-                  <Sparkles className="h-8 w-8 text-emerald-400 mx-auto" />
-                  <h4 className="font-bold text-sm">Message Compiled Safely</h4>
-                  <p className="text-xs text-slate-300 max-w-xs mx-auto leading-relaxed">
-                    Thank you, your inquiries are submitted to general concierge queues. We will reach back promptly.
-                  </p>
-                </motion.div>
-              ) : (
-                <form onSubmit={handleContactSubmit} className="space-y-4 mt-6">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Full Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Jonathan Sterling" 
-                      className="w-full glass-input rounded-xl px-4 py-3 text-xs focus:outline-none transition-all placeholder:text-slate-500 font-semibold"
-                      value={contactName}
-                      onChange={(e) => setContactName(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address</label>
-                    <input 
-                      type="email" 
-                      required
-                      placeholder="jon@luxury.com" 
-                      className="w-full glass-input rounded-xl px-4 py-3 text-xs focus:outline-none transition-all placeholder:text-slate-500 font-semibold"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Your Messages / Inquiries</label>
-                    <textarea 
-                      required
-                      rows={4}
-                      placeholder="Good morning operations. I would like to enquire about structural sizing of Tower B lofts..." 
-                      className="w-full glass-input rounded-xl px-4 py-3 text-xs focus:outline-none transition-all placeholder:text-slate-500 font-semibold resize-none"
-                      value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                    />
-                  </div>
-
-                  <button 
-                    type="submit"
-                    className="w-full py-4 glass-button-primary text-white text-xs font-bold tracking-widest uppercase rounded-xl transition-all shadow-md mt-4 cursor-pointer"
-                  >
-                    Submit Inquiries
-                  </button>
-                </form>
-              )}
-            </AnimatePresence>
+            <div className="mt-8 space-y-5">
+              <div className="flex items-start gap-4">
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Location</p>
+                  <p className="mt-1 text-sm leading-relaxed text-white">One Spatial Iloilo, Mandurriao, Iloilo City, Iloilo, Philippines</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <Phone className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Phone</p>
+                  <p className="mt-1 text-sm leading-relaxed text-white">+63 917 123 4567 (Gales Urban Haven Desk)</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email</p>
+                  <p className="mt-1 break-all text-sm leading-relaxed text-white">fstevenchristian@gmail.com</p>
+                </div>
+              </div>
           </div>
 
+        </div>
         </div>
       </section>
 
