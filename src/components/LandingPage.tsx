@@ -683,7 +683,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               <p className="pt-4 text-[10px] text-slate-500">Social channels and formal policy pages are planned for the production release.</p>
             <span className="text-slate-500">Legal Agreement (Planned)</span>
             <span className="text-slate-500">Privacy Charter (Planned)</span>
-            <a href="#landing-root" className="hover:text-slate-400 font-bold uppercase text-slate-300">Back To Peak ↑</a>
+            <a href="#landing-root" className="mt-6 inline-block hover:text-slate-400 font-bold uppercase text-slate-300">Back To Peak ↑</a>
           </div>
         </div>
       </footer>
