@@ -70,7 +70,7 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { db, dbEvents, dbReady } from './server/db/index.ts';
+import { db, dbEvents, dbReady, flushDatabase, persistenceMode, refreshDatabase } from './server/db/index.ts';
 import { bookingService } from './server/services/BookingService.ts';
 import { paymentService } from './server/services/PaymentService.ts';
 import { notificationService } from './server/services/NotificationService.ts';
@@ -154,6 +154,23 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
     }
     next();
   });
+}
+
+function requireDurableUnitStorage(_req: Request, res: Response, next: NextFunction) {
+  if (isVercel && persistenceMode !== 'postgres') {
+    return res.status(503).json({ error: 'Durable unit storage is not configured. Set DATABASE_URL for the Vercel deployment.' });
+  }
+  next();
+}
+
+async function refreshUnitStorage(_req: Request, res: Response, next: NextFunction) {
+  try {
+    await refreshDatabase();
+    next();
+  } catch (error) {
+    console.error('[UNITS] Failed to refresh durable unit storage:', error);
+    res.status(503).json({ error: 'Unable to load the current unit inventory.' });
+  }
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -733,7 +750,8 @@ export async function createApp() {
   });
 
   // 2. CONDO UNITS MODULE
-  app.get('/api/units', (req: Request, res: Response) => {
+  app.get('/api/units', requireDurableUnitStorage, refreshUnitStorage, (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
     const { type, minPrice, maxPrice, status, search } = req.query;
     let list = db.getUnits();
 
@@ -761,7 +779,8 @@ export async function createApp() {
     res.json(list);
   });
 
-  app.get('/api/units/:id', (req: Request, res: Response) => {
+  app.get('/api/units/:id', requireDurableUnitStorage, refreshUnitStorage, (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
     const unit = db.findUnitById(req.params.id);
     if (!unit) {
       return res.status(404).json({ error: 'Condominium unit not found.' });
@@ -769,7 +788,7 @@ export async function createApp() {
     res.json(unit);
   });
 
-  app.post('/api/units', requireAdmin, (req: Request, res: Response) => {
+  app.post('/api/units', requireAdmin, requireDurableUnitStorage, refreshUnitStorage, async (req: Request, res: Response) => {
     const user = (req as any).user;
     const { name, type, description, price, capacity, status, images } = req.body;
 
@@ -777,36 +796,53 @@ export async function createApp() {
       return res.status(400).json({ error: 'Please specify required properties: name, type, and price.' });
     }
 
-    const unit = db.createUnit({
-      name,
-      type,
-      description,
-      price: Number(price),
-      capacity: Number(capacity) || 2,
-      status: status || 'Available',
-      images: Array.isArray(images) ? images : []
-    }, user.id, user.name);
-
-    res.status(201).json(unit);
+    try {
+      const unit = db.createUnit({
+        name,
+        type,
+        description,
+        price: Number(price),
+        capacity: Number(capacity) || 2,
+        status: status || 'Available',
+        images: Array.isArray(images) ? images : []
+      }, user.id, user.name);
+      await flushDatabase();
+      res.status(201).json(unit);
+    } catch (error) {
+      console.error('[UNITS] Failed to persist created unit:', error);
+      res.status(500).json({ error: 'Unable to persist the new unit.' });
+    }
   });
 
 
-  app.put('/api/units/:id', requireAdmin, (req: Request, res: Response) => {
+  app.put('/api/units/:id', requireAdmin, requireDurableUnitStorage, refreshUnitStorage, async (req: Request, res: Response) => {
     const user = (req as any).user;
-    const updated = db.updateUnit(req.params.id, req.body, user.id, user.name);
-    if (!updated) {
-      return res.status(404).json({ error: 'Unit not found to update.' });
+    try {
+      const updated = db.updateUnit(req.params.id, req.body, user.id, user.name);
+      if (!updated) {
+        return res.status(404).json({ error: 'Unit not found to update.' });
+      }
+      await flushDatabase();
+      res.json(updated);
+    } catch (error) {
+      console.error('[UNITS] Failed to persist updated unit:', error);
+      res.status(500).json({ error: 'Unable to persist the unit update.' });
     }
-    res.json(updated);
   });
 
-  app.delete('/api/units/:id', requireAdmin, (req: Request, res: Response) => {
+  app.delete('/api/units/:id', requireAdmin, requireDurableUnitStorage, refreshUnitStorage, async (req: Request, res: Response) => {
     const user = (req as any).user;
-    const success = db.deleteUnit(req.params.id, user.id, user.name);
-    if (!success) {
-      return res.status(404).json({ error: 'Unit was not found or could not be deleted.' });
+    try {
+      const success = db.deleteUnit(req.params.id, user.id, user.name);
+      if (!success) {
+        return res.status(404).json({ error: 'Unit was not found or could not be deleted.' });
+      }
+      await flushDatabase();
+      res.json({ success: true, message: 'Unit was successfully unlisted.' });
+    } catch (error) {
+      console.error('[UNITS] Failed to persist deleted unit:', error);
+      res.status(500).json({ error: 'Unable to persist the unit deletion.' });
     }
-    res.json({ success: true, message: 'Unit was successfully unlisted.' });
   });
 
   // 3. BOOKINGS MODULE

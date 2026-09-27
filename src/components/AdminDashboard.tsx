@@ -128,13 +128,17 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       // Execute all fetches in parallel and wait for all to complete
       const [statsRes, unitsRes, bookingsRes, paymentsRes, maintenanceRes, logsRes, residentsRes] = await Promise.all([
         fetch('/api/dashboard/stats', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Stats fetch error:', e); return null; }),
-        fetch('/api/units').then(safeJson).catch(e => { console.error('Units fetch error:', e); return null; }),
+        fetch('/api/units', { cache: 'no-store' }).then(safeJson).catch(e => { console.error('Units fetch error:', e); return null; }),
         fetch('/api/bookings', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Bookings fetch error:', e); return null; }),
         fetch('/api/payments', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Payments fetch error:', e); return null; }),
         fetch('/api/maintenance', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Maintenance fetch error:', e); return null; }),
         fetch('/api/logs', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Logs fetch error:', e); return null; }),
         fetch('/api/residents', { headers: authHeaders }).then(safeJson).catch(e => { console.error('Residents fetch error:', e); return null; })
       ]);
+
+      if (!Array.isArray(unitsRes)) {
+        throw new Error('Unable to refresh unit inventory. The last displayed unit data may be out of date.');
+      }
 
       // Update state atomically once all data is fetched
       if (statsRes && statsRes.bookingStatusData && Array.isArray(statsRes.bookingStatusData) && Array.isArray(statsRes.monthlyRevenue)) {
@@ -318,7 +322,10 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
         });
       }
 
-      if (!res.ok) throw new Error('Action failed.');
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Unable to save the unit listing.');
+      }
       
       toast(editUnitItem ? 'Unit listing updated successfully!' : 'New condominium layout listed!', 'success');
       setShowAddUnitModal(false);
@@ -330,7 +337,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
       setUnitPrice(0);
       setUnitImages([]);
       
-      fetchAllData();
+      await fetchAllData();
     } catch (err: any) {
       toast(err.message, 'error');
     } finally {
@@ -357,16 +364,18 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
   const handleDeleteUnit = async (id: string) => {
     if (!window.confirm('Are you absolutely sure you want to unlist this condominium suite?')) return;
     try {
-      const res = await fetch(`/api/units/${id}`, {
+      const res = await fetch(`/api/units/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        toast('Unit unlisted successfully.', 'success');
-        fetchAllData();
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Unable to delete the unit listing.');
       }
-    } catch (e) {
-      console.error(e);
+      toast('Unit unlisted successfully.', 'success');
+      await fetchAllData();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to delete the unit listing.', 'error');
     }
   };
 
@@ -928,10 +937,12 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                   onClick={() => {
                     setEditUnitItem(null);
                     setUnitName('');
+                    setUnitType('');
                     setUnitDescription('');
                     setUnitPrice(0);
                     setUnitCapacity(2);
                     setUnitStatus('Available');
+                    setUnitImages([]);
                     setShowAddUnitModal(true);
                   }}
                   icon={Plus}
@@ -984,6 +995,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                             setUnitDescription(item.description);
                             setUnitPrice(item.price);
                             setUnitCapacity(item.capacity);
+                            setUnitStatus(item.status);
                             setUnitImages(item.images);
                             setShowAddUnitModal(true);
                           }}

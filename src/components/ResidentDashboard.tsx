@@ -112,7 +112,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   // Handlers
   const fetchAllData = () => {
     setLoadingUnits(true);
-    fetch('/api/units')
+    fetch('/api/units', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setUnits(data);

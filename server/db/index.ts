@@ -1,8 +1,9 @@
 import { db as jsonDb, dbEvents } from '../db.ts';
 import { PostgresStateAdapter } from './postgres.ts';
 
-const usePostgres = String(process.env.USE_POSTGRES || '').toLowerCase() === 'true';
 const databaseUrl = process.env.DATABASE_URL || '';
+const isVercel = Boolean(process.env.VERCEL);
+const usePostgres = String(process.env.USE_POSTGRES || '').toLowerCase() === 'true' || (isVercel && Boolean(databaseUrl));
 
 if (usePostgres && !databaseUrl) {
   console.warn('[DB] USE_POSTGRES=true requires DATABASE_URL, so the app will continue using the JSON database fallback.');
@@ -20,9 +21,7 @@ if (usePostgres && databaseUrl) {
 }
 
 /** Resolves before the app accepts requests in PostgreSQL mode. */
-export const dbReady = (postgresAdapter?.ready ?? Promise.resolve()).catch((error) => {
-  console.warn('[DB] Postgres readiness check failed. Falling back to JSON database mode.', error);
-});
+export const dbReady = postgresAdapter?.ready ?? Promise.resolve();
 
 /**
  * Compatibility boundary: existing synchronous services continue using the
@@ -31,8 +30,14 @@ export const dbReady = (postgresAdapter?.ready ?? Promise.resolve()).catch((erro
  */
 export const db = jsonDb;
 export { dbEvents };
-export const persistenceMode = usePostgres ? 'postgres' : 'json';
+export const persistenceMode = postgresAdapter ? 'postgres' : 'json';
+
+export async function refreshDatabase() {
+  await dbReady;
+  await postgresAdapter?.refresh();
+}
 
 export async function flushDatabase() {
+  await dbReady;
   await postgresAdapter?.flush();
 }

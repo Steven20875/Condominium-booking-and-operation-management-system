@@ -945,6 +945,52 @@ var db = new MockDatabase();
 // server/db/postgres.ts
 import { neon } from "@neondatabase/serverless";
 var SNAPSHOT_ID = "application";
+var COLLECTIONS = [
+  "users",
+  "units",
+  "bookings",
+  "payments",
+  "maintenanceRequests",
+  "notifications",
+  "activityLogs"
+];
+function cloneSnapshot(snapshot) {
+  return JSON.parse(JSON.stringify(snapshot));
+}
+function mergeRecords(base, local, current) {
+  const baseById = new Map(base.map((record) => [record.id, record]));
+  const localById = new Map(local.map((record) => [record.id, record]));
+  const merged = [...current];
+  for (const original of base) {
+    const changed = localById.get(original.id);
+    const currentIndex = merged.findIndex((record) => record.id === original.id);
+    if (!changed) {
+      if (currentIndex !== -1) merged.splice(currentIndex, 1);
+    } else if (JSON.stringify(changed) !== JSON.stringify(original)) {
+      if (currentIndex === -1) merged.push(changed);
+      else merged[currentIndex] = changed;
+    }
+  }
+  for (const record of local) {
+    if (baseById.has(record.id)) continue;
+    const currentIndex = merged.findIndex((currentRecord) => currentRecord.id === record.id);
+    if (currentIndex === -1) merged.push(record);
+    else merged[currentIndex] = record;
+  }
+  return merged;
+}
+function mergeSnapshot(base, local, current) {
+  const merged = cloneSnapshot(current);
+  const mergedCollections = merged;
+  for (const collection of COLLECTIONS) {
+    mergedCollections[collection] = mergeRecords(
+      base[collection],
+      local[collection],
+      current[collection]
+    );
+  }
+  return merged;
+}
 var PostgresStateAdapter = class {
   constructor(databaseUrl2) {
     this.databaseUrl = databaseUrl2;
@@ -957,18 +1003,49 @@ var PostgresStateAdapter = class {
     if (rows.length === 0) {
       throw new Error("PostgreSQL application_state is empty. Run db:migrate before enabling USE_POSTGRES.");
     }
+    this.lastPersistedSnapshot = cloneSnapshot(rows[0].state);
     db.replaceSnapshot(rows[0].state);
     db.setPersistenceHook((snapshot) => this.persist(snapshot));
   }
-  persist(snapshot) {
-    this.pendingWrite = this.pendingWrite.then(async () => {
+  async refresh() {
+    const refreshSnapshot = async () => {
       const sql = neon(this.databaseUrl);
-      await sql`
-        INSERT INTO application_state (id, state, updated_at)
-        VALUES (${SNAPSHOT_ID}, ${JSON.stringify(snapshot)}::jsonb, NOW())
-        ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, updated_at = NOW()
-      `;
-    });
+      const rows = await sql`SELECT state FROM application_state WHERE id = ${SNAPSHOT_ID}`;
+      if (rows.length === 0) {
+        throw new Error("PostgreSQL application_state is empty. Run db:migrate before enabling USE_POSTGRES.");
+      }
+      this.lastPersistedSnapshot = cloneSnapshot(rows[0].state);
+      db.replaceSnapshot(rows[0].state);
+    };
+    const refreshPromise = this.pendingWrite.then(refreshSnapshot, refreshSnapshot);
+    this.pendingWrite = refreshPromise;
+    await refreshPromise;
+  }
+  persist(snapshot) {
+    const persistSnapshot = async () => {
+      const base = this.lastPersistedSnapshot;
+      if (!base) throw new Error("PostgreSQL state has not finished initializing.");
+      const sql = neon(this.databaseUrl);
+      const localSnapshot = cloneSnapshot(snapshot);
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const rows = await sql`SELECT state FROM application_state WHERE id = ${SNAPSHOT_ID}`;
+        if (rows.length === 0) throw new Error("PostgreSQL application_state row is missing.");
+        const current = rows[0].state;
+        const merged = mergeSnapshot(base, localSnapshot, current);
+        const updated = await sql`
+          UPDATE application_state
+          SET state = ${JSON.stringify(merged)}::jsonb, updated_at = NOW()
+          WHERE id = ${SNAPSHOT_ID} AND state = ${JSON.stringify(current)}::jsonb
+          RETURNING id
+        `;
+        if (updated.length > 0) {
+          this.lastPersistedSnapshot = localSnapshot;
+          return;
+        }
+      }
+      throw new Error("PostgreSQL state changed repeatedly during persistence; retry the operation.");
+    };
+    this.pendingWrite = this.pendingWrite.then(persistSnapshot, persistSnapshot);
     return this.pendingWrite;
   }
   flush() {
@@ -977,8 +1054,9 @@ var PostgresStateAdapter = class {
 };
 
 // server/db/index.ts
-var usePostgres = String(process.env.USE_POSTGRES || "").toLowerCase() === "true";
 var databaseUrl = process.env.DATABASE_URL || "";
+var isVercel2 = Boolean("1");
+var usePostgres = String(process.env.USE_POSTGRES || "").toLowerCase() === "true" || isVercel2 && Boolean(databaseUrl);
 if (usePostgres && !databaseUrl) {
   console.warn("[DB] USE_POSTGRES=true requires DATABASE_URL, so the app will continue using the JSON database fallback.");
 }
@@ -991,10 +1069,17 @@ if (usePostgres && databaseUrl) {
     postgresAdapter = void 0;
   }
 }
-var dbReady = (postgresAdapter?.ready ?? Promise.resolve()).catch((error) => {
-  console.warn("[DB] Postgres readiness check failed. Falling back to JSON database mode.", error);
-});
+var dbReady = postgresAdapter?.ready ?? Promise.resolve();
 var db2 = db;
+var persistenceMode = postgresAdapter ? "postgres" : "json";
+async function refreshDatabase() {
+  await dbReady;
+  await postgresAdapter?.refresh();
+}
+async function flushDatabase() {
+  await dbReady;
+  await postgresAdapter?.flush();
+}
 
 // server/services/BookingService.ts
 var BookingService = class {
@@ -1084,9 +1169,9 @@ var projectRoot = __dirname;
 dotenv.config({ path: path2.resolve(projectRoot, ".env") });
 var PORT = Number(process.env.PORT) || 3e3;
 var VITE_HMR_PORT = Number(process.env.VITE_HMR_PORT) || 24678;
-var isVercel2 = Boolean("1");
+var isVercel3 = Boolean("1");
 var configuredJwtSecret = process.env.JWT_SECRET;
-if (isVercel2 && !configuredJwtSecret) {
+if (isVercel3 && !configuredJwtSecret) {
   console.warn("[AUTH] JWT_SECRET is not configured in the production environment. Generating a temporary secret for this runtime; set JWT_SECRET in Vercel to keep sessions stable across deploys.");
 }
 var JWT_SECRET = configuredJwtSecret || crypto.randomBytes(32).toString("hex");
@@ -1142,6 +1227,21 @@ function requireAdmin(req, res, next) {
     next();
   });
 }
+function requireDurableUnitStorage(_req, res, next) {
+  if (isVercel3 && persistenceMode !== "postgres") {
+    return res.status(503).json({ error: "Durable unit storage is not configured. Set DATABASE_URL for the Vercel deployment." });
+  }
+  next();
+}
+async function refreshUnitStorage(_req, res, next) {
+  try {
+    await refreshDatabase();
+    next();
+  } catch (error) {
+    console.error("[UNITS] Failed to refresh durable unit storage:", error);
+    res.status(503).json({ error: "Unable to load the current unit inventory." });
+  }
+}
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -1168,7 +1268,7 @@ function ensureGovernmentIdStorageDir() {
   if (!fs2.existsSync(targetDir)) {
     fs2.mkdirSync(targetDir, { recursive: true });
   }
-  if (isVercel2) {
+  if (isVercel3) {
     console.warn("[FILES] Vercel/serverless environment detected. Private government IDs are stored only in the local filesystem for the current runtime and will not persist across deployments.");
   }
   return targetDir;
@@ -1346,50 +1446,63 @@ async function createApp() {
       console.error("[AUTH] Firebase token verification failed:", error instanceof Error ? error.message : String(error));
       return res.status(503).json({ error: "Google sign-in is not configured for this deployment." });
     }
-    const uid = verifiedClaims.uid;
-    const email = verifiedClaims.email;
-    if (!isNonEmptyString(uid) || !isNonEmptyString(email)) {
-      return res.status(401).json({ error: "Verified Firebase identity is incomplete." });
-    }
-    if (verifiedClaims.email_verified !== true) {
-      return res.status(403).json({ error: "Please verify your email address before continuing." });
-    }
-    const normalizedEmail = email.trim().toLowerCase();
-    const allUsers = db2.getUsers();
-    const existingUserByUid = allUsers.find((user) => user.authUid === uid);
-    const existingUserByEmail = allUsers.find((user) => user.email.toLowerCase() === normalizedEmail);
-    const existingUser = existingUserByUid || existingUserByEmail;
-    if (existingUser) {
-      const isGoogleLogin = provider === "google";
-      const nextAuthProvider = existingUser.authProvider || (isGoogleLogin ? "google" : "email");
-      const updatedUser = db2.updateUser(existingUser.id, {
-        name: isNonEmptyString(name) ? String(name).trim() : existingUser.name,
-        phone: isNonEmptyString(phone) ? String(phone).trim() : existingUser.phone,
-        avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : existingUser.avatarUrl,
-        authProvider: nextAuthProvider,
-        authUid: uid,
+    try {
+      const uid = verifiedClaims.uid;
+      const email = verifiedClaims.email;
+      if (!isNonEmptyString(uid) || !isNonEmptyString(email)) {
+        return res.status(401).json({ error: "Verified Firebase identity is incomplete." });
+      }
+      if (verifiedClaims.email_verified !== true) {
+        return res.status(403).json({ error: "Please verify your email address before continuing." });
+      }
+      const normalizedEmail = email.trim().toLowerCase();
+      const allUsers = db2.getUsers();
+      const existingUserByUid = allUsers.find((user) => user.authUid === uid);
+      const existingUserByEmail = allUsers.find((user) => user.email.toLowerCase() === normalizedEmail);
+      const existingUser = existingUserByUid || existingUserByEmail;
+      if (existingUser) {
+        const isGoogleLogin = provider === "google";
+        const nextAuthProvider = existingUser.authProvider || (isGoogleLogin ? "google" : "email");
+        const updatedUser = db2.updateUser(existingUser.id, {
+          name: isNonEmptyString(name) ? String(name).trim() : existingUser.name,
+          phone: isNonEmptyString(phone) ? String(phone).trim() : existingUser.phone,
+          avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : existingUser.avatarUrl,
+          authProvider: nextAuthProvider,
+          authUid: uid,
+          email: normalizedEmail,
+          emailVerified: verifiedClaims.email_verified === true
+        });
+        if (!updatedUser) {
+          return res.status(500).json({ error: "Unable to synchronize the existing account." });
+        }
+        const userSafe2 = sanitizeUserForApi(updatedUser);
+        return res.status(200).json({ user: userSafe2, token: createAuthToken(updatedUser) });
+      }
+      const newUser = db2.createUser({
         email: normalizedEmail,
+        password: bcrypt.hashSync(crypto.randomBytes(24).toString("hex"), 12),
+        name: isNonEmptyString(name) ? String(name).trim() : normalizedEmail.split("@")[0],
+        phone: isNonEmptyString(phone) ? String(phone).trim() : void 0,
+        avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : void 0,
+        role: "resident",
+        authProvider: provider === "google" ? "google" : "firebase",
+        authUid: uid,
         emailVerified: verifiedClaims.email_verified === true
       });
-      if (!updatedUser) {
-        return res.status(500).json({ error: "Unable to synchronize the existing account." });
-      }
-      const userSafe2 = sanitizeUserForApi(updatedUser);
-      return res.status(200).json({ user: userSafe2, token: createAuthToken(updatedUser) });
+      const userSafe = sanitizeUserForApi(newUser);
+      return res.status(201).json({ user: userSafe, token: createAuthToken(newUser) });
+    } catch (error) {
+      console.error("[AUTH] Firebase user synchronization failed:", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : void 0,
+        persistenceMode: process.env.USE_POSTGRES === "true" ? "postgres" : "json",
+        hasFirebaseServiceAccount: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim())
+      });
+      return res.status(500).json({
+        error: "Unable to synchronize the Firebase account.",
+        code: "FIREBASE_USER_SYNC_FAILED"
+      });
     }
-    const newUser = db2.createUser({
-      email: normalizedEmail,
-      password: bcrypt.hashSync(crypto.randomBytes(24).toString("hex"), 12),
-      name: isNonEmptyString(name) ? String(name).trim() : normalizedEmail.split("@")[0],
-      phone: isNonEmptyString(phone) ? String(phone).trim() : void 0,
-      avatarUrl: isNonEmptyString(avatarUrl) ? String(avatarUrl).trim() : void 0,
-      role: "resident",
-      authProvider: provider === "google" ? "google" : "firebase",
-      authUid: uid,
-      emailVerified: verifiedClaims.email_verified === true
-    });
-    const userSafe = sanitizeUserForApi(newUser);
-    return res.status(201).json({ user: userSafe, token: createAuthToken(newUser) });
   });
   app.get("/api/auth/me", requireAuth, (req, res) => {
     const user = req.user;
@@ -1591,7 +1704,8 @@ async function createApp() {
     const safeResidents = residents.map((resident) => sanitizeUserForApi(resident));
     res.json(safeResidents);
   });
-  app.get("/api/units", (req, res) => {
+  app.get("/api/units", requireDurableUnitStorage, refreshUnitStorage, (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     const { type, minPrice, maxPrice, status, search } = req.query;
     let list = db2.getUnits();
     if (type) {
@@ -1614,45 +1728,64 @@ async function createApp() {
     }
     res.json(list);
   });
-  app.get("/api/units/:id", (req, res) => {
+  app.get("/api/units/:id", requireDurableUnitStorage, refreshUnitStorage, (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     const unit = db2.findUnitById(req.params.id);
     if (!unit) {
       return res.status(404).json({ error: "Condominium unit not found." });
     }
     res.json(unit);
   });
-  app.post("/api/units", requireAdmin, (req, res) => {
+  app.post("/api/units", requireAdmin, requireDurableUnitStorage, refreshUnitStorage, async (req, res) => {
     const user = req.user;
     const { name, type, description, price, capacity, status, images } = req.body;
     if (!name || !type || !price) {
       return res.status(400).json({ error: "Please specify required properties: name, type, and price." });
     }
-    const unit = db2.createUnit({
-      name,
-      type,
-      description,
-      price: Number(price),
-      capacity: Number(capacity) || 2,
-      status: status || "Available",
-      images: Array.isArray(images) ? images : []
-    }, user.id, user.name);
-    res.status(201).json(unit);
-  });
-  app.put("/api/units/:id", requireAdmin, (req, res) => {
-    const user = req.user;
-    const updated = db2.updateUnit(req.params.id, req.body, user.id, user.name);
-    if (!updated) {
-      return res.status(404).json({ error: "Unit not found to update." });
+    try {
+      const unit = db2.createUnit({
+        name,
+        type,
+        description,
+        price: Number(price),
+        capacity: Number(capacity) || 2,
+        status: status || "Available",
+        images: Array.isArray(images) ? images : []
+      }, user.id, user.name);
+      await flushDatabase();
+      res.status(201).json(unit);
+    } catch (error) {
+      console.error("[UNITS] Failed to persist created unit:", error);
+      res.status(500).json({ error: "Unable to persist the new unit." });
     }
-    res.json(updated);
   });
-  app.delete("/api/units/:id", requireAdmin, (req, res) => {
+  app.put("/api/units/:id", requireAdmin, requireDurableUnitStorage, refreshUnitStorage, async (req, res) => {
     const user = req.user;
-    const success = db2.deleteUnit(req.params.id, user.id, user.name);
-    if (!success) {
-      return res.status(404).json({ error: "Unit was not found or could not be deleted." });
+    try {
+      const updated = db2.updateUnit(req.params.id, req.body, user.id, user.name);
+      if (!updated) {
+        return res.status(404).json({ error: "Unit not found to update." });
+      }
+      await flushDatabase();
+      res.json(updated);
+    } catch (error) {
+      console.error("[UNITS] Failed to persist updated unit:", error);
+      res.status(500).json({ error: "Unable to persist the unit update." });
     }
-    res.json({ success: true, message: "Unit was successfully unlisted." });
+  });
+  app.delete("/api/units/:id", requireAdmin, requireDurableUnitStorage, refreshUnitStorage, async (req, res) => {
+    const user = req.user;
+    try {
+      const success = db2.deleteUnit(req.params.id, user.id, user.name);
+      if (!success) {
+        return res.status(404).json({ error: "Unit was not found or could not be deleted." });
+      }
+      await flushDatabase();
+      res.json({ success: true, message: "Unit was successfully unlisted." });
+    } catch (error) {
+      console.error("[UNITS] Failed to persist deleted unit:", error);
+      res.status(500).json({ error: "Unable to persist the unit deletion." });
+    }
   });
   app.get("/api/bookings", requireAuth, (req, res) => {
     const user = req.user;
