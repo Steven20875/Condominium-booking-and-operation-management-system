@@ -70,7 +70,7 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { db, dbEvents, dbReady, flushDatabase, persistenceMode, refreshDatabase } from './server/db/index.ts';
+import { db, dbEvents, ensureDatabaseReady, flushDatabase, persistenceMode, refreshDatabase } from './server/db/index.ts';
 import { bookingService } from './server/services/BookingService.ts';
 import { paymentService } from './server/services/PaymentService.ts';
 import { notificationService } from './server/services/NotificationService.ts';
@@ -308,13 +308,13 @@ const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standard
 const registrationRateLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many registration attempts. Please try again later.' } });
 const sensitiveMutationRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please try again later.' } });
 
-const migratedPasswords = db.migratePlaintextPasswords((password) => bcrypt.hashSync(password, 12));
-if (migratedPasswords > 0) {
-  console.log(`[AUTH] Migrated ${migratedPasswords} plaintext password(s) to bcrypt hashes.`);
-}
-
 export async function createApp() {
-  await dbReady;
+  await ensureDatabaseReady();
+  const migratedPasswords = db.migratePlaintextPasswords((password) => bcrypt.hashSync(password, 12));
+  if (migratedPasswords > 0) {
+    console.log(`[AUTH] Migrated ${migratedPasswords} plaintext password(s) to bcrypt hashes.`);
+  }
+
   const app = express();
 
   // Increase payload limits for direct base64 image uploads of condo units

@@ -61,12 +61,29 @@ function mergeSnapshot(base: DatabaseSchema, local: DatabaseSchema, current: Dat
 }
 
 export class PostgresStateAdapter {
-  public readonly ready: Promise<void>;
   private pendingWrite: Promise<void> = Promise.resolve();
   private lastPersistedSnapshot?: DatabaseSchema;
+  private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor(private readonly databaseUrl: string) {
-    this.ready = this.initialize();
+  }
+
+  public ensureInitialized(): Promise<void> {
+    if (this.initialized) return Promise.resolve();
+
+    if (!this.initializationPromise) {
+      this.initializationPromise = this.initialize()
+        .then(() => {
+          this.initialized = true;
+        })
+        .catch((error) => {
+          this.initializationPromise = null;
+          throw error;
+        });
+    }
+
+    return this.initializationPromise;
   }
 
   private async initialize() {
@@ -82,6 +99,8 @@ export class PostgresStateAdapter {
   }
 
   public async refresh() {
+    await this.ensureInitialized();
+
     const refreshSnapshot = async () => {
       const sql = neon(this.databaseUrl);
       const rows = await sql`SELECT state FROM application_state WHERE id = ${SNAPSHOT_ID}` as Array<{ state: DatabaseSchema }>;
@@ -131,6 +150,6 @@ export class PostgresStateAdapter {
   }
 
   public flush() {
-    return this.pendingWrite;
+    return this.ensureInitialized().then(() => this.pendingWrite);
   }
 }

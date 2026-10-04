@@ -7,7 +7,20 @@ process.env.VERCEL = '1';
 let appPromise: ReturnType<typeof createApp> | undefined;
 
 export default async function handler(req: Request, res: Response) {
-  appPromise ??= createApp();
-  const app = await appPromise;
+  if (!appPromise) {
+    appPromise = createApp();
+  }
+
+  const initialization = appPromise;
+  let app: Awaited<ReturnType<typeof createApp>>;
+  try {
+    app = await initialization;
+  } catch (error) {
+    if (appPromise === initialization) {
+      appPromise = undefined;
+    }
+    throw error;
+  }
+
   return app(req, res);
 }

@@ -11,33 +11,28 @@ if (usePostgres && !databaseUrl) {
 
 let postgresAdapter: PostgresStateAdapter | undefined;
 
-if (usePostgres && databaseUrl) {
-  try {
-    postgresAdapter = new PostgresStateAdapter(databaseUrl);
-  } catch (error) {
-    console.warn('[DB] Postgres initialization failed. Falling back to JSON database mode.', error);
-    postgresAdapter = undefined;
-  }
-}
-
-/** Resolves before the app accepts requests in PostgreSQL mode. */
-export const dbReady = postgresAdapter?.ready ?? Promise.resolve();
-
 /**
  * Compatibility boundary: existing synchronous services continue using the
  * established database contract while PostgreSQL mode hydrates and persists
- * the same snapshot through the durable adapter.
+ * the same snapshot through the durable adapter on first application startup.
  */
 export const db = jsonDb;
 export { dbEvents };
-export const persistenceMode = postgresAdapter ? 'postgres' : 'json';
+export const persistenceMode = usePostgres && databaseUrl ? 'postgres' : 'json';
+
+export async function ensureDatabaseReady() {
+  if (!usePostgres || !databaseUrl) return;
+
+  postgresAdapter ??= new PostgresStateAdapter(databaseUrl);
+  await postgresAdapter.ensureInitialized();
+}
 
 export async function refreshDatabase() {
-  await dbReady;
+  await ensureDatabaseReady();
   await postgresAdapter?.refresh();
 }
 
 export async function flushDatabase() {
-  await dbReady;
+  await ensureDatabaseReady();
   await postgresAdapter?.flush();
 }
