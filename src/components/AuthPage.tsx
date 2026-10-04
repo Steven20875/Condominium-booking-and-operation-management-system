@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastContext.tsx';
 import FerrofluidBackground from './FerrofluidBackground.tsx';
-import { Building, Lock, Mail, User, Phone, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, Bell } from 'lucide-react';
+import { Building, Lock, Mail, User, Clipboard, ArrowRight, Home, Check, Eye, EyeOff, ShieldCheck, Sparkles, Bell } from 'lucide-react';
 import { User as UserType } from '../types.ts';
 import { Button, Input } from './ui';
-import { createAccountWithEmailPassword, refreshFirebaseEmailVerification, sendFirebaseEmailVerification, signInWithGooglePopup, getFirebaseConfigStatus, initializeFirebase } from '../lib/firebase.ts';
+import { signInWithGooglePopup, getFirebaseConfigStatus, initializeFirebase } from '../lib/firebase.ts';
 
 interface AuthPageProps {
   onLoginSuccess: (user: UserType, token: string) => void;
@@ -18,21 +18,18 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   const [isLogin, setIsLogin] = useState<boolean>(true);
   const [isForgotPassword, setIsForgotPassword] = useState<boolean>(false);
   const [isEmailSent, setIsEmailSent] = useState<boolean>(false);
-  const [isEmailVerifying, setIsEmailVerifying] = useState<boolean>(false);
-  const [registrationSuccess, setRegistrationSuccess] = useState<{ user: UserType; token: string; emailVerificationSent: boolean } | null>(null);
-  const [isRefreshingVerification, setIsRefreshingVerification] = useState<boolean>(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState<{ user: UserType; token: string } | null>(null);
 
   // Form states
-  const [email, setEmail] = useState<string>('');
+  const [loginIdentifier, setLoginIdentifier] = useState<string>('');
+  const [recoveryEmail, setRecoveryEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [name, setName] = useState<string>('');
-  const [phone, setPhone] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
-  const [emailValid, setEmailValid] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [firebaseConfigStatus, setFirebaseConfigStatus] = useState(getFirebaseConfigStatus());
 
@@ -62,13 +59,6 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   }, [toast]);
 
   const isFirebaseConfigured = firebaseConfigStatus.isConfigured;
-  const isLocalAuthFallback = !isFirebaseConfigured;
-
-  const validateEmail = (value: string) => /^\S+@\S+\.\S+$/.test(value);
-  const handleEmailChange = (value: string) => {
-    setEmail(value);
-    setEmailValid(value === '' || validateEmail(value));
-  };
 
   const passwordChecks = {
     length: password.length >= 8,
@@ -82,35 +72,19 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
     : Object.values(passwordChecks).filter(Boolean).length >= 3
       ? 'Fair'
       : 'Weak';
-  const phoneValid = phone === '' || /^(09\d{9}|\+639\d{9})$/.test(phone.replace(/[\s()-]/g, ''));
   const registrationErrors = {
     name: !name.trim() ? 'Full Name is required.' : '',
-    email: !email ? 'Email Address is required.' : !emailValid ? 'Email format is invalid.' : '',
-    phone: !phoneValid ? 'Use 09XXXXXXXXX or +639XXXXXXXXX.' : '',
     password: Object.values(passwordChecks).every(Boolean) ? '' : 'Password does not meet all requirements.',
     confirmPassword: confirmPassword && confirmPassword !== password ? 'Passwords do not match.' : '',
     terms: !termsAccepted ? 'You must accept the Terms of Service and Privacy Policy.' : '',
   };
 
-  const hasRegistrationErrors = Object.values(registrationErrors).some(Boolean) || !name.trim() || !email.trim() || !password || !confirmPassword;
-
-  const getFirebaseErrorMessage = (error: any, fallback: string) => {
-    const messages: Record<string, string> = {
-      'auth/too-many-requests': 'Too many verification requests were made. Please wait before trying again.',
-      'auth/email-already-in-use': 'An account with this email already exists. Please sign in instead.',
-      'auth/invalid-email': 'Please enter a valid email address.',
-      'auth/weak-password': 'Firebase requires a stronger password. Use at least 8 characters with upper/lowercase, a number, and a special character.',
-      'auth/network-request-failed': 'Firebase could not connect. Check your network and try again.',
-      'auth/operation-not-allowed': 'Email/password registration is not enabled for this Firebase project.',
-    };
-
-    return messages[error?.code] || error?.message || fallback;
-  };
+  const hasRegistrationErrors = Object.values(registrationErrors).some(Boolean) || !name.trim() || !password || !confirmPassword;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast('Please enter both your email address and password.', 'warning');
+    if (!loginIdentifier.trim() || !password) {
+      toast('Please enter your email address or Resident ID and password.', 'warning');
       return;
     }
 
@@ -119,7 +93,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password })
+        body: JSON.stringify({ identifier: loginIdentifier.trim(), password })
       });
 
       const text = await response.text();
@@ -155,86 +129,15 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
     setIsLoading(true);
     try {
-      let user: UserType;
-      let token: string;
-      let emailVerificationSent = false;
-
-      if (isFirebaseConfigured) {
-        const firebaseCredential = await createAccountWithEmailPassword(email.trim().toLowerCase(), password);
-        await sendFirebaseEmailVerification(firebaseCredential.user);
-        user = {
-          id: `firebase-pending-${firebaseCredential.user.uid}`,
-          email: email.trim().toLowerCase(),
-          name: name.trim(),
-          role: 'resident',
-          phone: phone.trim() || undefined,
-          emailVerified: false,
-          governmentIdStatus: 'not_submitted',
-          hasValidId: false,
-          createdAt: new Date().toISOString()
-        };
-        token = '';
-        emailVerificationSent = true;
-      } else {
-        const response = await fetch('/api/auth/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim().toLowerCase(),
           password,
-          name: name.trim(),
-          phone: phone.trim() || undefined
+          name: name.trim()
         })
-        });
-
-        const text = await response.text();
-        let data: any = {};
-        if (text) {
-          try {
-            data = JSON.parse(text);
-          } catch {
-            const snippet = text.trim().replace(/\s+/g, ' ').slice(0, 220);
-            throw new Error(snippet || 'The server returned an unexpected non-JSON response.');
-          }
-        }
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Local registration failed.');
-        }
-        user = data.user;
-        token = data.token;
-      }
-
-      setRegistrationSuccess({ user, token, emailVerificationSent });
-      toast(emailVerificationSent ? 'Account created. Check your email to verify your account.' : 'Account created successfully.', 'success');
-    } catch (err: any) {
-      toast(getFirebaseErrorMessage(err, 'Registration failed.'), 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const continueAfterRegistration = async () => {
-    if (!registrationSuccess) return;
-
-    if (!registrationSuccess.emailVerificationSent) {
-      onLoginSuccess(registrationSuccess.user, registrationSuccess.token);
-      return;
-    }
-
-    setIsRefreshingVerification(true);
-    try {
-      const verification = await refreshFirebaseEmailVerification();
-      if (!verification.emailVerified || !verification.idToken) {
-        toast('Your email is not verified yet. Open the verification email, then try again.', 'warning');
-        return;
-      }
-
-      const response = await fetch('/api/auth/firebase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: verification.idToken, name: name.trim(), phone: phone.trim() || undefined, provider: 'email' })
       });
+
       const text = await response.text();
       let data: any = {};
       if (text) {
@@ -245,28 +148,23 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
           throw new Error(snippet || 'The server returned an unexpected non-JSON response.');
         }
       }
-      if (!response.ok) throw new Error(data.error || 'Unable to update email verification status.');
-      onLoginSuccess(data.user, data.token);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed.');
+      }
+
+      setRegistrationSuccess({ user: data.user as UserType, token: String(data.token || '') });
+      toast('Account created successfully.', 'success');
     } catch (err: any) {
-      toast(getFirebaseErrorMessage(err, 'Unable to check email verification status.'), 'error');
+      toast(err.message || 'Registration failed.', 'error');
     } finally {
-      setIsRefreshingVerification(false);
+      setIsLoading(false);
     }
   };
 
-  const resendVerificationEmail = async () => {
-    try {
-      const verification = await refreshFirebaseEmailVerification();
-      if (verification.emailVerified) {
-        toast('Your email is already verified. Continue to the Resident Portal.', 'success');
-        return;
-      }
-      if (!verification.user) throw new Error('Firebase account is not available.');
-      await sendFirebaseEmailVerification(verification.user);
-      toast('A new verification email has been sent.', 'success');
-    } catch (err: any) {
-      toast(getFirebaseErrorMessage(err, 'Unable to resend the verification email.'), 'error');
-    }
+  const continueAfterRegistration = () => {
+    if (!registrationSuccess) return;
+    onLoginSuccess(registrationSuccess.user, registrationSuccess.token);
   };
 
   const handleGoogleSignIn = async () => {
@@ -339,7 +237,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
   const handleForgotPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+    if (!recoveryEmail) {
       toast('Please enter your registered email address first.', 'warning');
       return;
     }
@@ -475,8 +373,8 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                         label="Email Address"
                         variant="glass"
                         placeholder="john@condo.com"
-                        value={email}
-                        onChange={(e: any) => setEmail(e.target.value)}
+                        value={recoveryEmail}
+                        onChange={(e: any) => setRecoveryEmail(e.target.value)}
                         icon={Mail}
                         required
                       />
@@ -521,15 +419,15 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
                   <form onSubmit={handleLogin} className="space-y-4">
                     <Input
-                      id="register-full-name"
-                      type="email"
-                      label="Email Address"
+                      id="login-identifier"
+                      type="text"
+                      label="Email or Resident ID"
                       variant="glass"
-                      placeholder="john@condo.com"
-                      value={email}
-                      onChange={(e: any) => handleEmailChange(e.target.value)}
-                      error={!emailValid ? 'Enter a valid email address to continue.' : undefined}
-                      icon={Mail}
+                      placeholder="Email address or Resident ID"
+                      autoComplete="username"
+                      value={loginIdentifier}
+                      onChange={(e: any) => setLoginIdentifier(e.target.value)}
+                      icon={User}
                       required
                     />
 
@@ -639,21 +537,15 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                   <div>
                     <h3 className="text-2xl font-serif font-bold text-white">Account Created Successfully</h3>
                     <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                      {registrationSuccess.emailVerificationSent
-                        ? 'Please check your email to verify your account before continuing.'
-                        : 'Your resident account is ready. Email verification is unavailable in the local demo.'}
+                      Your resident account is ready. Save your Resident ID; use it with your password when you sign in again.
                     </p>
                   </div>
-                  {registrationSuccess.emailVerificationSent && (
-                    <div className="rounded-2xl border border-blue-400/20 bg-blue-400/10 p-4 text-left text-xs leading-relaxed text-slate-300">
-                      <p>Step 1 ✓ Account Created</p>
-                      <p>Step 2 → Email Verification</p>
-                      <p>Step 3 ○ Resident Verification</p>
-                      <button type="button" onClick={resendVerificationEmail} className="mt-3 text-blue-300 underline">Resend verification email</button>
-                    </div>
-                  )}
-                  <Button type="button" variant="primary" fullWidth onClick={continueAfterRegistration} disabled={isRefreshingVerification} isLoading={isRefreshingVerification}>
-                    {registrationSuccess.emailVerificationSent ? 'I Verified My Email' : 'Continue to Resident Portal'}
+                  <div className="rounded-xl border border-blue-400/20 bg-blue-400/10 p-4 text-left">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Resident ID</p>
+                    <p className="mt-1 break-all font-mono text-sm font-bold text-white">{registrationSuccess.user.id}</p>
+                  </div>
+                  <Button type="button" variant="primary" fullWidth onClick={continueAfterRegistration}>
+                    Continue to Resident Portal
                   </Button>
                 </motion.div>
               ) : (
@@ -674,7 +566,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
 
                   <form onSubmit={handleRegister} className="space-y-4">
                     <Input
-                      id="register-email"
+                      id="register-full-name"
                       type="text"
                       label="Full Name"
                       variant="glass"
@@ -685,32 +577,6 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       error={registrationErrors.name || undefined}
                       icon={User}
                       required
-                    />
-
-                    <Input
-                      type="email"
-                      label="Email Address"
-                      variant="glass"
-                      placeholder="john@condo.com"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(e: any) => handleEmailChange(e.target.value)}
-                      error={registrationErrors.email || undefined}
-                      icon={Mail}
-                      required
-                    />
-
-                    <Input
-                      id="register-phone"
-                      type="tel"
-                      label="Phone Number"
-                      variant="glass"
-                      placeholder="(555) 123-4567"
-                      autoComplete="tel"
-                      value={phone}
-                      onChange={(e: any) => setPhone(e.target.value)}
-                      error={registrationErrors.phone || undefined}
-                      icon={Phone}
                     />
 
                     <div className="space-y-1">

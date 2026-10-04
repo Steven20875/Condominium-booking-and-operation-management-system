@@ -343,36 +343,28 @@ export async function createApp() {
 
   // 1. AUTHENTICATION MODULE
   app.post('/api/auth/register', registrationRateLimit, (req: Request, res: Response) => {
-    const { email, password, name, phone, unitNumber } = req.body;
-    const missing = validateFields(req.body, ['email', 'password', 'name']);
+    const { password, name } = req.body;
+    const missing = validateFields(req.body, ['password', 'name']);
     if (missing.length > 0) {
       return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
     }
 
-    if (!isNonEmptyString(email) || !isNonEmptyString(password) || !isNonEmptyString(name)) {
-      return res.status(400).json({ error: 'Email, password, and name must be valid non-empty strings.' });
+    if (!isNonEmptyString(password) || !isNonEmptyString(name)) {
+      return res.status(400).json({ error: 'Full Name and Password must be valid non-empty strings.' });
+    }
+
+    if (name.trim().length > 120) {
+      return res.status(400).json({ error: 'Full Name must be 120 characters or fewer.' });
     }
 
     if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
       return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.' });
     }
 
-    if (phone !== undefined && phone !== '' && !/^(09\d{9}|\+639\d{9})$/.test(String(phone).replace(/[\s()-]/g, ''))) {
-      return res.status(400).json({ error: 'Please enter a valid Philippine phone number.' });
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const existing = db.findUserByEmail(normalizedEmail);
-    if (existing) {
-      return res.status(400).json({ error: 'An account with this email address already exists.' });
-    }
-
     const newUser = db.createUser({
-      email: normalizedEmail,
+      email: '',
       password: bcrypt.hashSync(password, 12),
       name: name.trim(),
-      phone: isNonEmptyString(phone) ? phone.trim() : undefined,
-      unitNumber: isNonEmptyString(unitNumber) ? unitNumber.trim() : undefined,
       role: 'resident'
     });
 
@@ -382,24 +374,28 @@ export async function createApp() {
   });
 
   app.post('/api/auth/login', loginRateLimit, (req: Request, res: Response) => {
-    const rawEmail = req.body?.email;
+    const rawIdentifier = req.body?.identifier ?? req.body?.email;
     const rawPassword = req.body?.password;
 
     try {
-      const missing = validateFields(req.body, ['email', 'password']);
+      const missing = validateFields({ identifier: rawIdentifier, password: rawPassword }, ['identifier', 'password']);
       if (missing.length > 0) {
-        return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
+        return res.status(400).json({ error: 'Resident ID or email and password are required.' });
       }
 
-      if (!isNonEmptyString(rawEmail) || !isNonEmptyString(rawPassword)) {
-        return res.status(400).json({ error: 'Email and password must be valid non-empty strings.' });
+      if (!isNonEmptyString(rawIdentifier) || !isNonEmptyString(rawPassword)) {
+        return res.status(400).json({ error: 'Resident ID or email and password must be valid non-empty strings.' });
       }
 
-      const email = String(rawEmail).trim().toLowerCase();
+      const identifier = String(rawIdentifier).trim();
       const password = String(rawPassword);
-      const user = db.findUserByEmail(email);
+      const isEmailLogin = identifier.includes('@');
+      const user = isEmailLogin ? db.findUserByEmail(identifier.toLowerCase()) : db.findUserById(identifier);
 
       if (!user || typeof user.password !== 'string' || !bcrypt.compareSync(password, user.password)) {
+        return res.status(401).json({ error: 'Invalid email or password combination.' });
+      }
+      if (!isEmailLogin && user.role !== 'resident') {
         return res.status(401).json({ error: 'Invalid email or password combination.' });
       }
 
@@ -407,7 +403,7 @@ export async function createApp() {
       return res.status(200).json({ user: userSafe, token: createAuthToken(user) });
     } catch (error) {
       console.error('[AUTH] Login exception:', {
-        email: typeof rawEmail === 'string' ? rawEmail : String(rawEmail ?? ''),
+        identifier: typeof rawIdentifier === 'string' ? rawIdentifier : String(rawIdentifier ?? ''),
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
