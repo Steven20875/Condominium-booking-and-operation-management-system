@@ -427,7 +427,7 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               </div>
               <div className="flex items-center gap-3.5">
                 <Phone className="h-5 w-5 text-blue-400" />
-                <p>+63 917 123 4567 (Gales Urban Haven Desk)</p>
+                <p>+639954702127(Gales Urban Haven Desk)</p>
               </div>
               <div className="flex items-center gap-3.5">
                 <Mail className="h-5 w-5 text-blue-400" />
@@ -510,14 +510,14 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
                 <Phone className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Phone</p>
-                  <p className="mt-1 text-sm leading-relaxed text-white">+63 917 123 4567 (Gales Urban Haven Desk)</p>
+                  <p className="mt-1 text-sm leading-relaxed text-white">09954702127 (Gales Urban Haven Desk)</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
                 <Mail className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email</p>
-                  <p className="mt-1 break-all text-sm leading-relaxed text-white">fstevenchristian@gmail.com</p>
+                  <p className="mt-1 break-all text-sm leading-relaxed text-white">Thomas Gales@gmail.com</p>
                 </div>
               </div>
           </div>
@@ -570,7 +570,8 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
               <p className="pt-4 text-[10px] text-slate-500">Social channels and formal policy pages are planned for the production release.</p>
             <span className="text-slate-500">Legal Agreement (Planned)</span>
             <span className="text-slate-500">Privacy Charter (Planned)</span>
-            <a href="#landing-root" className="mt-6 inline-block hover:text-slate-400 font-bold uppercase text-slate-300">Back To Peak ↑</a>
+            <a href="#landing-root" className="mt-6 inline-block hover:text-slate-400 font-bold uppercase text-slate-300">
+              Back To Peak ↑</a>
           </div>
         </div>
       </footer>

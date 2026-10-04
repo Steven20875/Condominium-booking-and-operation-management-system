@@ -16,6 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { EventEmitter } from "events";
 var isVercel = Boolean("1");
+var shouldUsePostgres = String(process.env.USE_POSTGRES || "").toLowerCase() === "true" || isVercel && Boolean(process.env.DATABASE_URL);
 var currentFile = fileURLToPath(import.meta.url);
 var currentDir = path.dirname(currentFile);
 var appRoot = isVercel ? path.join(process.cwd()) : path.join(currentDir, "..");
@@ -138,6 +139,11 @@ var MockDatabase = class {
       exists: fs.existsSync(DB_FILE)
     });
     try {
+      if (shouldUsePostgres && Boolean(process.env.DATABASE_URL)) {
+        console.log("[DB] PostgreSQL is enabled for this runtime. Skipping stale JSON fallback so the live Neon snapshot remains the source of truth.");
+        this.data = { ...emptyData };
+        return;
+      }
       const parsedDb = readDatabaseFile(DB_FILE);
       if (parsedDb) {
         this.data = parsedDb;
@@ -221,6 +227,10 @@ var MockDatabase = class {
         void this.persistenceHook(this.getSnapshot()).catch((error) => {
           console.error("[DB] Persistence hook failed:", error);
         });
+      }
+      if (shouldUsePostgres && Boolean(process.env.DATABASE_URL)) {
+        dbEvents.emit("change", { stats: this.getDashboardStats(), timestamp: Date.now() });
+        return;
       }
       if (isVercel) {
         dbEvents.emit("change", { stats: this.getDashboardStats(), timestamp: Date.now() });
@@ -995,7 +1005,20 @@ var PostgresStateAdapter = class {
   constructor(databaseUrl2) {
     this.databaseUrl = databaseUrl2;
     this.pendingWrite = Promise.resolve();
-    this.ready = this.initialize();
+    this.initialized = false;
+    this.initializationPromise = null;
+  }
+  ensureInitialized() {
+    if (this.initialized) return Promise.resolve();
+    if (!this.initializationPromise) {
+      this.initializationPromise = this.initialize().then(() => {
+        this.initialized = true;
+      }).catch((error) => {
+        this.initializationPromise = null;
+        throw error;
+      });
+    }
+    return this.initializationPromise;
   }
   async initialize() {
     const sql = neon(this.databaseUrl);
@@ -1008,6 +1031,7 @@ var PostgresStateAdapter = class {
     db.setPersistenceHook((snapshot) => this.persist(snapshot));
   }
   async refresh() {
+    await this.ensureInitialized();
     const refreshSnapshot = async () => {
       const sql = neon(this.databaseUrl);
       const rows = await sql`SELECT state FROM application_state WHERE id = ${SNAPSHOT_ID}`;
@@ -1049,7 +1073,7 @@ var PostgresStateAdapter = class {
     return this.pendingWrite;
   }
   flush() {
-    return this.pendingWrite;
+    return this.ensureInitialized().then(() => this.pendingWrite);
   }
 };
 
@@ -1061,23 +1085,19 @@ if (usePostgres && !databaseUrl) {
   console.warn("[DB] USE_POSTGRES=true requires DATABASE_URL, so the app will continue using the JSON database fallback.");
 }
 var postgresAdapter;
-if (usePostgres && databaseUrl) {
-  try {
-    postgresAdapter = new PostgresStateAdapter(databaseUrl);
-  } catch (error) {
-    console.warn("[DB] Postgres initialization failed. Falling back to JSON database mode.", error);
-    postgresAdapter = void 0;
-  }
-}
-var dbReady = postgresAdapter?.ready ?? Promise.resolve();
 var db2 = db;
-var persistenceMode = postgresAdapter ? "postgres" : "json";
+var persistenceMode = usePostgres && databaseUrl ? "postgres" : "json";
+async function ensureDatabaseReady() {
+  if (!usePostgres || !databaseUrl) return;
+  postgresAdapter ??= new PostgresStateAdapter(databaseUrl);
+  await postgresAdapter.ensureInitialized();
+}
 async function refreshDatabase() {
-  await dbReady;
+  await ensureDatabaseReady();
   await postgresAdapter?.refresh();
 }
 async function flushDatabase() {
-  await dbReady;
+  await ensureDatabaseReady();
   await postgresAdapter?.flush();
 }
 
@@ -1344,12 +1364,12 @@ async function verifyFirebaseIdentityToken(idToken) {
 var loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1e3, limit: 30, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Too many sign-in attempts. Please try again later." } });
 var registrationRateLimit = rateLimit({ windowMs: 60 * 60 * 1e3, limit: 20, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Too many registration attempts. Please try again later." } });
 var sensitiveMutationRateLimit = rateLimit({ windowMs: 15 * 60 * 1e3, limit: 60, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Too many requests. Please try again later." } });
-var migratedPasswords = db2.migratePlaintextPasswords((password) => bcrypt.hashSync(password, 12));
-if (migratedPasswords > 0) {
-  console.log(`[AUTH] Migrated ${migratedPasswords} plaintext password(s) to bcrypt hashes.`);
-}
 async function createApp() {
-  await dbReady;
+  await ensureDatabaseReady();
+  const migratedPasswords = db2.migratePlaintextPasswords((password) => bcrypt.hashSync(password, 12));
+  if (migratedPasswords > 0) {
+    console.log(`[AUTH] Migrated ${migratedPasswords} plaintext password(s) to bcrypt hashes.`);
+  }
   const app = express();
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -1369,58 +1389,55 @@ async function createApp() {
     next();
   });
   app.post("/api/auth/register", registrationRateLimit, (req, res) => {
-    const { email, password, name, phone, unitNumber } = req.body;
-    const missing = validateFields(req.body, ["email", "password", "name"]);
+    const { password, name } = req.body;
+    const missing = validateFields(req.body, ["password", "name"]);
     if (missing.length > 0) {
       return res.status(400).json({ error: `Missing required fields: ${missing.join(", ")}.` });
     }
-    if (!isNonEmptyString(email) || !isNonEmptyString(password) || !isNonEmptyString(name)) {
-      return res.status(400).json({ error: "Email, password, and name must be valid non-empty strings." });
+    if (!isNonEmptyString(password) || !isNonEmptyString(name)) {
+      return res.status(400).json({ error: "Full Name and Password must be valid non-empty strings." });
+    }
+    if (name.trim().length > 120) {
+      return res.status(400).json({ error: "Full Name must be 120 characters or fewer." });
     }
     if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
       return res.status(400).json({ error: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character." });
     }
-    if (phone !== void 0 && phone !== "" && !/^(09\d{9}|\+639\d{9})$/.test(String(phone).replace(/[\s()-]/g, ""))) {
-      return res.status(400).json({ error: "Please enter a valid Philippine phone number." });
-    }
-    const normalizedEmail = email.trim().toLowerCase();
-    const existing = db2.findUserByEmail(normalizedEmail);
-    if (existing) {
-      return res.status(400).json({ error: "An account with this email address already exists." });
-    }
     const newUser = db2.createUser({
-      email: normalizedEmail,
+      email: "",
       password: bcrypt.hashSync(password, 12),
       name: name.trim(),
-      phone: isNonEmptyString(phone) ? phone.trim() : void 0,
-      unitNumber: isNonEmptyString(unitNumber) ? unitNumber.trim() : void 0,
       role: "resident"
     });
     const userSafe = sanitizeUserForApi(newUser);
     res.status(201).json({ user: userSafe, token: createAuthToken(newUser) });
   });
   app.post("/api/auth/login", loginRateLimit, (req, res) => {
-    const rawEmail = req.body?.email;
+    const rawIdentifier = req.body?.identifier ?? req.body?.email;
     const rawPassword = req.body?.password;
     try {
-      const missing = validateFields(req.body, ["email", "password"]);
+      const missing = validateFields({ identifier: rawIdentifier, password: rawPassword }, ["identifier", "password"]);
       if (missing.length > 0) {
-        return res.status(400).json({ error: `Missing required fields: ${missing.join(", ")}.` });
+        return res.status(400).json({ error: "Resident ID or email and password are required." });
       }
-      if (!isNonEmptyString(rawEmail) || !isNonEmptyString(rawPassword)) {
-        return res.status(400).json({ error: "Email and password must be valid non-empty strings." });
+      if (!isNonEmptyString(rawIdentifier) || !isNonEmptyString(rawPassword)) {
+        return res.status(400).json({ error: "Resident ID or email and password must be valid non-empty strings." });
       }
-      const email = String(rawEmail).trim().toLowerCase();
+      const identifier = String(rawIdentifier).trim();
       const password = String(rawPassword);
-      const user = db2.findUserByEmail(email);
+      const isEmailLogin = identifier.includes("@");
+      const user = isEmailLogin ? db2.findUserByEmail(identifier.toLowerCase()) : db2.findUserById(identifier);
       if (!user || typeof user.password !== "string" || !bcrypt.compareSync(password, user.password)) {
+        return res.status(401).json({ error: "Invalid email or password combination." });
+      }
+      if (!isEmailLogin && user.role !== "resident") {
         return res.status(401).json({ error: "Invalid email or password combination." });
       }
       const userSafe = sanitizeUserForApi(user);
       return res.status(200).json({ user: userSafe, token: createAuthToken(user) });
     } catch (error) {
       console.error("[AUTH] Login exception:", {
-        email: typeof rawEmail === "string" ? rawEmail : String(rawEmail ?? ""),
+        identifier: typeof rawIdentifier === "string" ? rawIdentifier : String(rawIdentifier ?? ""),
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : void 0
       });

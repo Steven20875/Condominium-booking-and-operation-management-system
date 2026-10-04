@@ -13,6 +13,7 @@ import {
   DashboardStats
 } from './types';
 const isVercel = Boolean(process.env.VERCEL);
+const shouldUsePostgres = String(process.env.USE_POSTGRES || '').toLowerCase() === 'true' || (isVercel && Boolean(process.env.DATABASE_URL));
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
 
@@ -168,6 +169,12 @@ export class MockDatabase {
     });
 
     try {
+      if (shouldUsePostgres && Boolean(process.env.DATABASE_URL)) {
+        console.log('[DB] PostgreSQL is enabled for this runtime. Skipping stale JSON fallback so the live Neon snapshot remains the source of truth.');
+        this.data = { ...emptyData };
+        return;
+      }
+
       const parsedDb = readDatabaseFile(DB_FILE);
       if (parsedDb) {
         this.data = parsedDb;
@@ -267,6 +274,11 @@ export class MockDatabase {
         void this.persistenceHook(this.getSnapshot()).catch((error) => {
           console.error('[DB] Persistence hook failed:', error);
         });
+      }
+
+      if (shouldUsePostgres && Boolean(process.env.DATABASE_URL)) {
+        dbEvents.emit('change', { stats: this.getDashboardStats(), timestamp: Date.now() });
+        return;
       }
 
       if (isVercel) {
