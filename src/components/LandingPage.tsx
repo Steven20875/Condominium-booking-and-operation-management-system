@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Building, Calendar, UserCheck, ShieldCheck, AreaChart, Wrench, Bell, Phone, MapPin, Mail, Sparkles, ArrowUpRight, CreditCard, Menu, X
 } from 'lucide-react';
-import FerrofluidBackground from './FerrofluidBackground.tsx';
 
 interface LandingPageProps {
   onLoginClick: () => void;
@@ -126,21 +125,15 @@ export default function LandingPage({ onLoginClick, onBrowseClick }: LandingPage
       </nav>
 
       {/* HERO SECTION */}
-      <section id="hero" className="relative overflow-hidden px-4 py-16 text-white select-none sm:px-6 md:py-32">
-        <FerrofluidBackground
-          colors={["#2563EB", "#0EA5E9", "#06B6D4"]}
-          speed={0.25}
-          scale={2}
-          turbulence={0.6}
-          glow={1.2}
-          opacity={0.5}
+      <section id="hero" className="relative flex min-h-[680px] items-center overflow-hidden px-4 py-16 text-white select-none sm:px-6 md:min-h-[760px] md:py-24">
+        <img
+          src="/images/one-spatial-iloilo-hero.jpg"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
-
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.94),rgba(15,23,42,0.98))] z-0" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.14),transparent_24%)] opacity-90" />
-
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 rounded-full w-[420px] h-[420px] bg-blue-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute right-20 top-16 rounded-full w-56 h-56 bg-cyan-400/10 blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/70 via-slate-950/35 to-slate-950/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/45 via-transparent to-slate-950/10" />
 
         <div className="max-w-5xl mx-auto relative z-10">
           <motion.div 
