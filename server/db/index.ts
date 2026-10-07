@@ -56,6 +56,10 @@ export async function flushDatabase() {
 export async function createGovernmentIdSubmission(record: {
   id: string;
   userId: string;
+  userName: string;
+  userEmail: string;
+  userRole: 'admin' | 'resident';
+  userCreatedAt: string;
   storageKey: string;
   mimeType: string;
   originalFileName: string;
@@ -69,28 +73,41 @@ export async function createGovernmentIdSubmission(record: {
 
   const sql = neon(databaseUrl);
 
-  await sql`
-    INSERT INTO government_id_submissions
-      (
-        id,
-        user_id,
-        storage_key,
-        mime_type,
-        original_file_name,
-        status,
-        uploaded_at
-      )
-    VALUES
-      (
-        ${record.id},
+  await sql.transaction([
+    sql`
+      INSERT INTO users (id, email, name, role, created_at)
+      VALUES (
         ${record.userId},
-        ${record.storageKey},
-        ${record.mimeType},
-        ${record.originalFileName},
-        'pending',
-        ${record.uploadedAt}
+        ${record.userEmail || null},
+        ${record.userName},
+        ${record.userRole},
+        ${record.userCreatedAt}
       )
-  `;
+      ON CONFLICT (id) DO NOTHING
+    `,
+    sql`
+      INSERT INTO government_id_submissions
+        (
+          id,
+          user_id,
+          storage_key,
+          mime_type,
+          original_file_name,
+          status,
+          uploaded_at
+        )
+      VALUES
+        (
+          ${record.id},
+          ${record.userId},
+          ${record.storageKey},
+          ${record.mimeType},
+          ${record.originalFileName},
+          'pending',
+          ${record.uploadedAt}
+        )
+    `
+  ]);
 }
 
 /**

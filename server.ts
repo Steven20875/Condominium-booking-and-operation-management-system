@@ -723,6 +723,10 @@ export async function createApp() {
       await createGovernmentIdSubmission({
         id: submissionId,
         userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+        userCreatedAt: user.createdAt,
         storageKey,
         mimeType: uploadedId.mimeType,
         originalFileName: uploadedId.originalFileName,
@@ -742,10 +746,19 @@ export async function createApp() {
         message: 'Your ID has been submitted and is waiting for admin verification.',
         canBook: false
       });
-    } catch {
+    } catch (error) {
       await deleteGovernmentIdSubmission(submissionId).catch(() => undefined);
       await deletePrivateGovernmentId(storageKey);
-      console.error('[GOVERNMENT_ID] Database update failed after private upload.');
+      console.error('[GOVERNMENT_ID] Database update failed after private upload.', {
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+              }
+            : error,
+      });
       return res.status(500).json({ error: 'The file uploaded, but its verification record could not be saved. Please try again.' });
     }
   });
