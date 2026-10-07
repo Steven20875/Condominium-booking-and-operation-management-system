@@ -288,15 +288,26 @@ function governmentIdExtension(mimeType: string) {
   return '.jpg';
 }
 
+function getGovernmentIdBlobAuth() {
+  const oidcToken = process.env.VERCEL_OIDC_TOKEN;
+  const storeId = process.env.BLOB_STORE_ID;
+
+  if (oidcToken && storeId) {
+    return { oidcToken, storeId };
+  }
+
+  return {};
+}
+
 async function deletePrivateGovernmentId(storageKey: string) {
   try {
-    await del(storageKey);
+    await del(storageKey, getGovernmentIdBlobAuth());
   } catch {
     console.error('[GOVERNMENT_ID] Uploaded object cleanup failed.');
   }
 }
 
-async function sendPrivateGovernmentId(res: Response, storageKey: string) {
+async function sendPrivateGovernmentId(req: Request, res: Response, storageKey: string) {
   const extension = path.extname(storageKey).toLowerCase();
   const mimeType = extension === '.pdf' ? 'application/pdf' : extension === '.png' ? 'image/png' : extension === '.jpg' ? 'image/jpeg' : '';
   if (!mimeType || !storageKey.startsWith('government-ids/')) {
@@ -304,7 +315,11 @@ async function sendPrivateGovernmentId(res: Response, storageKey: string) {
   }
 
   try {
-    const blob = await get(storageKey, { access: 'private', useCache: false });
+    const blob = await get(storageKey, {
+      access: 'private',
+      useCache: false,
+      ...getGovernmentIdBlobAuth()
+    });
     if (!blob || blob.statusCode !== 200 || !blob.stream) {
       return res.status(404).json({ error: 'No submitted government ID was found for this resident.' });
     }
@@ -681,7 +696,8 @@ export async function createApp() {
         access: 'private',
         addRandomSuffix: false,
         contentType: uploadedId.mimeType,
-        cacheControlMaxAge: 60
+        cacheControlMaxAge: 60,
+        ...getGovernmentIdBlobAuth()
       });
     } catch (error) {
       const storageError = error as {
@@ -738,7 +754,7 @@ export async function createApp() {
     if (!user || !user.governmentIdStorageKey) {
       return res.status(404).json({ error: 'No government ID record found for this user.' });
     }
-    return sendPrivateGovernmentId(res, user.governmentIdStorageKey);
+    return sendPrivateGovernmentId(req, res, user.governmentIdStorageKey);
   });
 
   app.get('/api/admin/government-id-verifications', requireAdmin, (req: Request, res: Response) => {
@@ -786,7 +802,7 @@ export async function createApp() {
     if (!targetUser.governmentIdStorageKey) {
       return res.status(404).json({ error: 'No submitted government ID was found for this resident.' });
     }
-    return sendPrivateGovernmentId(res, targetUser.governmentIdStorageKey);
+    return sendPrivateGovernmentId(req, res, targetUser.governmentIdStorageKey);
   });
 
   app.post('/api/admin/government-id-verifications/:userId/approve', requireAdmin, async (req: Request, res: Response) => {
