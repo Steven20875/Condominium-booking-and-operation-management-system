@@ -68,7 +68,7 @@ import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { del, get, put } from '@vercel/blob';
@@ -427,9 +427,9 @@ export async function createApp() {
   const app = express();
   app.set('trust proxy', 1);
 
-  const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Please try again later.' } });
-  const registrationRateLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many registration attempts. Please try again later.' } });
-  const sensitiveMutationRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please try again later.' } });
+  const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Please try again later.' }, keyGenerator: (req) => ipKeyGenerator(String(req.ip ?? req.socket.remoteAddress ?? 'unknown')) });
+  const registrationRateLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many registration attempts. Please try again later.' }, keyGenerator: (req) => ipKeyGenerator(String(req.ip ?? req.socket.remoteAddress ?? 'unknown')) });
+  const sensitiveMutationRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please try again later.' }, keyGenerator: (req) => ipKeyGenerator(String(req.ip ?? req.socket.remoteAddress ?? 'unknown')) });
 
   // Increase payload limits for direct base64 image uploads of condo units
   app.use(express.json({ limit: '50mb' }));
