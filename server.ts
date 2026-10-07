@@ -680,9 +680,20 @@ export async function createApp() {
           cacheControl: 'private, no-store, max-age=0'
         }
       });
-    } catch {
-      console.error('[GOVERNMENT_ID] Private object upload failed.');
-      return res.status(503).json({ error: 'Government ID storage is unavailable. Please try again later.' });
+    } catch (error) {
+      const storageError = error as {
+        code?: unknown;
+        message?: unknown;
+      };
+
+      console.error('[GOVERNMENT_ID] Private object upload failed.', {
+        code: storageError.code,
+        message: storageError.message
+      });
+
+      return res.status(503).json({
+        error: 'Government ID storage is unavailable. Please try again later.'
+      });
     }
 
     const submissionId = crypto.randomUUID();
