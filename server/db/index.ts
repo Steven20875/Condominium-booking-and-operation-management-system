@@ -50,7 +50,7 @@ export async function flushDatabase() {
 /**
  * Creates a Government ID submission record in PostgreSQL.
  *
- * The actual Government ID file is stored in private Cloud Storage.
+ * The actual Government ID file is stored in private Vercel Blob storage.
  * PostgreSQL only stores the generated storage key and metadata.
  */
 export async function createGovernmentIdSubmission(record: {
@@ -96,7 +96,7 @@ export async function createGovernmentIdSubmission(record: {
 /**
  * Deletes a Government ID submission record.
  *
- * The associated private Cloud Storage object must be deleted
+ * The associated private Vercel Blob object must be deleted
  * separately by the server upload handler.
  */
 export async function deleteGovernmentIdSubmission(

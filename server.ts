@@ -64,13 +64,14 @@ import express, { Request, Response, NextFunction } from 'express';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getStorage } from 'firebase-admin/storage';
+import { del, get, put } from '@vercel/blob';
 import { db, dbEvents, createGovernmentIdSubmission, deleteGovernmentIdSubmission, ensureDatabaseReady, flushDatabase, persistenceMode, refreshDatabase, updateGovernmentIdSubmissionStatus } from './server/db/index.ts';
 import { bookingService } from './server/services/BookingService.ts';
 import { paymentService } from './server/services/PaymentService.ts';
@@ -281,17 +282,6 @@ async function readGovernmentIdMultipart(req: Request) {
   return { buffer: bytes, originalFileName, mimeType: detectedMimeType };
 }
 
-function getPrivateGovernmentIdBucket() {
-  const bucketName = process.env.GOVERNMENT_ID_STORAGE_BUCKET;
-  if (!bucketName) throw new Error('Government ID storage is not configured.');
-
-  const app = getApps()[0] || initializeApp({
-    credential: cert(parseFirebaseServiceAccount()),
-    storageBucket: bucketName
-  });
-  return getStorage(app).bucket(bucketName);
-}
-
 function governmentIdExtension(mimeType: string) {
   if (mimeType === 'application/pdf') return '.pdf';
   if (mimeType === 'image/png') return '.png';
@@ -300,7 +290,7 @@ function governmentIdExtension(mimeType: string) {
 
 async function deletePrivateGovernmentId(storageKey: string) {
   try {
-    await getPrivateGovernmentIdBucket().file(storageKey).delete({ ignoreNotFound: true });
+    await del(storageKey);
   } catch {
     console.error('[GOVERNMENT_ID] Uploaded object cleanup failed.');
   }
@@ -314,12 +304,28 @@ async function sendPrivateGovernmentId(res: Response, storageKey: string) {
   }
 
   try {
-    const [fileBuffer] = await getPrivateGovernmentIdBucket().file(storageKey).download();
+    const blob = await get(storageKey, { access: 'private', useCache: false });
+    if (!blob || blob.statusCode !== 200 || !blob.stream) {
+      return res.status(404).json({ error: 'No submitted government ID was found for this resident.' });
+    }
+
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `inline; filename="government-id${extension}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    return res.send(fileBuffer);
+    const body = Readable.from((async function* () {
+      const reader = blob.stream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) return;
+          yield Buffer.from(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    })());
+    return body.pipe(res);
   } catch {
     return res.status(404).json({ error: 'No submitted government ID was found for this resident.' });
   }
@@ -670,15 +676,12 @@ export async function createApp() {
     }
 
     const storageKey = `government-ids/${user.id}/${crypto.randomUUID()}${governmentIdExtension(uploadedId.mimeType)}`;
-    let bucket;
     try {
-      bucket = getPrivateGovernmentIdBucket();
-      await bucket.file(storageKey).save(uploadedId.buffer, {
-        resumable: false,
-        metadata: {
-          contentType: uploadedId.mimeType,
-          cacheControl: 'private, no-store, max-age=0'
-        }
+      await put(storageKey, uploadedId.buffer, {
+        access: 'private',
+        addRandomSuffix: false,
+        contentType: uploadedId.mimeType,
+        cacheControlMaxAge: 60
       });
     } catch (error) {
       const storageError = error as {

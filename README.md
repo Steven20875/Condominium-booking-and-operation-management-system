@@ -219,6 +219,22 @@ npm run dev
 4. Copy the Firebase configuration into the `.env` file.
 5. Restart the application.
 
+## Private Government ID Storage
+
+Government ID files are stored in a **Private** Vercel Blob store. Neon PostgreSQL
+stores only the Blob pathname and verification metadata. The Firebase configuration
+above is used for Authentication; Firebase Cloud Storage is not used for Government IDs.
+
+For Vercel, create a Blob store with **Private** access and connect it to this project
+for the Production and Preview environments. Vercel supplies the Blob store identity
+and short-lived OIDC credentials to connected functions. Do not add a public Blob URL
+or expose a Blob token to frontend variables.
+
+For local development, use a private Blob store and provide its `BLOB_READ_WRITE_TOKEN`
+in `.env` (or pull the Vercel Development environment with `vercel env pull`). Keep the
+token server-side and never use the `VITE_` prefix. Government ID uploads remain limited
+to 3 MiB and JPEG, PNG, or PDF.
+
 ---
 
 ## Future Improvements
