@@ -686,10 +686,11 @@ export async function createApp() {
         message?: unknown;
       };
 
-      console.error('[GOVERNMENT_ID] Private object upload failed.', {
-        code: storageError.code,
-        message: storageError.message
-      });
+      console.error(
+        '[GOVERNMENT_ID] Private object upload failed:',
+        `code=${String(storageError.code ?? 'unknown')}`,
+        `message=${String(storageError.message ?? error)}`
+      );
 
       return res.status(503).json({
         error: 'Government ID storage is unavailable. Please try again later.'
