@@ -264,6 +264,11 @@ async function readGovernmentIdMultipart(req: Request) {
   if (formData.get('agreesToVerification') !== 'true') {
     throw new GovernmentIdRequestError('Please agree to submit your ID for verification.', 400);
   }
+  const emailValue = formData.get('email');
+  const contactEmail = typeof emailValue === 'string' ? emailValue.trim().toLowerCase() : '';
+  if (contactEmail && (contactEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail))) {
+    throw new GovernmentIdRequestError('Please provide a valid email address.', 400);
+  }
   if (fileValue.size === 0) {
     throw new GovernmentIdRequestError('The selected file is empty.', 400);
   }
@@ -279,7 +284,7 @@ async function readGovernmentIdMultipart(req: Request) {
   }
 
   const originalFileName = fileValue.name.replace(/[\\/\u0000-\u001f\u007f]/g, '_').slice(0, 255) || 'government-id';
-  return { buffer: bytes, originalFileName, mimeType: detectedMimeType };
+  return { buffer: bytes, originalFileName, mimeType: detectedMimeType, contactEmail };
 }
 
 function governmentIdExtension(mimeType: string) {
@@ -457,14 +462,22 @@ export async function createApp() {
 
   // 1. AUTHENTICATION MODULE
   app.post('/api/auth/register', registrationRateLimit, (req: Request, res: Response) => {
-    const { password, name } = req.body;
-    const missing = validateFields(req.body, ['password', 'name']);
+    const { email, password, name } = req.body;
+    const missing = validateFields(req.body, ['email', 'password', 'name']);
     if (missing.length > 0) {
       return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}.` });
     }
 
-    if (!isNonEmptyString(password) || !isNonEmptyString(name)) {
-      return res.status(400).json({ error: 'Full Name and Password must be valid non-empty strings.' });
+    if (!isNonEmptyString(email) || !isNonEmptyString(password) || !isNonEmptyString(name)) {
+      return res.status(400).json({ error: 'Email, Full Name, and Password must be valid non-empty strings.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Please provide a valid email address.' });
+    }
+    if (db.findUserByEmail(normalizedEmail)) {
+      return res.status(409).json({ error: 'An account with this email address already exists.' });
     }
 
     if (name.trim().length > 120) {
@@ -476,7 +489,7 @@ export async function createApp() {
     }
 
     const newUser = db.createUser({
-      email: '',
+      email: normalizedEmail,
       password: bcrypt.hashSync(password, 12),
       name: name.trim(),
       role: 'resident'
@@ -692,6 +705,15 @@ export async function createApp() {
     }
 
     const storageKey = `government-ids/${user.id}/${crypto.randomUUID()}${governmentIdExtension(uploadedId.mimeType)}`;
+    const normalizedEmail = (user.email || uploadedId.contactEmail).trim().toLowerCase();
+    if (!normalizedEmail) {
+      return res.status(400).json({ error: 'Add a valid email address to your account before submitting your Government ID.' });
+    }
+    const emailOwner = db.findUserByEmail(normalizedEmail);
+    if (emailOwner && emailOwner.id !== user.id) {
+      return res.status(409).json({ error: 'That email address is already associated with another account.' });
+    }
+
     try {
       await put(storageKey, uploadedId.buffer, {
         access: 'private',
@@ -720,11 +742,19 @@ export async function createApp() {
     const submissionId = crypto.randomUUID();
     const uploadedAt = new Date().toISOString();
     try {
+      if (!user.email) {
+        const updatedEmailUser = db.updateUser(user.id, { email: normalizedEmail });
+        if (!updatedEmailUser) {
+          throw new Error('User email could not be synchronized.');
+        }
+        await flushDatabase();
+      }
+
       await createGovernmentIdSubmission({
         id: submissionId,
         userId: user.id,
         userName: user.name,
-        userEmail: user.email,
+        userEmail: normalizedEmail,
         userRole: user.role,
         userCreatedAt: user.createdAt,
         storageKey,

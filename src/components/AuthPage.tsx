@@ -22,6 +22,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
   // Form states
   const [loginIdentifier, setLoginIdentifier] = useState<string>('');
   const [recoveryEmail, setRecoveryEmail] = useState<string>('');
+  const [registrationEmail, setRegistrationEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
@@ -73,6 +74,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
       : 'Weak';
   const registrationErrors = {
     name: !name.trim() ? 'Full Name is required.' : '',
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registrationEmail.trim()) ? '' : 'Enter a valid email address.',
     password: Object.values(passwordChecks).every(Boolean) ? '' : 'Password does not meet all requirements.',
     confirmPassword: confirmPassword && confirmPassword !== password ? 'Passwords do not match.' : '',
     terms: !termsAccepted ? 'You must accept the Terms of Service and Privacy Policy.' : '',
@@ -132,6 +134,7 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          email: registrationEmail.trim().toLowerCase(),
           password,
           name: name.trim()
         })
@@ -526,6 +529,20 @@ export default function AuthPage({ onLoginSuccess, onNavigateHome }: AuthPagePro
                       onChange={(e: any) => setName(e.target.value)}
                       error={registrationErrors.name || undefined}
                       icon={User}
+                      required
+                    />
+
+                    <Input
+                      id="register-email"
+                      type="email"
+                      label="Email Address"
+                      variant="glass"
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      value={registrationEmail}
+                      onChange={(e: any) => setRegistrationEmail(e.target.value)}
+                      error={registrationEmail && registrationErrors.email ? registrationErrors.email : undefined}
+                      icon={Mail}
                       required
                     />
 

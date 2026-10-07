@@ -73,6 +73,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [governmentIdRejectionReason, setGovernmentIdRejectionReason] = useState<string | null>(user.governmentIdRejectionReason || null);
   const [governmentIdFileName, setGovernmentIdFileName] = useState<string>('');
   const [governmentIdFile, setGovernmentIdFile] = useState<File | null>(null);
+  const [governmentIdContactEmail, setGovernmentIdContactEmail] = useState<string>(user.email || '');
   const [governmentIdAgrees, setGovernmentIdAgrees] = useState<boolean>(false);
   const [submittingGovernmentId, setSubmittingGovernmentId] = useState<boolean>(false);
 
@@ -235,12 +236,17 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       toast('Please upload a valid government-issued ID before submitting.', 'warning');
       return;
     }
+    if (!user.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(governmentIdContactEmail.trim())) {
+      toast('Enter a valid email address to continue with Government ID verification.', 'warning');
+      return;
+    }
 
     setSubmittingGovernmentId(true);
     try {
       const formData = new FormData();
       formData.append('file', governmentIdFile, governmentIdFile.name);
       formData.append('agreesToVerification', String(governmentIdAgrees));
+      if (!user.email) formData.append('email', governmentIdContactEmail.trim());
       const response = await fetch('/api/profile/government-id', {
         method: 'POST',
         headers: {
@@ -1493,6 +1499,18 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">Government ID has not been submitted. You cannot make a booking until a valid ID is submitted and verified.</p>
                   )}
                   {(hasValidId || governmentIdStatus !== 'not_submitted') && <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-3">
+                    {!user.email && <div className="space-y-1">
+                      <label htmlFor="government-id-contact-email" className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Contact Email</label>
+                      <input
+                        id="government-id-contact-email"
+                        type="email"
+                        autoComplete="email"
+                        value={governmentIdContactEmail}
+                        onChange={(event) => setGovernmentIdContactEmail(event.target.value)}
+                        required
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 focus:border-slate-700 focus:outline-none"
+                      />
+                    </div>}
                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                       <Upload className="h-3.5 w-3.5" />
                       Upload Government ID

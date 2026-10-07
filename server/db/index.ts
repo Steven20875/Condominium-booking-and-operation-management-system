@@ -72,13 +72,17 @@ export async function createGovernmentIdSubmission(record: {
   }
 
   const sql = neon(databaseUrl);
+  const normalizedEmail = record.userEmail.trim().toLowerCase();
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new Error('A valid resident email is required for the PostgreSQL user record.');
+  }
 
   await sql.transaction([
     sql`
       INSERT INTO users (id, email, name, role, created_at)
       VALUES (
         ${record.userId},
-        ${record.userEmail || null},
+        ${normalizedEmail},
         ${record.userName},
         ${record.userRole},
         ${record.userCreatedAt}
