@@ -1,11 +1,11 @@
-import type { Request, Response } from 'express';
+import type { Express, Request, Response } from 'express';
 import { createHash } from 'node:crypto';
 
 process.env.NODE_ENV = 'production';
 process.env.VERCEL = '1';
 
 const preflightPath = '/api/__diagnostic/resident-deletion-preflight';
-let appPromise: Promise<unknown> | undefined;
+let appPromise: Promise<Express> | undefined;
 
 async function runReadOnlyPreflight(res: Response) {
   res.setHeader('Cache-Control', 'no-store');
@@ -20,7 +20,7 @@ async function runReadOnlyPreflight(res: Response) {
     const { neon } = await import('@neondatabase/serverless');
     const sql = neon(databaseUrl);
     const [snapshotRows, normalizedRoleRows, unitsRows, dependentRows, fkRows] = await Promise.all([
-      sql`SELECT state FROM application_state WHERE id = ${'application'}` as Promise<Array<{ state: unknown }>>,
+      sql`SELECT state FROM application_state WHERE id = ${'application'}`,
       sql`SELECT role, COUNT(*)::int AS count FROM users GROUP BY role ORDER BY role`,
       sql`SELECT COUNT(*)::int AS count FROM units`,
       sql`
@@ -91,7 +91,7 @@ async function runReadOnlyPreflight(res: Response) {
   }
 }
 
-async function loadApp() {
+async function loadApp(): Promise<Express> {
   const { createApp } = await import('../server-build/server.mjs');
   return createApp();
 }
@@ -111,7 +111,7 @@ export default async function handler(req: Request, res: Response) {
   }
 
   const initialization = appPromise;
-  let app: Awaited<ReturnType<typeof loadApp>>;
+  let app: Express;
   try {
     app = await initialization;
   } catch (error) {

@@ -125,7 +125,7 @@ export class MockDatabase {
       emailVerified: user.emailVerified ?? true,
       hasValidId,
       governmentIdStatus: status,
-      governmentIdUrl: user.governmentIdUrl || '',
+      governmentIdStorageKey: user.governmentIdStorageKey || '',
       governmentIdUploadedAt: user.governmentIdUploadedAt || undefined,
       governmentIdVerifiedAt: user.governmentIdVerifiedAt || undefined,
       governmentIdRejectionReason: user.governmentIdRejectionReason || undefined,
@@ -438,7 +438,7 @@ export class MockDatabase {
     return user ? normalizeGovernmentIdStatus(user.governmentIdStatus ?? (user.hasValidId ? 'verified' : 'not_submitted')) : 'not_submitted';
   }
 
-  public submitGovernmentIdForVerification(userId: string, filePath: string, originalFileName: string, mimeType: string): User | undefined {
+  public submitGovernmentIdForVerification(userId: string, storageKey: string, originalFileName: string, mimeType: string): User | undefined {
     const idx = this.data.users.findIndex((user) => user.id === userId);
     if (idx === -1) return undefined;
 
@@ -446,7 +446,7 @@ export class MockDatabase {
     const updated = this.normalizeUserRecord({
       ...original,
       governmentIdStatus: 'pending',
-      governmentIdUrl: filePath,
+      governmentIdStorageKey: storageKey,
       governmentIdUploadedAt: new Date().toISOString(),
       governmentIdVerifiedAt: undefined,
       governmentIdRejectionReason: undefined,
@@ -457,7 +457,7 @@ export class MockDatabase {
     });
 
     const sanitizedName = String(originalFileName || 'government-id').replace(/\s+/g, ' ').trim();
-    updated.governmentIdUrl = filePath;
+    updated.governmentIdStorageKey = storageKey;
     updated.governmentIdUploadedAt = new Date().toISOString();
     updated.governmentIdRejectionReason = undefined;
     updated.governmentIdVerifiedAt = undefined;

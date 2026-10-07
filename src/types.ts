@@ -18,7 +18,7 @@ export interface User {
   emailVerified?: boolean;
   hasValidId?: boolean;
   governmentIdStatus?: GovernmentIdStatus;
-  governmentIdUrl?: string;
+  governmentIdStorageKey?: string;
   governmentIdUploadedAt?: string;
   governmentIdVerifiedAt?: string;
   governmentIdRejectionReason?: string;

@@ -72,8 +72,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
   const [governmentIdUploadedAt, setGovernmentIdUploadedAt] = useState<string | null>(user.governmentIdUploadedAt || null);
   const [governmentIdRejectionReason, setGovernmentIdRejectionReason] = useState<string | null>(user.governmentIdRejectionReason || null);
   const [governmentIdFileName, setGovernmentIdFileName] = useState<string>('');
-  const [governmentIdFileData, setGovernmentIdFileData] = useState<string>('');
-  const [governmentIdMimeType, setGovernmentIdMimeType] = useState<string>('');
+  const [governmentIdFile, setGovernmentIdFile] = useState<File | null>(null);
   const [governmentIdAgrees, setGovernmentIdAgrees] = useState<boolean>(false);
   const [submittingGovernmentId, setSubmittingGovernmentId] = useState<boolean>(false);
 
@@ -199,20 +198,31 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
     const file = e.target.files?.[0];
     if (!file) {
       setGovernmentIdFileName('');
-      setGovernmentIdFileData('');
-      setGovernmentIdMimeType('');
+      setGovernmentIdFile(null);
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setGovernmentIdFileName(file.name);
-        setGovernmentIdFileData(reader.result);
-        setGovernmentIdMimeType(file.type || 'application/octet-stream');
-      }
-    };
-    reader.readAsDataURL(file);
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if ((file.type && !allowedTypes.includes(file.type)) || file.size === 0) {
+      e.target.value = '';
+      setGovernmentIdFileName('');
+      setGovernmentIdFile(null);
+      setGovernmentIdMessage('File type not supported. Please upload a JPG, PNG, or PDF.');
+      toast('File type not supported. Please upload a JPG, PNG, or PDF.', 'error');
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      e.target.value = '';
+      setGovernmentIdFileName('');
+      setGovernmentIdFile(null);
+      setGovernmentIdMessage('The Government ID must be no larger than 3 MB.');
+      toast('The Government ID must be no larger than 3 MB.', 'error');
+      return;
+    }
+
+    setGovernmentIdFileName(file.name);
+    setGovernmentIdFile(file);
+    setGovernmentIdMessage('');
   };
 
   const handleGovernmentIdSubmit = async () => {
@@ -221,28 +231,25 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       return;
     }
 
-    if (!governmentIdFileData || !governmentIdFileName) {
+    if (!governmentIdFile || !governmentIdFileName) {
       toast('Please upload a valid government-issued ID before submitting.', 'warning');
       return;
     }
 
     setSubmittingGovernmentId(true);
     try {
+      const formData = new FormData();
+      formData.append('file', governmentIdFile, governmentIdFile.name);
+      formData.append('agreesToVerification', String(governmentIdAgrees));
       const response = await fetch('/api/profile/government-id', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          fileName: governmentIdFileName,
-          fileData: governmentIdFileData,
-          mimeType: governmentIdMimeType,
-          agreesToVerification: governmentIdAgrees
-        })
+        body: formData
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Unable to submit your government ID.');
 
       const nextStatus = data.governmentIdStatus || 'pending';
@@ -251,13 +258,14 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
       setGovernmentIdMessage(data.message || '');
       setGovernmentIdUploadedAt(data.governmentIdUploadedAt || null);
       setGovernmentIdRejectionReason(null);
-      setGovernmentIdFileData('');
+      setGovernmentIdFile(null);
       setGovernmentIdFileName('');
-      setGovernmentIdMimeType('');
       setGovernmentIdAgrees(false);
       toast(data.message || 'Government ID submitted for verification.', 'success');
     } catch (err: any) {
-      toast(err.message || 'Unable to submit government ID.', 'error');
+      const message = err.message || 'Unable to submit government ID.';
+      setGovernmentIdMessage(message);
+      toast(message, 'error');
     } finally {
       setSubmittingGovernmentId(false);
     }
@@ -1493,7 +1501,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                     <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[11px] text-slate-600 transition hover:border-slate-400 hover:bg-slate-100">
                       <input type="file" accept="image/jpeg,image/png,application/pdf" className="hidden" onChange={handleGovernmentIdFileChange} />
                       <span className="font-bold text-slate-800">{governmentIdFileName || 'Choose a JPG, PNG, or PDF file'}</span>
-                      <span className="mt-1 text-[10px] text-slate-500">Max size: 5MB</span>
+                      <span className="mt-1 text-[10px] text-slate-500">Max size: 3MB</span>
                     </label>
 
                     <label className="flex items-start gap-2 text-[10px] text-slate-600">
@@ -1515,7 +1523,7 @@ export default function ResidentDashboard({ user, token, onLogout, onUpdateUser,
                       <button
                         type="button"
                         onClick={handleGovernmentIdSubmit}
-                        disabled={submittingGovernmentId || !governmentIdAgrees || !governmentIdFileData}
+                        disabled={submittingGovernmentId || !governmentIdAgrees || !governmentIdFile}
                         className="rounded-xl bg-slate-900 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         {submittingGovernmentId ? 'Submitting...' : 'Submit for Review'}

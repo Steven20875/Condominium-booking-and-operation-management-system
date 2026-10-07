@@ -47,7 +47,7 @@ for (const payment of source.payments) {
 const postgresState = JSON.parse(JSON.stringify(source)) as DatabaseSchema;
 for (const user of postgresState.users) {
   // Local Windows paths are never imported as production-facing references.
-  user.governmentIdUrl = '';
+  user.governmentIdStorageKey = '';
 }
 
 const sql = neon(databaseUrl);

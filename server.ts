@@ -70,7 +70,8 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { db, dbEvents, ensureDatabaseReady, flushDatabase, persistenceMode, refreshDatabase } from './server/db/index.ts';
+import { getStorage } from 'firebase-admin/storage';
+import { db, dbEvents, createGovernmentIdSubmission, deleteGovernmentIdSubmission, ensureDatabaseReady, flushDatabase, persistenceMode, refreshDatabase, updateGovernmentIdSubmissionStatus } from './server/db/index.ts';
 import { bookingService } from './server/services/BookingService.ts';
 import { paymentService } from './server/services/PaymentService.ts';
 import { notificationService } from './server/services/NotificationService.ts';
@@ -100,8 +101,8 @@ if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = JWT_SECRET;
 }
 const JWT_EXPIRES_IN = '8h';
-const GOVERNMENT_ID_STORAGE_DIR = path.join(projectRoot, 'data', 'private', 'government-ids');
-const MAX_GOVERNMENT_ID_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_GOVERNMENT_ID_SIZE_BYTES = 3 * 1024 * 1024;
+const MAX_GOVERNMENT_ID_REQUEST_BYTES = MAX_GOVERNMENT_ID_SIZE_BYTES + 64 * 1024;
 const firebaseConfigFromEnv = {
   apiKey: process.env.VITE_FIREBASE_API_KEY || '',
   authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
@@ -195,42 +196,133 @@ function getGovernmentIdStatusForUser(user: any): 'not_submitted' | 'pending' | 
 }
 
 function sanitizeUserForApi(user: any) {
-  const { password: _password, governmentIdUrl: _governmentIdUrl, ...safeUser } = user;
+  const { password: _password, governmentIdStorageKey: _governmentIdStorageKey, ...safeUser } = user;
   return safeUser;
-}
-
-function ensureGovernmentIdStorageDir() {
-  const targetDir = GOVERNMENT_ID_STORAGE_DIR;
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
-
-  if (isVercel) {
-    console.warn('[FILES] Vercel/serverless environment detected. Private government IDs are stored only in the local filesystem for the current runtime and will not persist across deployments.');
-  }
-
-  return targetDir;
-}
-
-function getSafeGovernmentIdFilename(name: string, residentId: string) {
-  const sanitizedBase = String(name || 'government-id')
-    .replace(/\.[^/.]+$/, '')
-    .replace(/[^a-zA-Z0-9_-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'government-id';
-
-  return `${residentId}-${Date.now()}-${sanitizedBase}`;
 }
 
 function determineGovernmentIdMimeType(mimeType: unknown) {
   const normalized = typeof mimeType === 'string' ? mimeType.toLowerCase() : '';
-  if (['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'].includes(normalized)) {
-    return normalized;
-  }
-  if (normalized === 'image/pjpeg') {
+  if (normalized === 'image/jpeg' || normalized === 'image/jpg' || normalized === 'image/pjpeg') {
     return 'image/jpeg';
   }
+  if (normalized === 'image/png' || normalized === 'application/pdf') return normalized;
   return '';
+}
+
+function detectGovernmentIdMimeType(file: Buffer) {
+  if (file.length >= 3 && file[0] === 0xff && file[1] === 0xd8 && file[2] === 0xff) return 'image/jpeg';
+  if (file.length >= 8 && file.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (file.length >= 5 && file.subarray(0, 5).toString('ascii') === '%PDF-') return 'application/pdf';
+  return '';
+}
+
+class GovernmentIdRequestError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+  }
+}
+
+async function readGovernmentIdMultipart(req: Request) {
+  const contentType = String(req.headers['content-type'] || '');
+  if (!contentType.toLowerCase().startsWith('multipart/form-data;')) {
+    throw new GovernmentIdRequestError('Please upload the ID using the file selector.', 400);
+  }
+
+  const declaredLength = Number(req.headers['content-length'] || 0);
+  if (declaredLength > MAX_GOVERNMENT_ID_REQUEST_BYTES) {
+    throw new GovernmentIdRequestError('File size must not exceed 3 MB.', 413);
+  }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > MAX_GOVERNMENT_ID_REQUEST_BYTES) {
+      throw new GovernmentIdRequestError('File size must not exceed 3 MB.', 413);
+    }
+    chunks.push(buffer);
+  }
+
+  let formData: FormData;
+  try {
+    const multipartRequest = new globalThis.Request('http://localhost', {
+      method: 'POST',
+      headers: { 'content-type': contentType },
+      body: Buffer.concat(chunks)
+    });
+    formData = await multipartRequest.formData();
+  } catch {
+    throw new GovernmentIdRequestError('The uploaded form could not be read. Please try again.', 400);
+  }
+
+  const fileValue = formData.get('file');
+  if (!fileValue || typeof fileValue === 'string') {
+    throw new GovernmentIdRequestError('Please select a valid government-issued ID.', 400);
+  }
+  if (formData.get('agreesToVerification') !== 'true') {
+    throw new GovernmentIdRequestError('Please agree to submit your ID for verification.', 400);
+  }
+  if (fileValue.size === 0) {
+    throw new GovernmentIdRequestError('The selected file is empty.', 400);
+  }
+  if (fileValue.size > MAX_GOVERNMENT_ID_SIZE_BYTES) {
+    throw new GovernmentIdRequestError('File size must not exceed 3 MB.', 413);
+  }
+
+  const bytes = Buffer.from(await fileValue.arrayBuffer());
+  const detectedMimeType = detectGovernmentIdMimeType(bytes);
+  const declaredMimeType = determineGovernmentIdMimeType(fileValue.type);
+  if (!detectedMimeType || (declaredMimeType && declaredMimeType !== detectedMimeType)) {
+    throw new GovernmentIdRequestError('File type not supported. Please upload a valid JPG, PNG, or PDF.', 415);
+  }
+
+  const originalFileName = fileValue.name.replace(/[\\/\u0000-\u001f\u007f]/g, '_').slice(0, 255) || 'government-id';
+  return { buffer: bytes, originalFileName, mimeType: detectedMimeType };
+}
+
+function getPrivateGovernmentIdBucket() {
+  const bucketName = process.env.GOVERNMENT_ID_STORAGE_BUCKET;
+  if (!bucketName) throw new Error('Government ID storage is not configured.');
+
+  const app = getApps()[0] || initializeApp({
+    credential: cert(parseFirebaseServiceAccount()),
+    storageBucket: bucketName
+  });
+  return getStorage(app).bucket(bucketName);
+}
+
+function governmentIdExtension(mimeType: string) {
+  if (mimeType === 'application/pdf') return '.pdf';
+  if (mimeType === 'image/png') return '.png';
+  return '.jpg';
+}
+
+async function deletePrivateGovernmentId(storageKey: string) {
+  try {
+    await getPrivateGovernmentIdBucket().file(storageKey).delete({ ignoreNotFound: true });
+  } catch {
+    console.error('[GOVERNMENT_ID] Uploaded object cleanup failed.');
+  }
+}
+
+async function sendPrivateGovernmentId(res: Response, storageKey: string) {
+  const extension = path.extname(storageKey).toLowerCase();
+  const mimeType = extension === '.pdf' ? 'application/pdf' : extension === '.png' ? 'image/png' : extension === '.jpg' ? 'image/jpeg' : '';
+  if (!mimeType || !storageKey.startsWith('government-ids/')) {
+    return res.status(404).json({ error: 'No submitted government ID was found for this resident.' });
+  }
+
+  try {
+    const [fileBuffer] = await getPrivateGovernmentIdBucket().file(storageKey).download();
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="government-id${extension}"`);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(fileBuffer);
+  } catch {
+    return res.status(404).json({ error: 'No submitted government ID was found for this resident.' });
+  }
 }
 
 function calculateBookingTotal(unitPrice: number, startDate: string, endDate: string) {
@@ -552,66 +644,64 @@ export async function createApp() {
     res.json(response);
   });
 
-  app.post('/api/profile/government-id', sensitiveMutationRateLimit, requireAuth, (req: Request, res: Response) => {
+  app.post('/api/profile/government-id', sensitiveMutationRateLimit, requireAuth, async (req: Request, res: Response) => {
     const user = db.findUserById((req as any).user.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
     }
-
-    const { fileName, fileData, mimeType, agreesToVerification } = req.body || {};
-    const agrees = Boolean(agreesToVerification);
-
-    if (!agrees) {
-      db.updateUser(user.id, {
-        governmentIdStatus: 'not_submitted',
-        governmentIdUploadedAt: undefined,
-        governmentIdVerifiedAt: undefined,
-        governmentIdRejectionReason: undefined,
-        hasValidId: false,
-        validIdVerifiedAt: undefined,
-      });
-
-      return res.status(200).json({
-        governmentIdStatus: 'not_submitted',
-        message: 'Government ID verification is required before you can make a booking.',
-        canBook: false
-      });
+    if (user.role !== 'resident') {
+      return res.status(403).json({ error: 'Only residents can submit a Government ID.' });
+    }
+    if (getGovernmentIdStatusForUser(user) === 'pending') {
+      return res.status(409).json({ error: 'Your Government ID is already pending review.' });
+    }
+    if (persistenceMode !== 'postgres') {
+      return res.status(503).json({ error: 'Government ID verification is unavailable because PostgreSQL storage is not configured.' });
     }
 
-    if (!isNonEmptyString(fileName) || !isNonEmptyString(fileData) || !isNonEmptyString(mimeType)) {
-      return res.status(400).json({ error: 'Please select a valid government-issued ID.' });
-    }
-
-    const normalizedMime = determineGovernmentIdMimeType(mimeType);
-    if (!normalizedMime) {
-      return res.status(400).json({ error: 'File type not supported. Please upload JPG, JPEG, PNG, or PDF.' });
-    }
-
-    const match = String(fileData).match(/^data:(.*?);base64,(.*)$/);
-    if (!match) {
-      return res.status(400).json({ error: 'Please select a valid government-issued ID.' });
-    }
-
-    const rawBuffer = Buffer.from(match[2], 'base64');
-    if (rawBuffer.length === 0) {
-      return res.status(400).json({ error: 'Please select a valid government-issued ID.' });
-    }
-
-    if (rawBuffer.length > MAX_GOVERNMENT_ID_SIZE_BYTES) {
-      return res.status(400).json({ error: 'File size must not exceed 5 MB.' });
-    }
-
+    let uploadedId: Awaited<ReturnType<typeof readGovernmentIdMultipart>>;
     try {
-      const storageDir = ensureGovernmentIdStorageDir();
-      const safeFilename = getSafeGovernmentIdFilename(fileName, user.id);
-      const extension = normalizedMime === 'application/pdf' ? '.pdf' : normalizedMime === 'image/png' ? '.png' : '.jpg';
-      const finalPath = path.join(storageDir, `${safeFilename}${extension}`);
-      fs.writeFileSync(finalPath, rawBuffer);
-
-      const updatedUser = db.submitGovernmentIdForVerification(user.id, finalPath, fileName, normalizedMime);
-      if (!updatedUser) {
-        return res.status(500).json({ error: 'Unable to save your government ID for review.' });
+      uploadedId = await readGovernmentIdMultipart(req);
+    } catch (error) {
+      if (error instanceof GovernmentIdRequestError) {
+        return res.status(error.statusCode).json({ error: error.message });
       }
+      return res.status(400).json({ error: 'Unable to read the selected Government ID. Please try again.' });
+    }
+
+    const storageKey = `government-ids/${user.id}/${crypto.randomUUID()}${governmentIdExtension(uploadedId.mimeType)}`;
+    let bucket;
+    try {
+      bucket = getPrivateGovernmentIdBucket();
+      await bucket.file(storageKey).save(uploadedId.buffer, {
+        resumable: false,
+        metadata: {
+          contentType: uploadedId.mimeType,
+          cacheControl: 'private, no-store, max-age=0'
+        }
+      });
+    } catch {
+      console.error('[GOVERNMENT_ID] Private object upload failed.');
+      return res.status(503).json({ error: 'Government ID storage is unavailable. Please try again later.' });
+    }
+
+    const submissionId = crypto.randomUUID();
+    const uploadedAt = new Date().toISOString();
+    try {
+      await createGovernmentIdSubmission({
+        id: submissionId,
+        userId: user.id,
+        storageKey,
+        mimeType: uploadedId.mimeType,
+        originalFileName: uploadedId.originalFileName,
+        uploadedAt
+      });
+
+      const updatedUser = db.submitGovernmentIdForVerification(user.id, storageKey, uploadedId.originalFileName, uploadedId.mimeType);
+      if (!updatedUser) {
+        throw new Error('User record could not be updated.');
+      }
+      await flushDatabase();
 
       return res.status(201).json({
         governmentIdStatus: 'pending',
@@ -620,29 +710,20 @@ export async function createApp() {
         message: 'Your ID has been submitted and is waiting for admin verification.',
         canBook: false
       });
-    } catch (error) {
-      console.error('[GOVERNMENT_ID] Failed to save resident government ID:', error);
-      return res.status(500).json({ error: 'Unable to save the uploaded ID. Please try again.' });
+    } catch {
+      await deleteGovernmentIdSubmission(submissionId).catch(() => undefined);
+      await deletePrivateGovernmentId(storageKey);
+      console.error('[GOVERNMENT_ID] Database update failed after private upload.');
+      return res.status(500).json({ error: 'The file uploaded, but its verification record could not be saved. Please try again.' });
     }
   });
 
-  app.get('/api/profile/government-id', requireAuth, (req: Request, res: Response) => {
+  app.get('/api/profile/government-id', requireAuth, async (req: Request, res: Response) => {
     const user = db.findUserById((req as any).user.id);
-    if (!user || !user.governmentIdUrl) {
+    if (!user || !user.governmentIdStorageKey) {
       return res.status(404).json({ error: 'No government ID record found for this user.' });
     }
-
-    const filePath = String(user.governmentIdUrl);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Stored government ID file not found.' });
-    }
-
-    const extension = path.extname(filePath).toLowerCase();
-    const mimeType = extension === '.pdf' ? 'application/pdf' : extension === '.png' ? 'image/png' : 'image/jpeg';
-
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${path.basename(filePath)}"`);
-    return res.sendFile(filePath);
+    return sendPrivateGovernmentId(res, user.governmentIdStorageKey);
   });
 
   app.get('/api/admin/government-id-verifications', requireAdmin, (req: Request, res: Response) => {
@@ -672,7 +753,7 @@ export async function createApp() {
       email: targetUser.email,
       unitNumber: targetUser.unitNumber || '',
       governmentIdStatus: getGovernmentIdStatusForUser(targetUser),
-      governmentIdUrl: targetUser.governmentIdUrl || null,
+      hasGovernmentId: Boolean(targetUser.governmentIdStorageKey),
       governmentIdUploadedAt: targetUser.governmentIdUploadedAt || null,
       governmentIdVerifiedAt: targetUser.governmentIdVerifiedAt || null,
       governmentIdRejectionReason: targetUser.governmentIdRejectionReason || null,
@@ -682,25 +763,18 @@ export async function createApp() {
     res.json(residentData);
   });
 
-  app.get('/api/admin/government-id-verifications/:userId/file', requireAdmin, (req: Request, res: Response) => {
+  app.get('/api/admin/government-id-verifications/:userId/file', requireAdmin, async (req: Request, res: Response) => {
     const targetUser = db.findUserById(req.params.userId);
     if (!targetUser) {
       return res.status(404).json({ error: 'Resident not found.' });
     }
-
-    if (!targetUser.governmentIdUrl || !fs.existsSync(String(targetUser.governmentIdUrl))) {
+    if (!targetUser.governmentIdStorageKey) {
       return res.status(404).json({ error: 'No submitted government ID was found for this resident.' });
     }
-
-    const filePath = String(targetUser.governmentIdUrl);
-    const extension = path.extname(filePath).toLowerCase();
-    const mimeType = extension === '.pdf' ? 'application/pdf' : extension === '.png' ? 'image/png' : 'image/jpeg';
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${path.basename(filePath)}"`);
-    return res.sendFile(filePath);
+    return sendPrivateGovernmentId(res, targetUser.governmentIdStorageKey);
   });
 
-  app.post('/api/admin/government-id-verifications/:userId/approve', requireAdmin, (req: Request, res: Response) => {
+  app.post('/api/admin/government-id-verifications/:userId/approve', requireAdmin, async (req: Request, res: Response) => {
     const targetUser = db.findUserById(req.params.userId);
     if (!targetUser) {
       return res.status(404).json({ error: 'Resident not found.' });
@@ -711,6 +785,13 @@ export async function createApp() {
       return res.status(500).json({ error: 'Unable to approve the resident government ID.' });
     }
 
+    try {
+      await flushDatabase();
+      await updateGovernmentIdSubmissionStatus(targetUser.id, 'verified', (req as any).user.id);
+    } catch {
+      return res.status(500).json({ error: 'Unable to persist the Government ID verification decision.' });
+    }
+
     res.json({
       governmentIdStatus: 'verified',
       governmentIdVerifiedAt: updatedUser.governmentIdVerifiedAt,
@@ -719,7 +800,7 @@ export async function createApp() {
     });
   });
 
-  app.post('/api/admin/government-id-verifications/:userId/reject', requireAdmin, (req: Request, res: Response) => {
+  app.post('/api/admin/government-id-verifications/:userId/reject', requireAdmin, async (req: Request, res: Response) => {
     const { reason } = req.body || {};
     const targetUser = db.findUserById(req.params.userId);
     if (!targetUser) {
@@ -729,6 +810,13 @@ export async function createApp() {
     const updatedUser = db.rejectGovernmentId(targetUser.id, isNonEmptyString(reason) ? String(reason).trim() : 'Please upload a clearer and valid government-issued ID.');
     if (!updatedUser) {
       return res.status(500).json({ error: 'Unable to reject the resident government ID.' });
+    }
+
+    try {
+      await flushDatabase();
+      await updateGovernmentIdSubmissionStatus(targetUser.id, 'rejected', (req as any).user.id, isNonEmptyString(reason) ? String(reason).trim() : 'Please upload a clearer and valid government-issued ID.');
+    } catch {
+      return res.status(500).json({ error: 'Unable to persist the Government ID verification decision.' });
     }
 
     res.json({
