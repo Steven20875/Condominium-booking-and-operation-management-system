@@ -417,10 +417,6 @@ async function verifyFirebaseIdentityToken(idToken: string) {
   return getAuth().verifyIdToken(idToken);
 }
 
-const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Please try again later.' } });
-const registrationRateLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many registration attempts. Please try again later.' } });
-const sensitiveMutationRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please try again later.' } });
-
 export async function createApp() {
   await ensureDatabaseReady();
   const migratedPasswords = db.migratePlaintextPasswords((password) => bcrypt.hashSync(password, 12));
@@ -429,6 +425,11 @@ export async function createApp() {
   }
 
   const app = express();
+  app.set('trust proxy', 1);
+
+  const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Please try again later.' } });
+  const registrationRateLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many registration attempts. Please try again later.' } });
+  const sensitiveMutationRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please try again later.' } });
 
   // Increase payload limits for direct base64 image uploads of condo units
   app.use(express.json({ limit: '50mb' }));
