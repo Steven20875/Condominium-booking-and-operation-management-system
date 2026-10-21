@@ -798,7 +798,7 @@ export default function AdminDashboard({ user, token, onLogout }: AdminDashboard
                     <p className="text-[10px] text-amber-300">Open balances awaiting collection</p>
                   </div>
                   <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
-                    <DollarSign className="h-5 w-5" />
+                    <span className="text-xl font-bold leading-none">₱</span>
                   </div>
                 </div>
 
